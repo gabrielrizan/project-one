@@ -28,7 +28,7 @@ outline_size = 14
 
 [node name="Sprite" type="Sprite3D" parent="." unique_id=1223668590]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
-pixel_size = 0.1
+pixel_size = 0.008333
 billboard = 2
 shaded = true
 alpha_cut = 1
