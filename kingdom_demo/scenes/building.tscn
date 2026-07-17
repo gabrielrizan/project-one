@@ -1,0 +1,46 @@
+[gd_scene load_steps=3 format=3 uid="uid://pxld1msx74qf"]
+
+[ext_resource type="Script" uid="uid://dwj2yq00gvpv" path="res://kingdom_demo/scripts/building.gd" id="1_b"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_b"]
+size = Vector3(1.4, 1.6, 1.2)
+
+[node name="Building" type="StaticBody3D"]
+script = ExtResource("1_b")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+shape = SubResource("BoxShape3D_b")
+
+[node name="Sprite" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+pixel_size = 0.035
+billboard = 2
+shaded = true
+alpha_cut = 1
+texture_filter = 0
+
+[node name="Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+pixel_size = 0.008
+billboard = 1
+no_depth_test = true
+modulate = Color(0.95, 0.95, 0.8, 1)
+outline_modulate = Color(0.1, 0.08, 0.05, 1)
+font_size = 48
+outline_size = 12
+
+[node name="Icons" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.4, 0)
+
+[node name="Prompt" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+visible = false
+pixel_size = 0.009
+billboard = 1
+no_depth_test = true
+modulate = Color(1, 0.9, 0.4, 1)
+outline_modulate = Color(0.1, 0.08, 0.05, 1)
+text = "E  Add Job (3)"
+font_size = 56
+outline_size = 12

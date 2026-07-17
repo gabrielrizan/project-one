@@ -28,13 +28,21 @@ func _physics_process(delta: float) -> void:
 		input_dir.x -= 1.0
 	if Input.is_action_pressed("move_right"):
 		input_dir.x += 1.0
+	var screen_x := input_dir.x       # for sprite facing, before camera rotation
 	input_dir = input_dir.normalized()
+
+	# move relative to where the camera is looking (Thronefall-style)
+	var rig = get_tree().get_first_node_in_group("camera_rig")
+	if rig:
+		input_dir = input_dir.rotated(Vector3.UP, rig.yaw)
 
 	var target_velocity := input_dir * SPEED
 	velocity.x = move_toward(velocity.x, target_velocity.x, ACCEL * delta)
 	velocity.z = move_toward(velocity.z, target_velocity.z, ACCEL * delta)
 	move_and_slide()
 
+	if absf(screen_x) > 0.1:
+		sprite.flip_h = screen_x < 0.0
 	_animate(delta, input_dir.length() > 0.1)
 	_update_highlight()
 
@@ -45,8 +53,6 @@ func _animate(delta: float, moving: bool) -> void:
 	if moving:
 		_bob += delta * 12.0
 		sprite.position.y = _sprite_base_y + abs(sin(_bob)) * 0.08
-		if absf(velocity.x) > 0.1:
-			sprite.flip_h = velocity.x < 0.0
 	else:
 		sprite.position.y = move_toward(sprite.position.y, _sprite_base_y, delta * 0.6)
 

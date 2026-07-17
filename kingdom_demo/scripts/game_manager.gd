@@ -2,10 +2,13 @@ extends Node3D
 
 signal coins_changed(total: int)
 
-var coins: int = 0
+const STARTING_COINS := 100
+
+var coins: int = STARTING_COINS
 
 func _ready() -> void:
 	add_to_group("game_manager")
+	coins_changed.emit(coins)
 
 func add_coins(amount: int) -> void:
 	coins += amount

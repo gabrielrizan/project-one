@@ -5,18 +5,12 @@
 [ext_resource type="Script" uid="uid://ieol6ck0bdxh" path="res://kingdom_demo/scripts/day_night_cycle.gd" id="2_nbtlu"]
 [ext_resource type="PackedScene" uid="uid://cgqh2mar6ptq" path="res://kingdom_demo/scenes/monarch.tscn" id="3_p718k"]
 [ext_resource type="Script" uid="uid://b1n0riwc31bv7" path="res://kingdom_demo/scripts/camera_rig.gd" id="4_ndqrx"]
-[ext_resource type="PackedScene" uid="uid://cuj8werh85dix" path="res://kingdom_demo/scenes/tree.tscn" id="5_lov0m"]
-[ext_resource type="PackedScene" uid="uid://dm5lxh24wliwi" path="res://kingdom_demo/scenes/peasant.tscn" id="6_g0t53"]
+[ext_resource type="PackedScene" uid="uid://cf1mdvlepu7md" path="res://kingdom_demo/scenes/campfire.tscn" id="5_cmpf"]
 [ext_resource type="Script" uid="uid://xqy4jku5m8ob" path="res://kingdom_demo/scripts/coin_ui.gd" id="7_1yp2m"]
 [ext_resource type="Texture2D" uid="uid://dyf0xh70ryu36" path="res://kingdom_demo/assets/pixel/coin.png" id="9_dl8hl"]
 [ext_resource type="Texture2D" uid="uid://clc88gxbfm3l1" path="res://kingdom_demo/assets/pixel/sun.png" id="10_yycvq"]
-[ext_resource type="Texture2D" uid="uid://cs8t4vcvtbvfn" path="res://kingdom_demo/assets/pixel/castle_t1.png" id="11_sek56"]
-[ext_resource type="Texture2D" uid="uid://gymt7ucffauw" path="res://kingdom_demo/assets/pixel/castle_t0.png" id="12_q608y"]
-[ext_resource type="Texture2D" uid="uid://dgwmbhpowtkdd" path="res://kingdom_demo/assets/pixel/castle_t2.png" id="13_ankha"]
-[ext_resource type="Script" uid="uid://by34ga4x60qab" path="res://kingdom_demo/scripts/job_station.gd" id="15_yayu0"]
-[ext_resource type="Script" uid="uid://diixfuv3xqcn8" path="res://kingdom_demo/scripts/base_manager.gd" id="16_dl8hl"]
-[ext_resource type="Texture2D" uid="uid://bk5obcfou362n" path="res://kingdom_demo/assets/pixel/bow.png" id="16_tsck3"]
-[ext_resource type="Texture2D" uid="uid://c8yyi4k3tc2p2" path="res://kingdom_demo/assets/pixel/hammer.png" id="17_wmxty"]
+[ext_resource type="PackedScene" uid="uid://cuj8werh85dix" path="res://kingdom_demo/scenes/tree.tscn" id="11_tree"]
+[ext_resource type="PackedScene" uid="uid://bd7k767l1etkf" path="res://kingdom_demo/scenes/wall_side.tscn" id="12_ws"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_doh7v"]
 size = Vector3(40, 1, 40)
@@ -35,79 +29,58 @@ background_color = Color(0.5294118, 0.80784315, 0.92156863, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.56078434, 0.6509804, 0.7019608, 1)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_hmd67"]
-size = Vector3(4, 3, 1.6)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_2fva3"]
-size = Vector3(1.6, 2, 1.6)
-
-[node name="KingdomDemo" type="Node3D" unique_id=2114529964]
+[node name="KingdomDemo" type="Node3D" unique_id=55025416]
 script = ExtResource("1_0vp01")
 
-[node name="Ground" type="StaticBody3D" parent="." unique_id=1925335959]
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1634960005]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=490464616]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=15632896]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 shape = SubResource("BoxShape3D_doh7v")
 
-[node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=430224142]
+[node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=1143886086]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 material_override = SubResource("StandardMaterial3D_2w3nb")
 mesh = SubResource("BoxMesh_a7p3c")
 
-[node name="DayNightCycle" type="Node3D" parent="." unique_id=792098798 groups=["day_night_cycle"]]
+[node name="DayNightCycle" type="Node3D" parent="." unique_id=913575183 groups=["day_night_cycle"]]
 script = ExtResource("2_nbtlu")
 
-[node name="Sun" type="DirectionalLight3D" parent="DayNightCycle" unique_id=1397168119]
+[node name="Sun" type="DirectionalLight3D" parent="DayNightCycle" unique_id=1516669441]
 transform = Transform3D(0.8660254, 0.40957603, -0.28678823, 0, 0.57357645, 0.81915206, 0.5, -0.7094065, 0.49673176, 0, 0, 0)
 light_energy = 1.2
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="DayNightCycle" unique_id=771057982]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="DayNightCycle" unique_id=1859794773]
 environment = SubResource("Environment_hfmf3")
 
-[node name="Monarch" parent="." unique_id=847437799 instance=ExtResource("3_p718k")]
+[node name="Campfire" parent="." unique_id=585666102 instance=ExtResource("5_cmpf")]
 
-[node name="CameraRig" type="Node3D" parent="." unique_id=298221961]
+[node name="Monarch" parent="." unique_id=2100070990 instance=ExtResource("3_p718k")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 1)
+
+[node name="CameraRig" type="Node3D" parent="." unique_id=660562144]
 script = ExtResource("4_ndqrx")
 
-[node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=732557290]
-transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 9, 9)
+[node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=936210487]
+transform = Transform3D(1, 0, 0, 0, 0.76604444, 0.6427876, 0, -0.6427876, 0.76604444, -0.287, 6.645, 5.503)
 current = true
 fov = 50.0
 
-[node name="Tree1" parent="." unique_id=397003493 instance=ExtResource("5_lov0m")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, -4)
+[node name="WallSideN" parent="." unique_id=52080125 instance=ExtResource("12_ws")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -8)
 
-[node name="Tree2" parent="." unique_id=588720896 instance=ExtResource("5_lov0m")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -6)
+[node name="WallSideS" parent="." unique_id=1168241727 instance=ExtResource("12_ws")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
 
-[node name="Tree3" parent="." unique_id=1018024695 instance=ExtResource("5_lov0m")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0, 3)
+[node name="WallSideE" parent="." unique_id=1137648248 instance=ExtResource("12_ws")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 8, 0, 0)
 
-[node name="Tree4" parent="." unique_id=26222266 instance=ExtResource("5_lov0m")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 5)
+[node name="WallSideW" parent="." unique_id=540325069 instance=ExtResource("12_ws")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -8, 0, 0)
 
-[node name="Tree5" parent="." unique_id=668058692 instance=ExtResource("5_lov0m")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, 8)
+[node name="UI" type="CanvasLayer" parent="." unique_id=1334354863]
 
-[node name="Tree6" parent="." unique_id=942119697 instance=ExtResource("5_lov0m")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, -9)
-
-[node name="Peasant1" parent="." unique_id=2056448719 instance=ExtResource("6_g0t53")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 2)
-
-[node name="Peasant2" parent="." unique_id=1281871316 instance=ExtResource("6_g0t53")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, 3)
-
-[node name="Peasant3" parent="." unique_id=1433761259 instance=ExtResource("6_g0t53")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -1)
-
-[node name="Peasant4" parent="." unique_id=1413497339 instance=ExtResource("6_g0t53")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, -2)
-
-[node name="UI" type="CanvasLayer" parent="." unique_id=1964929677]
-
-[node name="HUD" type="Control" parent="UI" unique_id=642586933]
+[node name="HUD" type="Control" parent="UI" unique_id=80233685]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -117,7 +90,7 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("7_1yp2m")
 
-[node name="CoinIcon" type="TextureRect" parent="UI/HUD" unique_id=2082194701]
+[node name="CoinIcon" type="TextureRect" parent="UI/HUD" unique_id=1249820529]
 texture_filter = 1
 layout_mode = 0
 offset_left = 18.0
@@ -127,7 +100,7 @@ offset_bottom = 48.0
 texture = ExtResource("9_dl8hl")
 expand_mode = 1
 
-[node name="CoinValue" type="Label" parent="UI/HUD" unique_id=1277174160]
+[node name="CoinValue" type="Label" parent="UI/HUD" unique_id=1041769491]
 layout_mode = 0
 offset_left = 60.0
 offset_top = 15.0
@@ -136,7 +109,7 @@ offset_bottom = 38.0
 theme_override_font_sizes/font_size = 28
 text = "0"
 
-[node name="TimeIcon" type="TextureRect" parent="UI/HUD" unique_id=139343742]
+[node name="TimeIcon" type="TextureRect" parent="UI/HUD" unique_id=1352411760]
 texture_filter = 1
 layout_mode = 0
 offset_left = 18.0
@@ -146,126 +119,65 @@ offset_bottom = 88.0
 texture = ExtResource("10_yycvq")
 expand_mode = 1
 
-[node name="BaseIcon" type="TextureRect" parent="UI/HUD" unique_id=30330049]
-texture_filter = 1
+[node name="ControlsHint" type="Label" parent="UI/HUD" unique_id=1583115707]
 layout_mode = 0
-offset_left = 14.0
-offset_top = 92.0
-offset_right = 62.0
-offset_bottom = 124.0
-texture = ExtResource("11_sek56")
-expand_mode = 1
-stretch_mode = 5
+offset_right = 152.0
+offset_bottom = 23.0
+text = "Z / X  rotate camera"
 
-[node name="BaseValue" type="Label" parent="UI/HUD" unique_id=515886294 groups=["base_label"]]
-layout_mode = 0
-offset_left = 62.0
-offset_top = 98.0
-offset_right = 63.0
-offset_bottom = 121.0
-theme_override_font_sizes/font_size = 22
-text = "Tier 0"
+[node name="Tree1" parent="." unique_id=354399333 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.6, 0, -11.2)
 
-[node name="Castle" type="Node3D" parent="." unique_id=322340055]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 0, -16)
+[node name="Tree2" parent="." unique_id=435321349 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.8, 0, -13.7)
 
-[node name="CastleT0" type="Sprite3D" parent="Castle" unique_id=1908661730]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.44, 0)
-pixel_size = 0.015
-billboard = 2
-shaded = true
-alpha_cut = 1
-texture_filter = 0
-texture = ExtResource("12_q608y")
+[node name="Tree3" parent="." unique_id=1256209789 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.1, 0, 0.2)
 
-[node name="CastleT1" type="Sprite3D" parent="Castle" unique_id=334456022]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.44, 0)
-visible = false
-pixel_size = 0.01125
-billboard = 2
-shaded = true
-alpha_cut = 1
-texture_filter = 0
-texture = ExtResource("11_sek56")
+[node name="Tree4" parent="." unique_id=977191919 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.8, 0, -13.1)
 
-[node name="CastleT2" type="Sprite3D" parent="Castle" unique_id=1367256408]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.16, 0)
-visible = false
-pixel_size = 0.016875
-billboard = 2
-shaded = true
-alpha_cut = 1
-texture_filter = 0
-texture = ExtResource("13_ankha")
+[node name="Tree5" parent="." unique_id=1493255464 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4, 0, 10.5)
 
-[node name="CastleCollision" type="StaticBody3D" parent="Castle" unique_id=958087073]
-script = ExtResource("16_dl8hl")
+[node name="Tree6" parent="." unique_id=1897117647 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, -8.9)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Castle/CastleCollision" unique_id=1827284988]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
-shape = SubResource("BoxShape3D_hmd67")
+[node name="Tree7" parent="." unique_id=1449750199 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, 14.3)
 
-[node name="Prompt" type="Label3D" parent="Castle" unique_id=1789168145]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.7, 0)
-visible = false
-pixel_size = 0.01
-billboard = 1
-no_depth_test = true
-modulate = Color(1, 0.9, 0.4, 1)
-outline_modulate = Color(0.1, 0.08, 0.05, 1)
-text = "E  Upgrade Base (3)"
-font_size = 64
-outline_size = 14
+[node name="Tree8" parent="." unique_id=76198437 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.2, 0, -14.5)
 
-[node name="ArcherPost" type="Area3D" parent="." unique_id=1331437455]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, -13)
-script = ExtResource("15_yayu0")
+[node name="Tree9" parent="." unique_id=1219199565 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 0, -6.7)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ArcherPost" unique_id=776679552]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-shape = SubResource("BoxShape3D_2fva3")
+[node name="Tree10" parent="." unique_id=1096499832 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.1, 0, 10.1)
 
-[node name="Icon" type="Sprite3D" parent="ArcherPost" unique_id=920827183]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
-pixel_size = 0.0175
-billboard = 2
-shaded = true
-alpha_cut = 1
-texture_filter = 0
-texture = ExtResource("16_tsck3")
+[node name="Tree11" parent="." unique_id=457374484 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.2, 0, 2.6)
 
-[node name="Label" type="Label3D" parent="ArcherPost" unique_id=1089026138]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
-pixel_size = 0.008
-billboard = 1
-modulate = Color(0.7, 1, 0.7, 1)
-outline_modulate = Color(0.08, 0.1, 0.06, 1)
-text = "Archer Post"
-font_size = 56
+[node name="Tree12" parent="." unique_id=361862620 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -14)
 
-[node name="BuilderHut" type="Area3D" parent="." unique_id=1970715997]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0, -13)
-script = ExtResource("15_yayu0")
-job = "builder"
+[node name="Tree13" parent="." unique_id=1205035146 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.9, 0, 2.7)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="BuilderHut" unique_id=1147459861]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-shape = SubResource("BoxShape3D_2fva3")
+[node name="Tree15" parent="." unique_id=618322699 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.4, 0, 6.4)
 
-[node name="Icon" type="Sprite3D" parent="BuilderHut" unique_id=1448457342]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
-pixel_size = 0.0175
-billboard = 2
-shaded = true
-alpha_cut = 1
-texture_filter = 0
-texture = ExtResource("17_wmxty")
+[node name="Tree16" parent="." unique_id=725763824 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0, 12)
 
-[node name="Label" type="Label3D" parent="BuilderHut" unique_id=892434506]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
-pixel_size = 0.008
-billboard = 1
-modulate = Color(1, 0.82, 0.5, 1)
-outline_modulate = Color(0.08, 0.1, 0.06, 1)
-text = "Builder Hut"
-font_size = 56
+[node name="Tree18" parent="." unique_id=1483910433 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.1, 0, -0.4)
+
+[node name="Tree19" parent="." unique_id=1345691613 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.7, 0, 5.4)
+
+[node name="Tree20" parent="." unique_id=1338532271 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 0, 2.3)
+
+[node name="Tree21" parent="." unique_id=1341421992 instance=ExtResource("11_tree")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.9, 0, 14.2)

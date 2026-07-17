@@ -17,6 +17,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 [autoload]
 
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
+GoldFx="*res://kingdom_demo/scripts/gold_fx.gd"
 
 [display]
 
