@@ -171,7 +171,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 0, -16)
 
 [node name="CastleT0" type="Sprite3D" parent="Castle" unique_id=1908661730]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.44, 0)
-pixel_size = 0.09
+pixel_size = 0.015
 billboard = 2
 shaded = true
 alpha_cut = 1
@@ -181,7 +181,7 @@ texture = ExtResource("12_q608y")
 [node name="CastleT1" type="Sprite3D" parent="Castle" unique_id=334456022]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.44, 0)
 visible = false
-pixel_size = 0.09
+pixel_size = 0.01125
 billboard = 2
 shaded = true
 alpha_cut = 1
@@ -191,7 +191,7 @@ texture = ExtResource("11_sek56")
 [node name="CastleT2" type="Sprite3D" parent="Castle" unique_id=1367256408]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.16, 0)
 visible = false
-pixel_size = 0.09
+pixel_size = 0.016875
 billboard = 2
 shaded = true
 alpha_cut = 1
@@ -227,7 +227,7 @@ shape = SubResource("BoxShape3D_2fva3")
 
 [node name="Icon" type="Sprite3D" parent="ArcherPost" unique_id=920827183]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
-pixel_size = 0.07
+pixel_size = 0.0175
 billboard = 2
 shaded = true
 alpha_cut = 1
@@ -254,7 +254,7 @@ shape = SubResource("BoxShape3D_2fva3")
 
 [node name="Icon" type="Sprite3D" parent="BuilderHut" unique_id=1448457342]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
-pixel_size = 0.07
+pixel_size = 0.0175
 billboard = 2
 shaded = true
 alpha_cut = 1
