@@ -1,0 +1,125 @@
+[gd_scene format=3 uid="uid://b0l028hou24kb"]
+
+[sub_resource type="GDScript" id="GDScript_oyde6"]
+script/source = "extends Node3D
+
+@onready var camera: Camera3D = $PlayerCamera
+@onready var paper: AnimatableBody3D = $Parchment
+@onready var stamp_zone: Area3D = $Parchment/StampZone
+
+var grabbed_object: Node3D = null
+var lift_height: float = 0.2
+var current_mouse_pos: Vector2 = Vector2.ZERO
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion: current_mouse_pos = event.position
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.is_pressed(): try_grab(event.position)
+		else: release_grab()
+
+func _physics_process(delta: float) -> void:
+	if grabbed_object: drag_object(current_mouse_pos, delta)
+
+func try_grab(mouse_pos: Vector2) -> void:
+	var result = shoot_ray(mouse_pos, 1) # Layer 1
+	if result:
+		grabbed_object = result.collider
+		grabbed_object.position.y += lift_height
+		print(\"Grabbed: \", grabbed_object.name)
+
+func drag_object(mouse_pos: Vector2, delta: float) -> void:
+	var result = shoot_ray(mouse_pos, 2) # Layer 2 (Desk)
+	if result:
+		var target = Vector3(result.position.x, grabbed_object.global_position.y, result.position.z)
+		grabbed_object.global_position = grabbed_object.global_position.lerp(target, 15.0 * delta)
+
+func release_grab() -> void:
+	if grabbed_object:
+		# CHECK: Did we drop the stamp on the paper?
+		if grabbed_object.name == \"IronStamp\":
+			var overlapping = stamp_zone.get_overlapping_bodies()
+			if grabbed_object in overlapping:
+				print(\"STAMPED! Result: APPROVED\")
+				# Here you would trigger an animation/decal
+		
+		grabbed_object.position.y -= lift_height
+		grabbed_object = null
+
+func shoot_ray(mouse_pos: Vector2, mask: int) -> Dictionary:
+	var from = camera.project_ray_origin(mouse_pos)
+	var to = from + camera.project_ray_normal(mouse_pos) * 100.0
+	var space = get_world_3d().direct_space_state
+	return space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, mask))
+"
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_oyde6"]
+size = Vector3(5, 0.2, 3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_n1vwe"]
+albedo_color = Color(0.25, 0.14, 0.08, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_26jol"]
+material = SubResource("StandardMaterial3D_n1vwe")
+size = Vector3(5, 0.2, 3)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6715r"]
+size = Vector3(0.6, 0.02, 0.8)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_38gw7"]
+albedo_color = Color(0.85, 0.8, 0.65, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_pf06b"]
+material = SubResource("StandardMaterial3D_38gw7")
+size = Vector3(0.6, 0.02, 0.8)
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_u3kdw"]
+height = 0.3
+radius = 0.15
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1ejgn"]
+albedo_color = Color(0.3, 0.3, 0.35, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_57vtr"]
+material = SubResource("StandardMaterial3D_1ejgn")
+top_radius = 0.1
+bottom_radius = 0.15
+height = 0.3
+
+[node name="MainDesk" type="Node3D" unique_id=204088523]
+script = SubResource("GDScript_oyde6")
+
+[node name="PlayerCamera" type="Camera3D" parent="." unique_id=153081961]
+transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0, 2.5, 1.5)
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1519861970]
+transform = Transform3D(0.70710677, -0.49999997, 0.49999997, 0, 0.70710677, 0.70710677, -0.70710677, -0.49999997, 0.49999997, 0, 0, 0)
+
+[node name="WoodenDesk" type="StaticBody3D" parent="." unique_id=122708267]
+collision_layer = 2
+collision_mask = 0
+
+[node name="@CollisionShape3D@48484" type="CollisionShape3D" parent="WoodenDesk" unique_id=1744795324]
+shape = SubResource("BoxShape3D_oyde6")
+
+[node name="@MeshInstance3D@48485" type="MeshInstance3D" parent="WoodenDesk" unique_id=928774732]
+mesh = SubResource("BoxMesh_26jol")
+
+[node name="Parchment" type="AnimatableBody3D" parent="." unique_id=1913797469]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.11, 0)
+collision_mask = 0
+
+[node name="@CollisionShape3D@48486" type="CollisionShape3D" parent="Parchment" unique_id=2075594833]
+shape = SubResource("BoxShape3D_6715r")
+
+[node name="@MeshInstance3D@48487" type="MeshInstance3D" parent="Parchment" unique_id=1127328142]
+mesh = SubResource("BoxMesh_pf06b")
+
+[node name="IronStamp" type="AnimatableBody3D" parent="." unique_id=550304987]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.15, -0.5)
+collision_mask = 0
+
+[node name="@CollisionShape3D@48488" type="CollisionShape3D" parent="IronStamp" unique_id=2118341107]
+shape = SubResource("CylinderShape3D_u3kdw")
+
+[node name="@MeshInstance3D@48489" type="MeshInstance3D" parent="IronStamp" unique_id=1519965713]
+mesh = SubResource("CylinderMesh_57vtr")

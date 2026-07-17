@@ -1,0 +1,271 @@
+[gd_scene format=3 uid="uid://8tmdvlepu4md"]
+
+[ext_resource type="Script" uid="uid://cooi4ig1l04cy" path="res://kingdom_demo/scripts/game_manager.gd" id="1_0vp01"]
+[ext_resource type="Texture2D" uid="uid://dfkoingcc77k7" path="res://kingdom_demo/assets/pixel/grass.png" id="2_hfmf3"]
+[ext_resource type="Script" uid="uid://ieol6ck0bdxh" path="res://kingdom_demo/scripts/day_night_cycle.gd" id="2_nbtlu"]
+[ext_resource type="PackedScene" uid="uid://cgqh2mar6ptq" path="res://kingdom_demo/scenes/monarch.tscn" id="3_p718k"]
+[ext_resource type="Script" uid="uid://b1n0riwc31bv7" path="res://kingdom_demo/scripts/camera_rig.gd" id="4_ndqrx"]
+[ext_resource type="PackedScene" uid="uid://cuj8werh85dix" path="res://kingdom_demo/scenes/tree.tscn" id="5_lov0m"]
+[ext_resource type="PackedScene" uid="uid://dm5lxh24wliwi" path="res://kingdom_demo/scenes/peasant.tscn" id="6_g0t53"]
+[ext_resource type="Script" uid="uid://xqy4jku5m8ob" path="res://kingdom_demo/scripts/coin_ui.gd" id="7_1yp2m"]
+[ext_resource type="Texture2D" uid="uid://dyf0xh70ryu36" path="res://kingdom_demo/assets/pixel/coin.png" id="9_dl8hl"]
+[ext_resource type="Texture2D" uid="uid://clc88gxbfm3l1" path="res://kingdom_demo/assets/pixel/sun.png" id="10_yycvq"]
+[ext_resource type="Texture2D" uid="uid://cs8t4vcvtbvfn" path="res://kingdom_demo/assets/pixel/castle_t1.png" id="11_sek56"]
+[ext_resource type="Texture2D" uid="uid://gymt7ucffauw" path="res://kingdom_demo/assets/pixel/castle_t0.png" id="12_q608y"]
+[ext_resource type="Texture2D" uid="uid://dgwmbhpowtkdd" path="res://kingdom_demo/assets/pixel/castle_t2.png" id="13_ankha"]
+[ext_resource type="Script" uid="uid://by34ga4x60qab" path="res://kingdom_demo/scripts/job_station.gd" id="15_yayu0"]
+[ext_resource type="Script" uid="uid://diixfuv3xqcn8" path="res://kingdom_demo/scripts/base_manager.gd" id="16_dl8hl"]
+[ext_resource type="Texture2D" uid="uid://bk5obcfou362n" path="res://kingdom_demo/assets/pixel/bow.png" id="16_tsck3"]
+[ext_resource type="Texture2D" uid="uid://c8yyi4k3tc2p2" path="res://kingdom_demo/assets/pixel/hammer.png" id="17_wmxty"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_doh7v"]
+size = Vector3(40, 1, 40)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2w3nb"]
+albedo_texture = ExtResource("2_hfmf3")
+uv1_scale = Vector3(40, 40, 1)
+texture_filter = 0
+
+[sub_resource type="BoxMesh" id="BoxMesh_a7p3c"]
+size = Vector3(40, 1, 40)
+
+[sub_resource type="Environment" id="Environment_hfmf3"]
+background_mode = 1
+background_color = Color(0.5294118, 0.80784315, 0.92156863, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.56078434, 0.6509804, 0.7019608, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hmd67"]
+size = Vector3(4, 3, 1.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2fva3"]
+size = Vector3(1.6, 2, 1.6)
+
+[node name="KingdomDemo" type="Node3D" unique_id=2114529964]
+script = ExtResource("1_0vp01")
+
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1925335959]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=490464616]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+shape = SubResource("BoxShape3D_doh7v")
+
+[node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=430224142]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+material_override = SubResource("StandardMaterial3D_2w3nb")
+mesh = SubResource("BoxMesh_a7p3c")
+
+[node name="DayNightCycle" type="Node3D" parent="." unique_id=792098798 groups=["day_night_cycle"]]
+script = ExtResource("2_nbtlu")
+
+[node name="Sun" type="DirectionalLight3D" parent="DayNightCycle" unique_id=1397168119]
+transform = Transform3D(0.8660254, 0.40957603, -0.28678823, 0, 0.57357645, 0.81915206, 0.5, -0.7094065, 0.49673176, 0, 0, 0)
+light_energy = 1.2
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="DayNightCycle" unique_id=771057982]
+environment = SubResource("Environment_hfmf3")
+
+[node name="Monarch" parent="." unique_id=847437799 instance=ExtResource("3_p718k")]
+
+[node name="CameraRig" type="Node3D" parent="." unique_id=298221961]
+script = ExtResource("4_ndqrx")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=732557290]
+transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 9, 9)
+current = true
+fov = 50.0
+
+[node name="Tree1" parent="." unique_id=397003493 instance=ExtResource("5_lov0m")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, -4)
+
+[node name="Tree2" parent="." unique_id=588720896 instance=ExtResource("5_lov0m")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -6)
+
+[node name="Tree3" parent="." unique_id=1018024695 instance=ExtResource("5_lov0m")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0, 3)
+
+[node name="Tree4" parent="." unique_id=26222266 instance=ExtResource("5_lov0m")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 5)
+
+[node name="Tree5" parent="." unique_id=668058692 instance=ExtResource("5_lov0m")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, 8)
+
+[node name="Tree6" parent="." unique_id=942119697 instance=ExtResource("5_lov0m")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, -9)
+
+[node name="Peasant1" parent="." unique_id=2056448719 instance=ExtResource("6_g0t53")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 2)
+
+[node name="Peasant2" parent="." unique_id=1281871316 instance=ExtResource("6_g0t53")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, 3)
+
+[node name="Peasant3" parent="." unique_id=1433761259 instance=ExtResource("6_g0t53")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -1)
+
+[node name="Peasant4" parent="." unique_id=1413497339 instance=ExtResource("6_g0t53")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, -2)
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=1964929677]
+
+[node name="HUD" type="Control" parent="UI" unique_id=642586933]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("7_1yp2m")
+
+[node name="CoinIcon" type="TextureRect" parent="UI/HUD" unique_id=2082194701]
+texture_filter = 1
+layout_mode = 0
+offset_left = 18.0
+offset_top = 14.0
+offset_right = 52.0
+offset_bottom = 48.0
+texture = ExtResource("9_dl8hl")
+expand_mode = 1
+
+[node name="CoinValue" type="Label" parent="UI/HUD" unique_id=1277174160]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 15.0
+offset_right = 61.0
+offset_bottom = 38.0
+theme_override_font_sizes/font_size = 28
+text = "0"
+
+[node name="TimeIcon" type="TextureRect" parent="UI/HUD" unique_id=139343742]
+texture_filter = 1
+layout_mode = 0
+offset_left = 18.0
+offset_top = 54.0
+offset_right = 52.0
+offset_bottom = 88.0
+texture = ExtResource("10_yycvq")
+expand_mode = 1
+
+[node name="BaseIcon" type="TextureRect" parent="UI/HUD" unique_id=30330049]
+texture_filter = 1
+layout_mode = 0
+offset_left = 14.0
+offset_top = 92.0
+offset_right = 62.0
+offset_bottom = 124.0
+texture = ExtResource("11_sek56")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BaseValue" type="Label" parent="UI/HUD" unique_id=515886294 groups=["base_label"]]
+layout_mode = 0
+offset_left = 62.0
+offset_top = 98.0
+offset_right = 63.0
+offset_bottom = 121.0
+theme_override_font_sizes/font_size = 22
+text = "Tier 0"
+
+[node name="Castle" type="Node3D" parent="." unique_id=322340055]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 0, -16)
+
+[node name="CastleT0" type="Sprite3D" parent="Castle" unique_id=1908661730]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.44, 0)
+pixel_size = 0.09
+billboard = 2
+shaded = true
+alpha_cut = 1
+texture_filter = 0
+texture = ExtResource("12_q608y")
+
+[node name="CastleT1" type="Sprite3D" parent="Castle" unique_id=334456022]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.44, 0)
+visible = false
+pixel_size = 0.09
+billboard = 2
+shaded = true
+alpha_cut = 1
+texture_filter = 0
+texture = ExtResource("11_sek56")
+
+[node name="CastleT2" type="Sprite3D" parent="Castle" unique_id=1367256408]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.16, 0)
+visible = false
+pixel_size = 0.09
+billboard = 2
+shaded = true
+alpha_cut = 1
+texture_filter = 0
+texture = ExtResource("13_ankha")
+
+[node name="CastleCollision" type="StaticBody3D" parent="Castle" unique_id=958087073]
+script = ExtResource("16_dl8hl")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Castle/CastleCollision" unique_id=1827284988]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+shape = SubResource("BoxShape3D_hmd67")
+
+[node name="Prompt" type="Label3D" parent="Castle" unique_id=1789168145]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.7, 0)
+visible = false
+pixel_size = 0.01
+billboard = 1
+no_depth_test = true
+modulate = Color(1, 0.9, 0.4, 1)
+outline_modulate = Color(0.1, 0.08, 0.05, 1)
+text = "E  Upgrade Base (3)"
+font_size = 64
+outline_size = 14
+
+[node name="ArcherPost" type="Area3D" parent="." unique_id=1331437455]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, -13)
+script = ExtResource("15_yayu0")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ArcherPost" unique_id=776679552]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("BoxShape3D_2fva3")
+
+[node name="Icon" type="Sprite3D" parent="ArcherPost" unique_id=920827183]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+pixel_size = 0.07
+billboard = 2
+shaded = true
+alpha_cut = 1
+texture_filter = 0
+texture = ExtResource("16_tsck3")
+
+[node name="Label" type="Label3D" parent="ArcherPost" unique_id=1089026138]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
+pixel_size = 0.008
+billboard = 1
+modulate = Color(0.7, 1, 0.7, 1)
+outline_modulate = Color(0.08, 0.1, 0.06, 1)
+text = "Archer Post"
+font_size = 56
+
+[node name="BuilderHut" type="Area3D" parent="." unique_id=1970715997]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0, -13)
+script = ExtResource("15_yayu0")
+job = "builder"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="BuilderHut" unique_id=1147459861]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("BoxShape3D_2fva3")
+
+[node name="Icon" type="Sprite3D" parent="BuilderHut" unique_id=1448457342]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+pixel_size = 0.07
+billboard = 2
+shaded = true
+alpha_cut = 1
+texture_filter = 0
+texture = ExtResource("17_wmxty")
+
+[node name="Label" type="Label3D" parent="BuilderHut" unique_id=892434506]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
+pixel_size = 0.008
+billboard = 1
+modulate = Color(1, 0.82, 0.5, 1)
+outline_modulate = Color(0.08, 0.1, 0.06, 1)
+text = "Builder Hut"
+font_size = 56
