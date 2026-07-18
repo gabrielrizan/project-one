@@ -127,14 +127,16 @@ func _spawn_village() -> void:
 	if _village_spawned:
 		return
 	_village_spawned = true
-	# the tent is where the village grows from -- 15 gold turns it into the hall
+	# the tent is where the village grows from -- 15 gold turns it into the hall,
+	# which also raises the palisade into castle stone
 	_spawn_building(TENT_MODEL, "Tent", Vector3(-3.6, 0, -2.6), 1.8, 1.3, "",
-		TOWN_HALL_MODEL, "Town Hall", 1.4, 2.0, TOWN_HALL_COST)
+		TOWN_HALL_MODEL, "Town Hall", 1.4, 2.0, TOWN_HALL_COST, true)
 	_spawn_building(WORKER_MODEL, "Workers", Vector3(3.6, 0, -2.6), 1.8, 1.4, "worker")
 	_spawn_building(ARCHER_MODEL, "Archers", Vector3(0, 0, -4.6), 1.2, 2.4, "archer")
 
 func _spawn_building(scene: PackedScene, bname: String, pos: Vector3, sc: float, height: float, job: String,
-		up_scene: PackedScene = null, up_name := "", up_scale := 1.0, up_height := 0.0, up_cost := 0) -> void:
+		up_scene: PackedScene = null, up_name := "", up_scale := 1.0, up_height := 0.0, up_cost := 0,
+		raises_castle := false) -> void:
 	var b := BUILDING_SCENE.instantiate()
 	b.model_scene = scene
 	b.display_name = bname
@@ -146,6 +148,7 @@ func _spawn_building(scene: PackedScene, bname: String, pos: Vector3, sc: float,
 	b.upgrade_scale = up_scale
 	b.upgrade_height = up_height
 	b.upgrade_cost = up_cost
+	b.upgrade_raises_castle = raises_castle
 	get_tree().current_scene.add_child(b)
 	b.global_position = pos
 

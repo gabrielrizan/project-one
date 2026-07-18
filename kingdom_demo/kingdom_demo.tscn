@@ -15,15 +15,16 @@
 [ext_resource type="PackedScene" uid="uid://dnmswfihbrwc2" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/rock-b.glb" id="13_hfmf3"]
 [ext_resource type="PackedScene" uid="uid://dcwgtu1qgcyts" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/grass-large.glb" id="14_dl8hl"]
 [ext_resource type="PackedScene" uid="uid://dnd2gc472qdj4" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/patch-grass-large.glb" id="15_yycvq"]
+[ext_resource type="Script" uid="uid://cm70csskstbyp" path="res://kingdom_demo/scripts/world_decor.gd" id="16_a7p3c"]
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_doh7v"]
-size = Vector3(40, 1, 40)
+[sub_resource type="BoxShape3D" id="BoxShape3D_hfmf3"]
+size = Vector3(100, 1, 100)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ndqrx"]
 albedo_color = Color(0.44, 0.63, 0.33, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_a7p3c"]
-size = Vector3(40, 1, 40)
+[sub_resource type="BoxMesh" id="BoxMesh_dl8hl"]
+size = Vector3(100, 1, 100)
 
 [sub_resource type="Environment" id="Environment_hfmf3"]
 background_mode = 1
@@ -38,12 +39,12 @@ script = ExtResource("1_0vp01")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=15632896]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
-shape = SubResource("BoxShape3D_doh7v")
+shape = SubResource("BoxShape3D_hfmf3")
 
 [node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=1143886086]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 material_override = SubResource("StandardMaterial3D_ndqrx")
-mesh = SubResource("BoxMesh_a7p3c")
+mesh = SubResource("BoxMesh_dl8hl")
 
 [node name="DayNightCycle" type="Node3D" parent="." unique_id=913575183 groups=["day_night_cycle"]]
 script = ExtResource("2_nbtlu")
@@ -215,3 +216,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0, -6)
 
 [node name="Grass5" parent="Decor" unique_id=398413273 instance=ExtResource("15_yycvq")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 13)
+
+[node name="WorldDecor" type="Node3D" parent="." unique_id=711066067]
+script = ExtResource("16_a7p3c")
