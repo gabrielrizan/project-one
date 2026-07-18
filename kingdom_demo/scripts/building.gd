@@ -5,14 +5,16 @@ extends StaticBody3D
 ## over the roof count the positions still *open*, so they tick down as villagers
 ## take work.
 
-@export var sprite_texture: Texture2D
+@export var model_scene: PackedScene            # the 3D model this building shows
 @export var display_name: String = ""
-@export var sprite_pixel_size: float = 0.035
+@export var model_scale: float = 1.0
+@export var model_height: float = 1.5           # used to seat prompts / label / collision
 @export var job_type: String = ""              # "worker" | "archer" | "" (no jobs)
 
-@export var upgrade_texture: Texture2D         # set to make this building upgradeable
+@export var upgrade_model_scene: PackedScene    # set to make this building upgradeable
 @export var upgrade_display_name: String = ""
-@export var upgrade_pixel_size: float = 0.0
+@export var upgrade_scale: float = 1.0
+@export var upgrade_height: float = 0.0
 @export var upgrade_cost: int = 0
 
 const MAX_JOBS := 4
@@ -22,7 +24,7 @@ const LOG_TEX := preload("res://kingdom_demo/assets/pixel/hammer.png")
 const ARROW_TEX := preload("res://kingdom_demo/assets/pixel/bow.png")
 const DUST_TEX := preload("res://kingdom_demo/assets/pixel/wood_chip.png")
 
-@onready var sprite: Sprite3D = $Sprite
+@onready var model_root: Node3D = $Model
 @onready var label: Label3D = $Label
 @onready var _prompt: Label3D = $Prompt
 @onready var _icons: Node3D = $Icons
@@ -31,14 +33,14 @@ const DUST_TEX := preload("res://kingdom_demo/assets/pixel/wood_chip.png")
 var jobs := 0          # positions created (paid for)
 var filled := 0        # positions taken by loyal villagers
 var upgraded := false
+var _model: Node3D = null
 var _height := 1.5
 var _busy := false
 
 func _ready() -> void:
 	add_to_group("building")
-	if sprite_texture:
-		sprite.texture = sprite_texture
-	_fit_sprite(sprite_pixel_size)
+	_show_model(model_scene, model_scale)
+	_fit(model_height)
 	label.text = display_name
 	if job_type != "":
 		add_to_group("workplace")
@@ -47,51 +49,30 @@ func _ready() -> void:
 
 # ---- layout ----
 
-## Sizes and seats the sprite so the art's base rests on the grass and everything
-## hanging off the building lines up above it -- whatever transparent padding the
-## source texture happens to carry.
-func _fit_sprite(px: float) -> void:
-	sprite.pixel_size = px
-	var canvas_h: float = float(sprite.texture.get_height()) if sprite.texture else 40.0
-	var canvas_w: float = float(sprite.texture.get_width()) if sprite.texture else 40.0
-	var art := _art_rows()
-	_height = float(art.y - art.x + 1) * px
-	sprite.position.y = canvas_h * px * 0.5 - float(canvas_h - 1.0 - art.y) * px
+func _show_model(scene: PackedScene, sc: float) -> void:
+	if is_instance_valid(_model):
+		_model.queue_free()
+	_model = null
+	if scene == null:
+		return
+	_model = scene.instantiate()
+	model_root.add_child(_model)
+	_model.scale = Vector3(sc, sc, sc)
+
+## Seats the label / prompt / job icons above the building and rebuilds a
+## collision box that matches the requested height.
+func _fit(height: float) -> void:
+	_height = maxf(0.4, height)
 	# stacked clear of each other: prompt over the roof, then name, then job icons
-	_prompt.position.y = _height - 0.15
-	label.position.y = _height + 0.35
-	_icons.position.y = _height + 0.85
+	_prompt.position.y = _height + 0.15
+	label.position.y = _height + 0.55
+	_icons.position.y = _height + 1.05
 	# a fresh shape per building -- the one in the scene is shared between instances
 	var box := BoxShape3D.new()
-	var w := maxf(0.8, canvas_w * px * 0.75)
-	box.size = Vector3(w, _height, w * 0.8)
+	var w := maxf(0.9, _height * 0.7)
+	box.size = Vector3(w, _height, w)
 	_collision.shape = box
 	_collision.position.y = _height * 0.5
-
-## First and last rows of the texture that actually have pixels in them.
-func _art_rows() -> Vector2i:
-	var tex := sprite.texture
-	if tex == null:
-		return Vector2i(0, 39)
-	var img := tex.get_image()
-	if img == null:
-		return Vector2i(0, tex.get_height() - 1)
-	if img.is_compressed():
-		img.decompress()
-	var w := img.get_width()
-	var top := 0
-	var bottom := img.get_height() - 1
-	while top < bottom and _row_blank(img, w, top):
-		top += 1
-	while bottom > top and _row_blank(img, w, bottom):
-		bottom -= 1
-	return Vector2i(top, bottom)
-
-func _row_blank(img: Image, w: int, y: int) -> bool:
-	for x in range(w):
-		if img.get_pixel(x, y).a > 0.03:
-			return false
-	return true
 
 # ---- job positions (queried by villagers) ----
 
@@ -116,7 +97,7 @@ func work_point() -> Vector3:
 # ---- interaction ----
 
 func _can_upgrade() -> bool:
-	return upgrade_cost > 0 and upgrade_texture != null and not upgraded
+	return upgrade_cost > 0 and upgrade_model_scene != null and not upgraded
 
 func _prompt_text() -> String:
 	if _can_upgrade():
@@ -208,21 +189,18 @@ func _layout_icons() -> void:
 func _raise_upgrade() -> void:
 	upgraded = true
 	display_name = upgrade_display_name
-	sprite.texture = upgrade_texture
-	_fit_sprite(upgrade_pixel_size)
+	_show_model(upgrade_model_scene, upgrade_scale)
+	_fit(upgrade_height if upgrade_height > 0.0 else _height)
 	label.text = display_name
 	if job_type == "":
 		remove_from_group("interactable")
 	_dust()
 	# the new hall heaves up out of the ground, the grass hiding the join
-	var seat := sprite.position.y
-	sprite.position.y = seat - _height * 0.7
-	sprite.scale = Vector3(1.18, 0.4, 1.0)
-	sprite.modulate = Color(1.5, 1.45, 1.3, 1.0)
+	_model.position.y = -_height * 0.7
+	_model.scale = Vector3(upgrade_scale * 1.1, upgrade_scale * 0.4, upgrade_scale * 1.1)
 	var t := create_tween()
-	t.tween_property(sprite, "position:y", seat, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.parallel().tween_property(sprite, "scale", Vector3.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.parallel().tween_property(sprite, "modulate", Color(1, 1, 1, 1), 0.55)
+	t.tween_property(_model, "position:y", 0.0, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(_model, "scale", Vector3(upgrade_scale, upgrade_scale, upgrade_scale), 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _dust() -> void:
 	for i in range(10):

@@ -4,8 +4,8 @@ extends Node3D
 ## renewable income rather than something you can strip-mine once.
 
 const ANIMAL_SCENE := preload("res://kingdom_demo/scenes/wild_animal.tscn")
-const RABBIT_TEX := preload("res://kingdom_demo/assets/pixel/rabbit.png")
-const DEER_TEX := preload("res://kingdom_demo/assets/pixel/deer.png")
+const RABBIT_MODEL := preload("res://kingdom_demo/assets/3d/Ultimate Animated Animals - July 2021-20260718T121948Z-1-001/Ultimate Animated Animals - July 2021/glTF/Fox.gltf")
+const DEER_MODEL := preload("res://kingdom_demo/assets/3d/Ultimate Animated Animals - July 2021-20260718T121948Z-1-001/Ultimate Animated Animals - July 2021/glTF/Stag.gltf")
 
 const RABBITS := 6
 const STAGS := 3
@@ -41,17 +41,17 @@ func _process(delta: float) -> void:
 		_spawn_stag()
 
 func _spawn_rabbit() -> void:
-	_spawn("rabbit", RABBIT_TEX, 0.009, 1, 3.4, 5.0, 2.2)
+	_spawn("rabbit", RABBIT_MODEL, 0.22, 1, 3.4, 5.0, 2.2)
 
 func _spawn_stag() -> void:
-	_spawn("stag", DEER_TEX, 0.011, 2, 2.7, 7.0, 3.4)
+	_spawn("stag", DEER_MODEL, 0.38, 2, 2.7, 7.0, 3.4)
 
-func _spawn(species: String, tex: Texture2D, px: float, gold: int,
+func _spawn(species: String, model: PackedScene, sc: float, gold: int,
 		speed: float, roam: float, spook: float) -> void:
 	var a := ANIMAL_SCENE.instantiate()
 	a.species = species
-	a.sprite_texture = tex
-	a.sprite_pixel_size = px
+	a.model_scene = model
+	a.model_scale = sc
 	a.gold_yield = gold
 	a.move_speed = speed
 	a.roam_radius = roam

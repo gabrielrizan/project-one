@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://c8wldanml0001"]
+[gd_scene load_steps=3 format=3 uid="uid://c8wldanml0001"]
 
-[ext_resource type="Script" path="res://kingdom_demo/scripts/wild_animal.gd" id="1_wa"]
+[ext_resource type="Script" uid="uid://cyc6ok8injdqm" path="res://kingdom_demo/scripts/wild_animal.gd" id="1_wa"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_wa"]
 radius = 0.22
@@ -15,10 +15,4 @@ script = ExtResource("1_wa")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
 shape = SubResource("CapsuleShape3D_wa")
 
-[node name="Sprite" type="Sprite3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0)
-pixel_size = 0.009
-billboard = 2
-shaded = true
-alpha_cut = 1
-texture_filter = 0
+[node name="Model" type="Node3D" parent="."]

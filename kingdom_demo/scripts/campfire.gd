@@ -14,13 +14,13 @@ const TOWN_HALL_COST := 15
 
 const BUILDING_SCENE := preload("res://kingdom_demo/scenes/building.tscn")
 const VILLAGER_SCENE := preload("res://kingdom_demo/scenes/villager.tscn")
-const TENT_TEX := preload("res://kingdom_demo/assets/pixel/tent.png")
-const WORKER_TEX := preload("res://kingdom_demo/assets/pixel/worker_building.png")
-const ARCHER_TEX := preload("res://kingdom_demo/assets/pixel/archer_building.png")
-const TOWN_HALL_TEX := preload("res://kingdom_demo/assets/pixel/castle_t0.png")
+const TENT_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tent.glb")
+const WORKER_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tent-canvas.glb")
+const ARCHER_MODEL := preload("res://kingdom_demo/assets/3d/kenney_castle-kit/Models/GLB format/tower-base.glb")
+const TOWN_HALL_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/structure.glb")
 
-@onready var _out: Sprite3D = $Extinguished
-@onready var _lit: Sprite3D = $Lit
+@onready var _out: Node3D = $Extinguished
+@onready var _lit: Node3D = $Lit
 @onready var _liquid: Sprite3D = $Lit/Liquid
 @onready var _prompt: Label3D = $Prompt
 
@@ -128,21 +128,23 @@ func _spawn_village() -> void:
 		return
 	_village_spawned = true
 	# the tent is where the village grows from -- 15 gold turns it into the hall
-	_spawn_building(TENT_TEX, "Tent", Vector3(-3.6, 0, -2.6), 0.045, "",
-		TOWN_HALL_TEX, "Town Hall", 0.021, TOWN_HALL_COST)
-	_spawn_building(WORKER_TEX, "Workers", Vector3(3.6, 0, -2.6), 0.04, "worker")
-	_spawn_building(ARCHER_TEX, "Archers", Vector3(0, 0, -4.6), 0.04, "archer")
+	_spawn_building(TENT_MODEL, "Tent", Vector3(-3.6, 0, -2.6), 1.8, 1.3, "",
+		TOWN_HALL_MODEL, "Town Hall", 1.4, 2.0, TOWN_HALL_COST)
+	_spawn_building(WORKER_MODEL, "Workers", Vector3(3.6, 0, -2.6), 1.8, 1.4, "worker")
+	_spawn_building(ARCHER_MODEL, "Archers", Vector3(0, 0, -4.6), 1.2, 2.4, "archer")
 
-func _spawn_building(tex: Texture2D, bname: String, pos: Vector3, px: float, job: String,
-		up_tex: Texture2D = null, up_name := "", up_px := 0.0, up_cost := 0) -> void:
+func _spawn_building(scene: PackedScene, bname: String, pos: Vector3, sc: float, height: float, job: String,
+		up_scene: PackedScene = null, up_name := "", up_scale := 1.0, up_height := 0.0, up_cost := 0) -> void:
 	var b := BUILDING_SCENE.instantiate()
-	b.sprite_texture = tex
+	b.model_scene = scene
 	b.display_name = bname
-	b.sprite_pixel_size = px
+	b.model_scale = sc
+	b.model_height = height
 	b.job_type = job
-	b.upgrade_texture = up_tex
+	b.upgrade_model_scene = up_scene
 	b.upgrade_display_name = up_name
-	b.upgrade_pixel_size = up_px
+	b.upgrade_scale = up_scale
+	b.upgrade_height = up_height
 	b.upgrade_cost = up_cost
 	get_tree().current_scene.add_child(b)
 	b.global_position = pos

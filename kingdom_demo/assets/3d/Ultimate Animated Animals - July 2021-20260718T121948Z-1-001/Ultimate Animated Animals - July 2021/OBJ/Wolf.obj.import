@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://cy27ohd16fvr5"
+path="res://.godot/imported/Wolf.obj-e706b2ea1e51355f26b821e0e00e42f2.mesh"
+
+[deps]
+
+files=["res://.godot/imported/Wolf.obj-e706b2ea1e51355f26b821e0e00e42f2.mesh"]
+
+source_file="res://kingdom_demo/assets/3d/Ultimate Animated Animals - July 2021-20260718T121948Z-1-001/Ultimate Animated Animals - July 2021/OBJ/Wolf.obj"
+dest_files=["res://.godot/imported/Wolf.obj-e706b2ea1e51355f26b821e0e00e42f2.mesh", "res://.godot/imported/Wolf.obj-e706b2ea1e51355f26b821e0e00e42f2.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

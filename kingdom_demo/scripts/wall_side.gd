@@ -7,13 +7,12 @@ extends StaticBody3D
 const BUILD_COST := 5
 const HALF := 8.0             # wall runs local x  -HALF .. +HALF
 const GATE_HALF := 1.0        # stakes stop this far from centre -> gate opening
-const STAKE_SPACING := 0.55
+const STAKE_SPACING := 1.0    # one fence section wide
 const OPEN_ANGLE := 85.0
 
-const STAKE_TEX := preload("res://kingdom_demo/assets/pixel/stake.png")
-const LEAF_TEX := preload("res://kingdom_demo/assets/pixel/gate_leaf.png")
+const FENCE_SCENE := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/fence.glb")
 
-@onready var _marker: Sprite3D = $MarkerSprite
+@onready var _marker: Node3D = $MarkerSprite
 @onready var _marker_col: CollisionShape3D = $MarkerCollision
 @onready var _prompt: Label3D = $Prompt
 
@@ -73,17 +72,11 @@ func _build_stakes() -> void:
 		x += STAKE_SPACING
 
 func _add_stake(x: float) -> void:
-	var s := Sprite3D.new()
-	s.texture = STAKE_TEX
-	s.pixel_size = 0.05
-	s.shaded = true
-	s.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
-	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	var sink := randf() * 0.22
-	s.position = Vector3(x + randf_range(-0.06, 0.06), 0.8 - sink, randf_range(-0.06, 0.06))
-	# heavy random tilt so the palisade looks rough / not vertically aligned
-	s.rotation_degrees = Vector3(randf_range(-4, 4), randf_range(-8, 8), randf_range(-15, 15))
+	var s := FENCE_SCENE.instantiate()
 	add_child(s)
+	# a little jitter keeps the palisade looking hand-built rather than prefab
+	s.position = Vector3(x + randf_range(-0.05, 0.05), 0.0, randf_range(-0.06, 0.06))
+	s.rotation_degrees = Vector3(0, randf_range(-4, 4), 0)
 
 func _build_wall_collision() -> void:
 	var seg := HALF - GATE_HALF
@@ -125,13 +118,8 @@ func _make_leaf(hinge_x: float, dir: float) -> Node3D:
 	var pivot := Node3D.new()
 	pivot.position = Vector3(hinge_x, 0, 0)
 	add_child(pivot)
-	var s := Sprite3D.new()
-	s.texture = LEAF_TEX
-	s.pixel_size = 0.0625
-	s.shaded = true
-	s.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
-	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	s.position = Vector3(dir * 0.5, 0.8, 0)   # leaf extends from the hinge toward centre
+	var s := FENCE_SCENE.instantiate()
+	s.position = Vector3(dir * 0.5, 0.0, 0)   # leaf extends from the hinge toward centre
 	pivot.add_child(s)
 	return pivot
 
