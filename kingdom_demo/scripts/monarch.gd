@@ -56,6 +56,13 @@ func _animate(delta: float, moving: bool) -> void:
 	else:
 		sprite.position.y = move_toward(sprite.position.y, _sprite_base_y, delta * 0.6)
 
+## A subject kneeling to present their take -- the king straightens and accepts it.
+func receive_tribute() -> void:
+	_punch()
+	var t := create_tween()
+	t.tween_property(sprite, "modulate", Color(1.9, 1.7, 1.15, 1.0), 0.1)
+	t.tween_property(sprite, "modulate", Color(1, 1, 1, 1), 0.4)
+
 func _punch() -> void:
 	var t := create_tween()
 	t.tween_property(sprite, "scale", Vector3(1.25, 0.8, 1.25), 0.06)
@@ -81,6 +88,11 @@ func _closest_interactable() -> Node3D:
 	return closest
 
 func _update_highlight() -> void:
+	# Mid-payment the king stays locked on whatever he is counting gold into:
+	# walking past something else neither switches the highlight nor lights up a
+	# second prompt, so only ever one tally is on screen.
+	if GoldFx.is_paying():
+		return
 	var closest := _closest_interactable()
 	if closest == _highlighted:
 		return
@@ -91,6 +103,8 @@ func _update_highlight() -> void:
 		_highlighted.show_prompt()
 
 func _try_interact() -> void:
+	if GoldFx.is_paying():
+		return
 	if not is_instance_valid(_highlighted) or not _highlighted.has_method("interact"):
 		return
 	_highlighted.interact(self)

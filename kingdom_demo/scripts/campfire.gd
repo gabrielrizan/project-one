@@ -3,18 +3,21 @@ extends StaticBody3D
 ##   extinguished --(spend 3 gold)--> lit  (also raises tent + worker + archer huts)
 ##   lit --(feed gold to the cauldron)--> fills; full cauldron bubbles and draws
 ##   hungry villagers in from the wild.
-## All gold spends play the shared GoldFx coin-slot animation.
+## All gold spends raise the shared GoldFx tally.
 
 const LIGHT_COST := 3
 const CAULDRON_MAX := 3
 const FEED_COST := 1
 const VILLAGER_COUNT := 5
 
+const TOWN_HALL_COST := 15
+
 const BUILDING_SCENE := preload("res://kingdom_demo/scenes/building.tscn")
 const VILLAGER_SCENE := preload("res://kingdom_demo/scenes/villager.tscn")
 const TENT_TEX := preload("res://kingdom_demo/assets/pixel/tent.png")
 const WORKER_TEX := preload("res://kingdom_demo/assets/pixel/worker_building.png")
 const ARCHER_TEX := preload("res://kingdom_demo/assets/pixel/archer_building.png")
+const TOWN_HALL_TEX := preload("res://kingdom_demo/assets/pixel/castle_t0.png")
 
 @onready var _out: Sprite3D = $Extinguished
 @onready var _lit: Sprite3D = $Lit
@@ -37,9 +40,9 @@ func _ready() -> void:
 
 func _prompt_text() -> String:
 	if not lit:
-		return "E  Light Fire (%d)" % LIGHT_COST
+		return "Hold E  Light Fire (%d)" % LIGHT_COST
 	if not cauldron_full:
-		return "E  Fill Cauldron (%d)   %d/%d" % [FEED_COST, fill, CAULDRON_MAX]
+		return "Hold E  Fill Cauldron (%d)   %d/%d" % [FEED_COST, fill, CAULDRON_MAX]
 	return ""
 
 func show_prompt() -> void:
@@ -124,16 +127,23 @@ func _spawn_village() -> void:
 	if _village_spawned:
 		return
 	_village_spawned = true
-	_spawn_building(TENT_TEX, "Tent", Vector3(-3.6, 0, -2.6), 0.045, "")
+	# the tent is where the village grows from -- 15 gold turns it into the hall
+	_spawn_building(TENT_TEX, "Tent", Vector3(-3.6, 0, -2.6), 0.045, "",
+		TOWN_HALL_TEX, "Town Hall", 0.021, TOWN_HALL_COST)
 	_spawn_building(WORKER_TEX, "Workers", Vector3(3.6, 0, -2.6), 0.04, "worker")
 	_spawn_building(ARCHER_TEX, "Archers", Vector3(0, 0, -4.6), 0.04, "archer")
 
-func _spawn_building(tex: Texture2D, bname: String, pos: Vector3, px: float, job: String) -> void:
+func _spawn_building(tex: Texture2D, bname: String, pos: Vector3, px: float, job: String,
+		up_tex: Texture2D = null, up_name := "", up_px := 0.0, up_cost := 0) -> void:
 	var b := BUILDING_SCENE.instantiate()
 	b.sprite_texture = tex
 	b.display_name = bname
 	b.sprite_pixel_size = px
 	b.job_type = job
+	b.upgrade_texture = up_tex
+	b.upgrade_display_name = up_name
+	b.upgrade_pixel_size = up_px
+	b.upgrade_cost = up_cost
 	get_tree().current_scene.add_child(b)
 	b.global_position = pos
 

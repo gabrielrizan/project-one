@@ -22,8 +22,8 @@ billboard = 1
 no_depth_test = true
 modulate = Color(1, 0.95, 0.5, 1)
 outline_modulate = Color(0.1, 0.08, 0.05, 1)
-text = "E  Chop"
-font_size = 64
+text = "Hold E  Mark Tree"
+font_size = 50
 outline_size = 14
 
 [node name="Sprite" type="Sprite3D" parent="." unique_id=200675486]
