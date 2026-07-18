@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://c8wldanml0001"]
+
+[ext_resource type="Script" path="res://kingdom_demo/scripts/wild_animal.gd" id="1_wa"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_wa"]
+radius = 0.22
+height = 0.5
+
+[node name="WildAnimal" type="CharacterBody3D"]
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_wa")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+shape = SubResource("CapsuleShape3D_wa")
+
+[node name="Sprite" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0)
+pixel_size = 0.009
+billboard = 2
+shaded = true
+alpha_cut = 1
+texture_filter = 0

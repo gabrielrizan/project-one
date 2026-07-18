@@ -33,7 +33,7 @@ func _ready() -> void:
 func show_prompt() -> void:
 	if built or _busy:
 		return
-	_prompt.text = "E  Build Wall (%d)" % BUILD_COST
+	_prompt.text = "Hold E  Build Wall (%d)" % BUILD_COST
 	_prompt.visible = true
 
 func hide_prompt() -> void:
