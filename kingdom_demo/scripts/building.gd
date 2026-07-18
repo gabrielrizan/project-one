@@ -16,6 +16,7 @@ extends StaticBody3D
 @export var upgrade_scale: float = 1.0
 @export var upgrade_height: float = 0.0
 @export var upgrade_cost: int = 0
+@export var upgrade_raises_castle: bool = false # Town Hall: turns the palisade to stone
 
 const MAX_JOBS := 4
 const JOB_COST := 3
@@ -194,6 +195,10 @@ func _raise_upgrade() -> void:
 	label.text = display_name
 	if job_type == "":
 		remove_from_group("interactable")
+	if upgrade_raises_castle:
+		var gm := get_tree().get_first_node_in_group("game_manager")
+		if gm and gm.has_method("raise_castle_age"):
+			gm.raise_castle_age()
 	_dust()
 	# the new hall heaves up out of the ground, the grass hiding the join
 	_model.position.y = -_height * 0.7
