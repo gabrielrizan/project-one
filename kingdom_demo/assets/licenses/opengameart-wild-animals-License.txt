@@ -1,0 +1,25 @@
+Animated Wild Animals
+
+Created by ScratchIO
+Source: https://opengameart.org/content/animated-wild-animals
+
+------------------------------
+
+License: CC0 1.0 Universal (Public Domain Dedication)
+
+https://creativecommons.org/publicdomain/zero/1.0/
+
+The author has waived all copyright and related rights to this work worldwide.
+You may copy, modify, distribute and use the work, including for commercial
+purposes, all without asking permission. Attribution is not required.
+
+------------------------------
+
+Used in this project:
+
+  rabbit.png  - single idle frame cut from Rabbit/Rabbit_Idle.png
+  deer.png    - single idle frame cut from Deer/Deer_Idle.png
+
+The original packs ship 10-frame Idle / Walk / Run strips for each animal; only
+the first idle frame of each is checked in, since the game renders animals as
+billboarded still sprites.
