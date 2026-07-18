@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://cifyf7md7h35d"
+path="res://.godot/imported/Stag.obj-84786f28d09ad98c86494b6b2fac2708.mesh"
+
+[deps]
+
+files=["res://.godot/imported/Stag.obj-84786f28d09ad98c86494b6b2fac2708.mesh"]
+
+source_file="res://kingdom_demo/assets/3d/Ultimate Animated Animals - July 2021-20260718T121948Z-1-001/Ultimate Animated Animals - July 2021/OBJ/Stag.obj"
+dest_files=["res://.godot/imported/Stag.obj-84786f28d09ad98c86494b6b2fac2708.mesh", "res://.godot/imported/Stag.obj-84786f28d09ad98c86494b6b2fac2708.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

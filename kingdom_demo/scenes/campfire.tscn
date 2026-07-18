@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3 uid="uid://cf1mdvlepu7md"]
+[gd_scene load_steps=8 format=3 uid="uid://cf1mdvlepu7md"]
 
 [ext_resource type="Script" uid="uid://dxhqc5c5pptxn" path="res://kingdom_demo/scripts/campfire.gd" id="1_cf"]
-[ext_resource type="Texture2D" uid="uid://del0o7swdyk47" path="res://kingdom_demo/assets/pixel/campfire_out.png" id="2_out"]
-[ext_resource type="Texture2D" uid="uid://bjarx5hbqw8bi" path="res://kingdom_demo/assets/pixel/campfire_lit.png" id="3_lit"]
-[ext_resource type="Texture2D" uid="uid://dta4tyfhxwejp" path="res://kingdom_demo/assets/pixel/cauldron_liquid.png" id="4_liq"]
+[ext_resource type="PackedScene" uid="uid://befoxaqi0xv07" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/campfire-pit.glb" id="2_pit"]
+[ext_resource type="PackedScene" uid="uid://b221c8t3klo3l" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/campfire-stand.glb" id="3_stand"]
+[ext_resource type="Texture2D" uid="uid://bjarx5hbqw8bi" path="res://kingdom_demo/assets/pixel/campfire_lit.png" id="4_flame"]
+[ext_resource type="Texture2D" uid="uid://dta4tyfhxwejp" path="res://kingdom_demo/assets/pixel/cauldron_liquid.png" id="5_liq"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_cf"]
 size = Vector3(1.4, 1, 1.4)
@@ -15,34 +16,36 @@ script = ExtResource("1_cf")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 shape = SubResource("BoxShape3D_cf")
 
-[node name="Extinguished" type="Sprite3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0.03, 0)
-pixel_size = 0.06
-shaded = true
-alpha_cut = 1
-no_depth_test = true
-texture_filter = 0
-texture = ExtResource("2_out")
+[node name="Extinguished" parent="." instance=ExtResource("2_pit")]
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 0, 0)
 
-[node name="Lit" type="Sprite3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.81, 0)
+[node name="Lit" parent="." instance=ExtResource("3_stand")]
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 0, 0)
 visible = false
-pixel_size = 0.03
+
+[node name="Flame" type="Sprite3D" parent="Lit"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+pixel_size = 0.02
 billboard = 2
-shaded = true
 alpha_cut = 1
 texture_filter = 0
-texture = ExtResource("3_lit")
+texture = ExtResource("4_flame")
+
+[node name="FireLight" type="OmniLight3D" parent="Lit"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+light_color = Color(1, 0.68, 0.36, 1)
+light_energy = 2.5
+omni_range = 6.0
 
 [node name="Liquid" type="Sprite3D" parent="Lit"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0.06)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.72, 0)
 visible = false
 pixel_size = 0.02
 billboard = 2
 shaded = true
 alpha_cut = 1
 texture_filter = 0
-texture = ExtResource("4_liq")
+texture = ExtResource("5_liq")
 
 [node name="Prompt" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)

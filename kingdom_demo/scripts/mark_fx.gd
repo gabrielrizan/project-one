@@ -62,16 +62,22 @@ static func banner(owner: Node3D, tex: Texture2D, y: float, px: float) -> Sprite
 	t.tween_property(s, "modulate:a", 1.0, 0.26)
 	return s
 
-static func shake(owner: Node3D, s: Sprite3D, base_x: float, amount: float) -> void:
+static func shake(owner: Node3D, s: Node3D, base_x: float, amount: float) -> void:
 	var t := owner.create_tween()
 	t.tween_property(s, "position:x", base_x + amount, 0.04)
 	t.tween_property(s, "position:x", base_x - amount, 0.06)
 	t.tween_property(s, "position:x", base_x, 0.05)
 
-static func hit_flash(owner: Node3D, s: Sprite3D) -> void:
+## Sprites flash bright; 3D models (no `modulate`) get a quick squash-pulse instead.
+static func hit_flash(owner: Node3D, s: Node3D) -> void:
 	var t := owner.create_tween()
-	t.tween_property(s, "modulate", Color(1.8, 1.8, 1.8, 1.0), 0.04)
-	t.tween_property(s, "modulate", Color(1, 1, 1, 1), 0.14)
+	if s is Sprite3D:
+		t.tween_property(s, "modulate", Color(1.8, 1.8, 1.8, 1.0), 0.04)
+		t.tween_property(s, "modulate", Color(1, 1, 1, 1), 0.14)
+	else:
+		var base: Vector3 = s.scale
+		t.tween_property(s, "scale", base * Vector3(1.06, 0.94, 1.06), 0.04)
+		t.tween_property(s, "scale", base, 0.14)
 
 ## Foliage shaken loose, fluttering down.
 static func leaves(owner: Node3D, at: Vector3, n: int, high: float, low: float, spread: float) -> void:

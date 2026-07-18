@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://ciucd0pt86k17"
+path="res://.godot/imported/stairs-stone-square.obj-643a4d9c07d169bb2f0cc83251f6284d.mesh"
+
+[deps]
+
+files=["res://.godot/imported/stairs-stone-square.obj-643a4d9c07d169bb2f0cc83251f6284d.mesh"]
+
+source_file="res://kingdom_demo/assets/3d/kenney_castle-kit/Models/OBJ format/stairs-stone-square.obj"
+dest_files=["res://.godot/imported/stairs-stone-square.obj-643a4d9c07d169bb2f0cc83251f6284d.mesh", "res://.godot/imported/stairs-stone-square.obj-643a4d9c07d169bb2f0cc83251f6284d.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false
