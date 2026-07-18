@@ -17,8 +17,8 @@ const TRUNK_BASE_Y := 0.08    # where the trunk meets the grass -- the topple hi
 const BANNER_Y := 2.95
 const FALL_TIME := 0.85
 
-@onready var sprite: Sprite3D = $Sprite
-@onready var stump: Sprite3D = $Stump
+@onready var model: Node3D = $Model
+@onready var stump: Node3D = $Stump
 @onready var prompt: Label3D = $Prompt
 @onready var collision: CollisionShape3D = $CollisionShape3D
 
@@ -36,7 +36,7 @@ var _banner_t := 0.0
 func _ready() -> void:
 	add_to_group("interactable")
 	add_to_group("tree")
-	_base_x = sprite.position.x
+	_base_x = model.position.x
 	set_process(false)   # only marked trees need per-frame work
 
 func _process(delta: float) -> void:
@@ -76,7 +76,7 @@ func _mark() -> void:
 	remove_from_group("interactable")
 	add_to_group("marked_tree")
 	hide_prompt()
-	MarkFx.shake(self, sprite, _base_x, 0.09)
+	MarkFx.shake(self, model, _base_x, 0.09)
 	_blaze = MarkFx.blaze(self, TRUNK_Y, 0.013)
 	MarkFx.face_camera(_blaze, chop_anchor())
 	_banner = MarkFx.banner(self, AXE_TEX, BANNER_Y, 0.012)
@@ -106,8 +106,8 @@ func take_chop(from: Vector3) -> bool:
 	if felled:
 		return false
 	_chops += 1
-	MarkFx.shake(self, sprite, _base_x, 0.06)
-	MarkFx.hit_flash(self, sprite)
+	MarkFx.shake(self, model, _base_x, 0.06)
+	MarkFx.hit_flash(self, model)
 	var back := from - global_position
 	back.y = 0.0
 	MarkFx.debris(self, chop_anchor(),
@@ -134,58 +134,43 @@ func _fell(from: Vector3) -> void:
 		_blaze.queue_free()
 	if is_instance_valid(_banner):
 		_banner.queue_free()
-	sprite.visible = false
 	stump.visible = true
 	_topple(from)
 
+## Tip the whole 3D trunk over on a hinge at its base, falling away from the cutter.
 func _topple(from: Vector3) -> void:
-	# Swap the Y-billboarded trunk for a free-standing copy pinned to the camera's
-	# yaw: once it can't spin to face us any more, it can actually rotate and fall.
-	var yaw := 0.0
-	var right := Vector3.RIGHT
-	var cam := get_viewport().get_camera_3d()
-	if cam:
-		var cz := cam.global_transform.basis.z
-		yaw = atan2(cz.x, cz.z)
-		right = cam.global_transform.basis.x
-
-	# ...and it falls away from whoever is swinging the axe
-	var to_cutter := from - global_position
-	to_cutter.y = 0.0
-	var side := signf(right.dot(to_cutter))
-	if side == 0.0:
-		side = 1.0
+	var away := global_position - from
+	away.y = 0.0
+	var fall_dir := away.normalized() if away.length() > 0.01 else Vector3.BACK
 
 	var pivot := Node3D.new()
 	add_child(pivot)
 	pivot.position = Vector3(0, TRUNK_BASE_Y, 0)
-	pivot.rotation.y = yaw
+	# Aim the pivot's local +Z along the fall direction, then tipping it about the
+	# local X axis topples the trunk that way.
+	pivot.rotation.y = atan2(fall_dir.x, fall_dir.z)
 
-	var faller := MarkFx.sprite(sprite.texture, sprite.pixel_size)
-	faller.billboard = BaseMaterial3D.BILLBOARD_DISABLED
-	faller.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED   # so it can fade out smoothly
-	faller.shaded = true
-	pivot.add_child(faller)
-	faller.position = Vector3(0, sprite.position.y - TRUNK_BASE_Y, 0)
+	# Re-home the standing model under the hinge, keeping its world pose.
+	var world := model.global_transform
+	model.get_parent().remove_child(model)
+	pivot.add_child(model)
+	model.global_transform = world
 
 	var t := create_tween()
-	t.tween_property(pivot, "rotation:z", side * 0.10, 0.26).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	t.tween_property(pivot, "rotation:z", side * deg_to_rad(87.0), FALL_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	t.tween_callback(func() -> void: _trunk_landed(pivot, faller, side, right))
+	t.tween_property(pivot, "rotation:x", deg_to_rad(-6.0), 0.24).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.tween_property(pivot, "rotation:x", deg_to_rad(87.0), FALL_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	t.tween_callback(func() -> void: _trunk_landed(pivot, fall_dir))
 
-func _trunk_landed(pivot: Node3D, faller: Sprite3D, side: float, right: Vector3) -> void:
+func _trunk_landed(pivot: Node3D, fall_dir: Vector3) -> void:
 	if not is_instance_valid(pivot):
 		return
-	var dir := -right * side
-	dir.y = 0.0
-	if dir.length() > 0.01:
-		MarkFx.debris(self, global_position + dir.normalized() * 2.0 + Vector3(0, 0.1, 0),
-			Vector3.ZERO, 8, Color(0.74, 0.70, 0.60, 0.9), 0.014, 1.1)
+	MarkFx.debris(self, global_position + fall_dir * 2.0 + Vector3(0, 0.1, 0),
+		Vector3.ZERO, 8, Color(0.74, 0.70, 0.60, 0.9), 0.014, 1.1)
 	var t := pivot.create_tween()
-	t.tween_property(pivot, "rotation:z", side * deg_to_rad(81.0), 0.10).set_trans(Tween.TRANS_SINE)
-	t.tween_property(pivot, "rotation:z", side * deg_to_rad(88.0), 0.14).set_trans(Tween.TRANS_SINE)
+	t.tween_property(pivot, "rotation:x", deg_to_rad(84.0), 0.10).set_trans(Tween.TRANS_SINE)
+	t.tween_property(pivot, "rotation:x", deg_to_rad(88.0), 0.14).set_trans(Tween.TRANS_SINE)
 	t.tween_interval(0.5)
-	t.tween_property(faller, "modulate:a", 0.0, 0.5)
+	t.tween_property(pivot, "scale", Vector3(0.01, 0.01, 0.01), 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	t.tween_callback(pivot.queue_free)
 	_drop_gold()
 

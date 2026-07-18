@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://pxld1msx74qf"]
+[gd_scene load_steps=3 format=3 uid="uid://pxld1msx74qf"]
 
 [ext_resource type="Script" uid="uid://dwj2yq00gvpv" path="res://kingdom_demo/scripts/building.gd" id="1_b"]
 
@@ -12,13 +12,7 @@ script = ExtResource("1_b")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 shape = SubResource("BoxShape3D_b")
 
-[node name="Sprite" type="Sprite3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
-pixel_size = 0.035
-billboard = 2
-shaded = true
-alpha_cut = 1
-texture_filter = 0
+[node name="Model" type="Node3D" parent="."]
 
 [node name="Label" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)

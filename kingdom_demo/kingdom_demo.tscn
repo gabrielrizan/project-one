@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://8tmdvlepu4md"]
 
 [ext_resource type="Script" uid="uid://cooi4ig1l04cy" path="res://kingdom_demo/scripts/game_manager.gd" id="1_0vp01"]
-[ext_resource type="Texture2D" uid="uid://dfkoingcc77k7" path="res://kingdom_demo/assets/pixel/grass.png" id="2_hfmf3"]
 [ext_resource type="Script" uid="uid://ieol6ck0bdxh" path="res://kingdom_demo/scripts/day_night_cycle.gd" id="2_nbtlu"]
 [ext_resource type="PackedScene" uid="uid://cgqh2mar6ptq" path="res://kingdom_demo/scenes/monarch.tscn" id="3_p718k"]
 [ext_resource type="Script" uid="uid://b1n0riwc31bv7" path="res://kingdom_demo/scripts/camera_rig.gd" id="4_ndqrx"]
@@ -9,18 +8,19 @@
 [ext_resource type="Script" uid="uid://xqy4jku5m8ob" path="res://kingdom_demo/scripts/coin_ui.gd" id="7_1yp2m"]
 [ext_resource type="Texture2D" uid="uid://dyf0xh70ryu36" path="res://kingdom_demo/assets/pixel/coin.png" id="9_dl8hl"]
 [ext_resource type="Texture2D" uid="uid://clc88gxbfm3l1" path="res://kingdom_demo/assets/pixel/sun.png" id="10_yycvq"]
+[ext_resource type="PackedScene" uid="uid://clad8q2n673md" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/rock-a.glb" id="11_p6jlh"]
 [ext_resource type="PackedScene" uid="uid://cuj8werh85dix" path="res://kingdom_demo/scenes/tree.tscn" id="11_tree"]
+[ext_resource type="PackedScene" uid="uid://dowbc762jur4v" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/rock-c.glb" id="12_a7p3c"]
 [ext_resource type="PackedScene" uid="uid://bd7k767l1etkf" path="res://kingdom_demo/scenes/wall_side.tscn" id="12_ws"]
-[ext_resource type="Script" uid="uid://c6d1mxxvejufd" path="res://kingdom_demo/scripts/wildlife.gd" id="13_wild"]
-[ext_resource type="PackedScene" uid="uid://l3xnslje6465" path="res://kingdom_demo/scenes/berry_bush.tscn" id="14_bush"]
+[ext_resource type="PackedScene" uid="uid://dnmswfihbrwc2" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/rock-b.glb" id="13_hfmf3"]
+[ext_resource type="PackedScene" uid="uid://dcwgtu1qgcyts" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/grass-large.glb" id="14_dl8hl"]
+[ext_resource type="PackedScene" uid="uid://dnd2gc472qdj4" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/patch-grass-large.glb" id="15_yycvq"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_doh7v"]
 size = Vector3(40, 1, 40)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2w3nb"]
-albedo_texture = ExtResource("2_hfmf3")
-uv1_scale = Vector3(40, 40, 1)
-texture_filter = 0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ndqrx"]
+albedo_color = Color(0.44, 0.63, 0.33, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_a7p3c"]
 size = Vector3(40, 1, 40)
@@ -30,10 +30,6 @@ background_mode = 1
 background_color = Color(0.5294118, 0.80784315, 0.92156863, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.56078434, 0.6509804, 0.7019608, 1)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_coinhud"]
-atlas = ExtResource("9_dl8hl")
-region = Rect2(51, 49, 24, 26)
 
 [node name="KingdomDemo" type="Node3D" unique_id=55025416]
 script = ExtResource("1_0vp01")
@@ -46,7 +42,7 @@ shape = SubResource("BoxShape3D_doh7v")
 
 [node name="Mesh" type="MeshInstance3D" parent="Ground" unique_id=1143886086]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
-material_override = SubResource("StandardMaterial3D_2w3nb")
+material_override = SubResource("StandardMaterial3D_ndqrx")
 mesh = SubResource("BoxMesh_a7p3c")
 
 [node name="DayNightCycle" type="Node3D" parent="." unique_id=913575183 groups=["day_night_cycle"]]
@@ -68,7 +64,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 1)
 script = ExtResource("4_ndqrx")
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=936210487]
-transform = Transform3D(1, 0, 0, 0, 0.76604444, 0.6427876, 0, -0.6427876, 0.76604444, -0.287, 8.645, 8.503)
+transform = Transform3D(1, 0, 0, 0, 0.76604444, 0.6427876, 0, -0.6427876, 0.76604444, -0.287, 6.645, 5.503)
 current = true
 fov = 50.0
 
@@ -100,37 +96,35 @@ script = ExtResource("7_1yp2m")
 texture_filter = 1
 layout_mode = 0
 offset_left = 18.0
-offset_top = 12.0
-offset_right = 62.0
-offset_bottom = 60.0
-texture = SubResource("AtlasTexture_coinhud")
+offset_top = 14.0
+offset_right = 52.0
+offset_bottom = 48.0
+texture = ExtResource("9_dl8hl")
 expand_mode = 1
 
 [node name="CoinValue" type="Label" parent="UI/HUD" unique_id=1041769491]
 layout_mode = 0
-offset_left = 74.0
-offset_top = 16.0
-offset_right = 75.0
-offset_bottom = 54.0
-theme_override_font_sizes/font_size = 36
+offset_left = 60.0
+offset_top = 15.0
+offset_right = 61.0
+offset_bottom = 38.0
+theme_override_font_sizes/font_size = 28
 text = "0"
 
 [node name="TimeIcon" type="TextureRect" parent="UI/HUD" unique_id=1352411760]
 texture_filter = 1
 layout_mode = 0
 offset_left = 18.0
-offset_top = 68.0
+offset_top = 54.0
 offset_right = 52.0
-offset_bottom = 102.0
+offset_bottom = 88.0
 texture = ExtResource("10_yycvq")
 expand_mode = 1
 
 [node name="ControlsHint" type="Label" parent="UI/HUD" unique_id=1583115707]
 layout_mode = 0
-offset_left = 18.0
-offset_top = 110.0
-offset_right = 200.0
-offset_bottom = 133.0
+offset_right = 152.0
+offset_bottom = 23.0
 text = "Z / X  rotate camera"
 
 [node name="Tree1" parent="." unique_id=354399333 instance=ExtResource("11_tree")]
@@ -190,29 +184,34 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 0, 2.3)
 [node name="Tree21" parent="." unique_id=1341421992 instance=ExtResource("11_tree")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.9, 0, 14.2)
 
-[node name="Wildlife" type="Node3D" parent="." unique_id=1535431595]
-script = ExtResource("13_wild")
+[node name="Decor" type="Node3D" parent="." unique_id=1279072974]
 
-[node name="BerryBush1" parent="." unique_id=818290037 instance=ExtResource("14_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.4, 0, 5.9)
+[node name="Rock1" parent="Decor" unique_id=322541372 instance=ExtResource("11_p6jlh")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, 0, 6)
 
-[node name="BerryBush2" parent="." unique_id=1878144160 instance=ExtResource("14_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.3, 0, 9.8)
+[node name="Rock3" parent="Decor" unique_id=1936699971 instance=ExtResource("12_a7p3c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, 12)
 
-[node name="BerryBush3" parent="." unique_id=1215294513 instance=ExtResource("14_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.1, 0, -9.4)
+[node name="Rock4" parent="Decor" unique_id=1563795661 instance=ExtResource("11_p6jlh")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 0, 9)
 
-[node name="BerryBush4" parent="." unique_id=857530456 instance=ExtResource("14_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.6, 0, -2.4)
+[node name="Rock5" parent="Decor" unique_id=1834607580 instance=ExtResource("13_hfmf3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -12)
 
-[node name="BerryBush5" parent="." unique_id=56138283 instance=ExtResource("14_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.2, 0, -4.6)
+[node name="Grass2" parent="Decor" unique_id=1403729281 instance=ExtResource("14_dl8hl")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0, 11)
 
-[node name="BerryBush6" parent="." unique_id=203827131 instance=ExtResource("14_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.9, 0, -11.6)
+[node name="Grass3" parent="Decor" unique_id=1329326467 instance=ExtResource("15_yycvq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 0, -11)
 
-[node name="BerryBush7" parent="." unique_id=1873753530 instance=ExtResource("14_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.8, 0, 11.4)
+[node name="Grass4" parent="Decor" unique_id=242344302 instance=ExtResource("14_dl8hl")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0, 2)
 
-[node name="BerryBush8" parent="." unique_id=309935002 instance=ExtResource("14_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.1, 0, 6.8)
+[node name="Rock2" parent="Decor" unique_id=526292112 instance=ExtResource("13_hfmf3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, -4)
+
+[node name="Grass1" parent="Decor" unique_id=41603809 instance=ExtResource("15_yycvq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0, -6)
+
+[node name="Grass5" parent="Decor" unique_id=398413273 instance=ExtResource("15_yycvq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 13)

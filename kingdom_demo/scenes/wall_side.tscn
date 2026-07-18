@@ -1,7 +1,7 @@
-[gd_scene format=3 uid="uid://bd7k767l1etkf"]
+[gd_scene load_steps=4 format=3 uid="uid://bd7k767l1etkf"]
 
 [ext_resource type="Script" uid="uid://ur01xvawl2rf" path="res://kingdom_demo/scripts/wall_side.gd" id="1_ws"]
-[ext_resource type="Texture2D" uid="uid://dl3xf8dp52rt" path="res://kingdom_demo/assets/pixel/gate_marker.png" id="2_mk"]
+[ext_resource type="PackedScene" uid="uid://dmty7gmfe7qu3" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/signpost.glb" id="2_mk"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_mk"]
 size = Vector3(1.6, 1.6, 1.6)
@@ -13,14 +13,7 @@ script = ExtResource("1_ws")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 shape = SubResource("BoxShape3D_mk")
 
-[node name="MarkerSprite" type="Sprite3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
-pixel_size = 0.05
-billboard = 2
-shaded = true
-alpha_cut = 1
-texture_filter = 0
-texture = ExtResource("2_mk")
+[node name="MarkerSprite" parent="." instance=ExtResource("2_mk")]
 
 [node name="Prompt" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
