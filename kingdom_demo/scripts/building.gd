@@ -1,25 +1,36 @@
 extends StaticBody3D
-## A village building. The Tent is decorative; the Workers and Archers huts are
-## workplaces: the monarch pays gold to create jobs (shown as hammer / bow icons
-## above the roof, up to MAX_JOBS), and loyal villagers walk over to fill them.
+## A village building. The Tent is decorative but can be rebuilt into the Town
+## Hall; the Workers and Archers huts are workplaces: the monarch pays gold to
+## create jobs and loyal villagers walk over to fill them. The hammer / bow icons
+## over the roof count the positions still *open*, so they tick down as villagers
+## take work.
 
 @export var sprite_texture: Texture2D
 @export var display_name: String = ""
 @export var sprite_pixel_size: float = 0.035
-@export var job_type: String = ""      # "worker" | "archer" | "" (no jobs)
+@export var job_type: String = ""              # "worker" | "archer" | "" (no jobs)
+
+@export var upgrade_texture: Texture2D         # set to make this building upgradeable
+@export var upgrade_display_name: String = ""
+@export var upgrade_pixel_size: float = 0.0
+@export var upgrade_cost: int = 0
 
 const MAX_JOBS := 4
 const JOB_COST := 3
-const HAMMER_TEX := preload("res://kingdom_demo/assets/pixel/hammer.png")
-const BOW_TEX := preload("res://kingdom_demo/assets/pixel/bow.png")
+# despite the filenames, these two are a log and an arrow
+const LOG_TEX := preload("res://kingdom_demo/assets/pixel/hammer.png")
+const ARROW_TEX := preload("res://kingdom_demo/assets/pixel/bow.png")
+const DUST_TEX := preload("res://kingdom_demo/assets/pixel/wood_chip.png")
 
 @onready var sprite: Sprite3D = $Sprite
 @onready var label: Label3D = $Label
 @onready var _prompt: Label3D = $Prompt
 @onready var _icons: Node3D = $Icons
+@onready var _collision: CollisionShape3D = $CollisionShape3D
 
-var jobs := 0          # jobs created (paid for)
-var filled := 0        # jobs taken by loyal villagers
+var jobs := 0          # positions created (paid for)
+var filled := 0        # positions taken by loyal villagers
+var upgraded := false
 var _height := 1.5
 var _busy := false
 
@@ -27,17 +38,62 @@ func _ready() -> void:
 	add_to_group("building")
 	if sprite_texture:
 		sprite.texture = sprite_texture
-	sprite.pixel_size = sprite_pixel_size
-	_height = (sprite.texture.get_height() if sprite.texture else 40) * sprite_pixel_size
-	sprite.position.y = _height * 0.5
-	label.position.y = _height + 0.25
+	_fit_sprite(sprite_pixel_size)
 	label.text = display_name
-	_icons.position.y = _height + 0.55
 	if job_type != "":
-		add_to_group("interactable")
 		add_to_group("workplace")
+	if job_type != "" or _can_upgrade():
+		add_to_group("interactable")
 
-# ---- job slots (queried by villagers) ----
+# ---- layout ----
+
+## Sizes and seats the sprite so the art's base rests on the grass and everything
+## hanging off the building lines up above it -- whatever transparent padding the
+## source texture happens to carry.
+func _fit_sprite(px: float) -> void:
+	sprite.pixel_size = px
+	var canvas_h: float = float(sprite.texture.get_height()) if sprite.texture else 40.0
+	var canvas_w: float = float(sprite.texture.get_width()) if sprite.texture else 40.0
+	var art := _art_rows()
+	_height = float(art.y - art.x + 1) * px
+	sprite.position.y = canvas_h * px * 0.5 - float(canvas_h - 1.0 - art.y) * px
+	# stacked clear of each other: prompt over the roof, then name, then job icons
+	_prompt.position.y = _height - 0.15
+	label.position.y = _height + 0.35
+	_icons.position.y = _height + 0.85
+	# a fresh shape per building -- the one in the scene is shared between instances
+	var box := BoxShape3D.new()
+	var w := maxf(0.8, canvas_w * px * 0.75)
+	box.size = Vector3(w, _height, w * 0.8)
+	_collision.shape = box
+	_collision.position.y = _height * 0.5
+
+## First and last rows of the texture that actually have pixels in them.
+func _art_rows() -> Vector2i:
+	var tex := sprite.texture
+	if tex == null:
+		return Vector2i(0, 39)
+	var img := tex.get_image()
+	if img == null:
+		return Vector2i(0, tex.get_height() - 1)
+	if img.is_compressed():
+		img.decompress()
+	var w := img.get_width()
+	var top := 0
+	var bottom := img.get_height() - 1
+	while top < bottom and _row_blank(img, w, top):
+		top += 1
+	while bottom > top and _row_blank(img, w, bottom):
+		bottom -= 1
+	return Vector2i(top, bottom)
+
+func _row_blank(img: Image, w: int, y: int) -> bool:
+	for x in range(w):
+		if img.get_pixel(x, y).a > 0.03:
+			return false
+	return true
+
+# ---- job positions (queried by villagers) ----
 
 func open_jobs() -> int:
 	return jobs - filled
@@ -49,6 +105,7 @@ func claim_job() -> bool:
 	if not has_open_job():
 		return false
 	filled += 1
+	_take_job_icon()
 	_refresh_prompt()
 	return true
 
@@ -56,14 +113,19 @@ func work_point() -> Vector3:
 	# a spot just in front of the building for workers to stand
 	return global_position + Vector3(0, 0, 1.4)
 
-# ---- interaction (create jobs) ----
+# ---- interaction ----
+
+func _can_upgrade() -> bool:
+	return upgrade_cost > 0 and upgrade_texture != null and not upgraded
 
 func _prompt_text() -> String:
+	if _can_upgrade():
+		return "Hold E  %s (%d)" % [upgrade_display_name, upgrade_cost]
 	if job_type == "":
 		return ""
 	if jobs >= MAX_JOBS:
 		return "%s  (full)" % display_name
-	return "E  Add Job (%d)   %d/%d" % [JOB_COST, jobs, MAX_JOBS]
+	return "Hold E  Add Job (%d)   %d/%d" % [JOB_COST, jobs, MAX_JOBS]
 
 func show_prompt() -> void:
 	if _busy or _prompt_text() == "":
@@ -79,24 +141,35 @@ func _refresh_prompt() -> void:
 		_prompt.text = _prompt_text()
 
 func interact(who: Node3D) -> void:
-	if _busy or job_type == "" or jobs >= MAX_JOBS:
+	if _busy:
 		return
-	if not GoldFx.can_afford(JOB_COST):
+	if _can_upgrade():
+		await _buy(who, upgrade_cost, _raise_upgrade)
+	elif job_type != "" and jobs < MAX_JOBS:
+		await _buy(who, JOB_COST, _add_job)
+
+func _buy(who: Node3D, cost: int, on_paid: Callable) -> void:
+	if not GoldFx.can_afford(cost):
 		return
 	_busy = true
 	hide_prompt()
-	var ok: bool = await GoldFx.pay(who, self, JOB_COST, _height + 0.9)
+	var ok: bool = await GoldFx.pay(who, self, cost, _height + 0.9)
 	_busy = false
 	if ok:
-		jobs += 1
-		_add_job_icon()
+		on_paid.call()
 	if is_in_group("interactable") and is_instance_valid(who) and global_position.distance_to(who.global_position) < 3.5:
 		show_prompt()
 
+# ---- jobs ----
+
+func _add_job() -> void:
+	jobs += 1
+	_add_job_icon()
+
 func _add_job_icon() -> void:
 	var s := Sprite3D.new()
-	s.texture = BOW_TEX if job_type == "archer" else HAMMER_TEX
-	s.pixel_size = 0.014
+	s.texture = ARROW_TEX if job_type == "archer" else LOG_TEX
+	s.pixel_size = 0.0075
 	s.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	s.no_depth_test = true
@@ -106,9 +179,66 @@ func _add_job_icon() -> void:
 	s.scale = Vector3.ZERO
 	t.tween_property(s, "scale", Vector3.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
+## A villager just took this post, so its icon lifts off the roof and the row
+## closes up -- what's left is the count of vacancies.
+func _take_job_icon() -> void:
+	var n := _icons.get_child_count()
+	if n == 0:
+		return
+	var icon: Node3D = _icons.get_child(n - 1)
+	var world := icon.global_position
+	_icons.remove_child(icon)
+	get_tree().current_scene.add_child(icon)
+	icon.global_position = world
+	_layout_icons()
+	var t := icon.create_tween()
+	t.tween_property(icon, "global_position", world + Vector3(0, 0.45, 0), 0.32).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(icon, "scale", Vector3.ZERO, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	t.tween_callback(icon.queue_free)
+
 func _layout_icons() -> void:
 	var n := _icons.get_child_count()
-	var spacing := 0.32
+	var spacing := 0.52     # wide enough that the tools never pile into each other
 	var start_x := -spacing * (n - 1) * 0.5
 	for i in range(n):
 		_icons.get_child(i).position = Vector3(start_x + i * spacing, 0, 0)
+
+# ---- upgrade ----
+
+func _raise_upgrade() -> void:
+	upgraded = true
+	display_name = upgrade_display_name
+	sprite.texture = upgrade_texture
+	_fit_sprite(upgrade_pixel_size)
+	label.text = display_name
+	if job_type == "":
+		remove_from_group("interactable")
+	_dust()
+	# the new hall heaves up out of the ground, the grass hiding the join
+	var seat := sprite.position.y
+	sprite.position.y = seat - _height * 0.7
+	sprite.scale = Vector3(1.18, 0.4, 1.0)
+	sprite.modulate = Color(1.5, 1.45, 1.3, 1.0)
+	var t := create_tween()
+	t.tween_property(sprite, "position:y", seat, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(sprite, "scale", Vector3.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(sprite, "modulate", Color(1, 1, 1, 1), 0.55)
+
+func _dust() -> void:
+	for i in range(10):
+		var p := Sprite3D.new()
+		p.texture = DUST_TEX
+		p.pixel_size = 0.016
+		p.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+		p.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		p.modulate = Color(0.76, 0.72, 0.62, 0.95)
+		get_tree().current_scene.add_child(p)
+		var a := randf() * TAU
+		p.global_position = global_position + Vector3(cos(a), 0, sin(a)) * randf_range(0.3, 1.0) + Vector3(0, 0.1, 0)
+		var to := p.global_position + Vector3(cos(a), 0, sin(a)) * randf_range(0.5, 1.0)
+		to.y += randf_range(0.4, 0.9)
+		var t := p.create_tween()
+		t.tween_property(p, "global_position", to, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(p, "scale", Vector3(2.0, 2.0, 2.0), 0.6)
+		t.parallel().tween_property(p, "modulate:a", 0.0, 0.6)
+		t.tween_callback(p.queue_free)
