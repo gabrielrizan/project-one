@@ -16,3 +16,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
 shape = SubResource("CapsuleShape3D_wa")
 
 [node name="Model" type="Node3D" parent="."]
+
+[node name="NavAgent" type="NavigationAgent3D" parent="."]
+radius = 0.35
+height = 1.5
+path_desired_distance = 0.5
+target_desired_distance = 0.4
+avoidance_enabled = false

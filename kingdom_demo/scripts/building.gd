@@ -97,6 +97,9 @@ func _fit(height: float) -> void:
 	box.size = Vector3(w, _height, w)
 	_collision.shape = box
 	_collision.position.y = _height * 0.5
+	# a new hut, or a tier that just grew a wider footprint -- either way the
+	# villagers' paths through the village need to know about it
+	NavWorld.rebake(self)
 
 # ---- job positions (queried by villagers) ----
 

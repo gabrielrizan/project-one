@@ -1,10 +1,11 @@
-[gd_scene load_steps=9 format=3 uid="uid://cf1mdvlepu7md"]
+[gd_scene load_steps=10 format=3 uid="uid://cf1mdvlepu7md"]
 
 [ext_resource type="Script" uid="uid://dxhqc5c5pptxn" path="res://kingdom_demo/scripts/campfire.gd" id="1_cf"]
 [ext_resource type="PackedScene" uid="uid://befoxaqi0xv07" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/campfire-pit.glb" id="2_pit"]
 [ext_resource type="PackedScene" uid="uid://b221c8t3klo3l" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/campfire-stand.glb" id="3_stand"]
 [ext_resource type="PackedScene" path="res://kingdom_demo/assets/3d/props/flame.glb" id="4_flame"]
 [ext_resource type="PackedScene" path="res://kingdom_demo/assets/3d/props/cauldron.glb" id="5_pot"]
+[ext_resource type="AudioStream" uid="uid://cgrgl82eg1qvl" path="res://kingdom_demo/assets/audio/campfire_loop.ogg" id="6_fire"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_cf"]
 size = Vector3(1.4, 1, 1.4)
@@ -24,6 +25,15 @@ script = ExtResource("1_cf")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 shape = SubResource("BoxShape3D_cf")
+
+[node name="Crackle" type="AudioStreamPlayer3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+stream = ExtResource("6_fire")
+volume_db = -4.0
+unit_size = 3.5
+max_distance = 22.0
+bus = &"Ambience"
+attenuation_filter_cutoff_hz = 20500.0
 
 [node name="Extinguished" parent="." instance=ExtResource("2_pit")]
 transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 0, 0)

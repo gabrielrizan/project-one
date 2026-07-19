@@ -185,6 +185,8 @@ func _plant(pos: Vector3) -> void:
 	add_child(t)
 	t.position = Vector3(clampf(pos.x, -48.0, 48.0), 0.0, clampf(pos.z, -48.0, 48.0))
 	t.rotation.y = _rng.randf() * TAU
+	# scenery trees carry no script, so `wind.gd` rocks them from the outside
+	t.add_to_group("wind_sway")
 
 ## Builds one tree with random shape / size / colour.
 func _make_tree() -> Node3D:

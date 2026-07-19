@@ -50,16 +50,22 @@ each session. `GAME_DESIGN.md` §13 lists rough priorities, but treat it as idea
 wanderers → they eat, become citizens, take jobs · workers fell marked trees · archers hunt
 and forage by daylight · crew construction for walls, wall→stone, and both hall tiers ·
 main building L1 Tent → L2 Wooden Hall → L3 Stone Hall · day/night with real camp lighting ·
+navmesh pathfinding round everything solid, re-baked as the village changes ·
 title + pause menus, settings persist.
 
 **⚠️ Nothing can go wrong yet.** There are no enemies, no night waves, no combat, and no
 lose condition. The walls, gates, archers and day/night cycle are all *setup* for a threat
 that does not exist. That is the single biggest gap — see `GAME_DESIGN.md` §9.
 
-**Also not built:** L4 Castle · soup upkeep / morale / desertion · housing cap · mercenaries
+**Also not built:** L4 Castle · soup upkeep / morale / desertion · mercenaries
 · map objectives and moving to the next map · any audio at all.
 
 **Placeholder numbers:** hall tier costs are a flat 5 so testing is fast, not a tuned curve.
+
+**Population is capped by the hall's tier** — 6 at L1 Tent, 9 at L2, 12 at L3
+(`campfire.gd::TIER_CAPS`). Room to grow is what the upgrade buys. The cap gates *drawing
+new wanderers*, not filling the pot: a batch of five outnumbers the cauldron's three
+servings, so refusing the sale at cap would strand the last arrivals hungry for good.
 
 ## The two docs
 
@@ -84,6 +90,9 @@ on an unresolved fork, check **§12 (Open questions)** and raise it rather than 
 - **Implement the mechanic asked for.** Don't redesign adjacent systems in the same pass;
   surface the idea instead.
 - **Ask before downloading any new asset**, and record its licence in `assets/licenses/`.
+- **Audio is CC0 or CC-BY only** — never `-SA` or `-NC`. Claude cannot hear anything, so
+  Andrei does every ear test: send candidates out for audition with the per-role criteria
+  from `ASSETS.md` ("What to listen for"), restated each batch.
 - **No full end-to-end tests.** Go straight at the feature; don't re-verify things that
   already worked. See "Running and verifying".
 - **Hand finished features to Andrei to play-test**, and ask him to report back using the
@@ -205,10 +214,15 @@ for the duration, so the king stays **locked on target** and a second tally can 
 - **`villager.gd` is one big state machine** for the whole civilian life cycle — eating,
   taking a job, chopping, hunting, foraging, building, hauling gold home. Resist splitting
   it across files; keep the sections commented instead.
-- **Villagers have no pathfinding.** They steer straight at a goal, so a building square in
-  the way pins them — `move_and_slide` has nothing to slide along on a dead-on hit.
-  `_unstick()` sidesteps after 0.45s of trying-but-not-moving. Placing anything new in the
-  village interior can create a new pin point.
+- **Everything that walks paths through the navmesh** (`nav_world.gd`, `nav_mover.gd`).
+  `NavWorld` is a `NavigationRegion3D` in the main scene that bakes from the world's
+  *static collision*, so anything solid is an obstacle with no bookkeeping — nothing
+  registers itself. Put a collider up or take one down and call `NavWorld.rebake(self)`;
+  requests coalesce and the bake is synchronous (~15ms). Bodies own a `NavigationAgent3D`
+  plus a `NavMover`, which turns a destination into a steering direction — so `_seek()`
+  and `_move_to()` kept their shape and every caller is unchanged. **F3** toggles path
+  lines and pathfinding logs. `_unstick()` survives as a backstop for the two cases the
+  mesh can't cover: another villager in the doorway, and a goal that isn't on the mesh.
 
 ## Gotchas that have already cost time
 
@@ -235,6 +249,24 @@ for the duration, so the king stays **locked on target** and a second tally can 
   `for t in get_nodes_in_group("tree"): if t.felled` **always counts zero** — the felled ones
   are already gone. Measure the group *shrinking*, not a flag on members. This produced a
   confident false bug report at least once.
+- **A short obstacle can quietly become a step.** Recast measures climb in whole
+  `cell_height` cells. At a 0.25 cell with `agent_max_climb = 0.5`, a 0.7m berry bush came
+  out exactly two cells tall — i.e. a step you walk up — so bushes vanished from the mesh
+  while keeping their collision. Peasants heading for the cauldron were routed *through* a
+  bush, bounced off it, and shuffled back and forth against it all day. The world is one
+  flat slab, so `cell_height` and `agent_max_climb` are both as small as they go. **If the
+  navmesh and physics ever disagree about what is solid, units oscillate** — that is the
+  signature of this class of bug.
+- **A baked navmesh does not sit on the ground.** Recast lays polygons on top of the voxel
+  column, so the surface comes out `2 × cell_height` (0.5m here) above the collider face
+  bodies stand on. `NavigationAgent3D` measures "have I reached this waypoint" in all three
+  axes, so an agent at y=0 decides it has *never* arrived and stalls one step into its path
+  — moving, but at a crawl, with no error anywhere. `NavWorld` measures the offset after
+  each bake and every agent wears it as `path_height_offset`. Cost an afternoon.
+- **Baking takes collision at face value, including a shut gate.** A closed gate is a solid
+  box across the only gap in the palisade; baked in, it seals the village and nothing ever
+  gets out. `NavWorld._lift_gates()` drops them for the bake and puts them straight back.
+  Anything else that is solid-but-meant-to-be-passable needs the same treatment.
 - **Holding "interact" for a fixed 1–2s is not enough for a big tally.** Each coin takes
   `COIN_FLIGHT + COIN_GAP` ≈ 0.44s, so a 30-gold purchase needs ~14s of holding. Size the
   hold off the cost or the purchase silently never completes.
@@ -244,6 +276,9 @@ for the duration, so the king stays **locked on target** and a second tally can 
 Full inventory and provenance: **`kingdom_demo/ASSETS.md`**. The rules:
 
 - Licences for everything live in `assets/licenses/` — keep that true.
+- **Anything requiring attribution goes in `assets/licenses/ATTRIBUTION-REQUIRED.md`**, in the
+  same commit that adds the asset. That file is the shipping checklist for the credits
+  screen; a CC-BY asset that never reaches it is a licence violation waiting to happen.
 - **Ask before downloading anything new**, and record the licence next to the others.
 - Everything must land in the palette above; tint off-palette assets rather than accepting
   them as-is.

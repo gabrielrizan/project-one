@@ -36,6 +36,9 @@ var _banner_t := 0.0
 func _ready() -> void:
 	add_to_group("interactable")
 	add_to_group("tree")
+	# the Model sways, never the body -- moving the StaticBody3D would drag its
+	# collider around and the navmesh is baked from exactly that. See wind.gd.
+	model.add_to_group("wind_sway")
 	_base_x = model.position.x
 	set_process(false)   # only marked trees need per-frame work
 
@@ -129,6 +132,11 @@ func _fell(from: Vector3) -> void:
 		remove_from_group("interactable")
 	hide_prompt()
 	collision.set_deferred("disabled", true)
+	NavWorld.rebake(self)    # the trunk stops being something to walk around
+	# hand the model back before the topple takes it over, or the wind would keep
+	# writing rotation onto something mid-fall
+	model.remove_from_group("wind_sway")
+	model.rotation = Vector3.ZERO
 	set_process(false)
 	if is_instance_valid(_blaze):
 		_blaze.queue_free()

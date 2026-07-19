@@ -21,7 +21,6 @@ const ACCEL := 40.0
 const ARRIVE := 1.8
 const WORK_ARRIVE := 0.7
 const EAT_TIME := 2.5
-const WALL_HALF := 8.0     # matches the palisade square
 
 const CHOP_REACH := 1.15   # where a worker plants their feet to swing
 const SWING_TIME := 0.46
@@ -29,6 +28,11 @@ const GATHER_REACH := 0.55
 const DELIVER_REACH := 1.7
 const ERRAND_SCAN := 1.0   # how often an idle villager looks for something to do
 const LOOT_TIMEOUT := 5.0
+## Give up on a coin that can't be got at, so a villager is never locked out of
+## work by one. Collecting anything resets it, so a good haul is never cut short --
+## only a coin nobody can reach runs it down. Abandoned gold is not lost: it keeps
+## bobbing where it fell and the monarch snaps it up when he rides past.
+const GATHER_TIMEOUT := 6.0
 const CARRY_SPACING := 0.30
 const CARRY_Y := 1.32
 
@@ -54,6 +58,7 @@ const CARRY_SCALE := 0.75
 const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
 
 @onready var model_root: Node3D = $Model
+@onready var _agent: NavigationAgent3D = $NavAgent
 
 var target := Vector3.ZERO          # cauldron position, set by spawner
 
@@ -65,8 +70,7 @@ var _mill := Vector3.ZERO
 var _mill_t := 0.0
 var _bob := 0.0
 var _base_y := 0.0
-var _route_gate := Vector3.ZERO
-var _has_gate := false
+var _nav: NavMover = null
 
 var _tree: Node3D = null
 var _quarry: Node3D = null
@@ -86,6 +90,7 @@ var _beat_t := 0.0
 var _facing := 1.0
 var _scan_t := 0.0
 var _wait_t := 0.0
+var _gather_t := 0.0
 var _stuck_t := 0.0
 var _detour := Vector3.ZERO
 var _detour_t := 0.0
@@ -97,12 +102,16 @@ func _ready() -> void:
 	_base_y = 0.0
 	_set_model(VILLAGER_MODEL)
 	_mill = target
+	_nav = NavMover.new(_agent, self)
+
+func _exit_tree() -> void:
+	if _nav:
+		_nav.cleanup()
 
 func _physics_process(delta: float) -> void:
 	match _state:
 		State.SEEK_FOOD:
-			var g := _route(target)
-			_seek(delta, g, (ARRIVE if g == target else 0.4))
+			_seek(delta, target, ARRIVE)
 			if global_position.distance_to(target) < ARRIVE:
 				_state = State.EAT
 				_eat_t = EAT_TIME
@@ -122,8 +131,7 @@ func _physics_process(delta: float) -> void:
 				_become_loyal()
 			else:
 				var wp: Vector3 = _workplace.work_point()
-				var g := _route(wp)
-				_seek(delta, g, (WORK_ARRIVE if g == wp else 0.4))
+				_seek(delta, wp, WORK_ARRIVE)
 				if global_position.distance_to(wp) < WORK_ARRIVE:
 					_start_working()
 		State.WORK:
@@ -267,8 +275,7 @@ func _walk_to_tree(delta: float) -> void:
 	if not _tree_standing():
 		_abandon_tree()
 		return
-	var g := _route(_chop_spot)
-	_seek(delta, g, (0.2 if g == _chop_spot else 0.4))
+	_seek(delta, _chop_spot, 0.2)
 	if global_position.distance_to(_tree.global_position) < CHOP_REACH + 0.35:
 		_state = State.CHOP
 		_swing_t = 0.25
@@ -352,8 +359,7 @@ func _walk_to_site(delta: float) -> void:
 	if _site_t <= 0.0:
 		_leave_site()
 		return
-	var g := _route(_build_spot)
-	_seek(delta, g, (0.25 if g == _build_spot else 0.4))
+	_seek(delta, _build_spot, 0.25)
 	if global_position.distance_to(_build_spot) < BUILD_REACH:
 		_state = State.BUILD
 		_hammer_t = 0.2
@@ -430,8 +436,7 @@ func _stalk(delta: float) -> void:
 		_face(_quarry.global_position)
 		_stand(delta)
 		return
-	var g := _route(_quarry.global_position)
-	_seek(delta, g, (BOW_RANGE * 0.85 if g == _quarry.global_position else 0.4))
+	_seek(delta, _quarry.global_position, BOW_RANGE * 0.85)
 
 func _take_aim(delta: float) -> void:
 	if not _quarry_alive():
@@ -515,8 +520,7 @@ func _walk_to_bush(delta: float) -> void:
 		_abandon_bush()
 		return
 	var p: Vector3 = _bush.pick_point()
-	var g := _route(p)
-	_seek(delta, g, (FORAGE_REACH if g == p else 0.4))
+	_seek(delta, p, FORAGE_REACH)
 	if global_position.distance_to(p) < FORAGE_REACH + 0.3:
 		_state = State.FORAGE
 		_pick_t = PICK_TIME
@@ -565,6 +569,7 @@ func receive_loot(coins: Array) -> void:
 	_loot = coins
 	if _state == State.LOOT_WAIT:
 		_state = State.GATHER
+		_gather_t = GATHER_TIMEOUT
 
 func _gather(delta: float) -> void:
 	var next: Node3D = null
@@ -576,18 +581,25 @@ func _gather(delta: float) -> void:
 		if d < best:
 			best = d
 			next = c
-	if next == null:
-		_loot.clear()
-		if _purse.is_empty():
-			_end_errand()
-		else:
-			_state = State.PRESENT if _job_is("archer") else State.DELIVER
+	# nothing left worth chasing -- either we picked it all up, or the last of it
+	# is somewhere we can't get to and we've spent long enough trying
+	_gather_t -= delta
+	if next == null or _gather_t <= 0.0:
+		_done_gathering()
 		return
 	_seek(delta, next.global_position, 0.15)
 	if best < GATHER_REACH:
 		_loot.erase(next)
 		next.collect_to(self)
 		_pocket_coin()
+		_gather_t = GATHER_TIMEOUT   # still making progress, so keep going
+
+func _done_gathering() -> void:
+	_loot.clear()
+	if _purse.is_empty():
+		_end_errand()
+	else:
+		_state = State.PRESENT if _job_is("archer") else State.DELIVER
 
 ## Workers just dump the timber gold at the king's feet.
 func _deliver(delta: float) -> void:
@@ -596,8 +608,7 @@ func _deliver(delta: float) -> void:
 		_dump_purse(global_position)
 		_end_errand()
 		return
-	var g := _route(king.global_position)
-	_seek(delta, g, (DELIVER_REACH if g == king.global_position else 0.4))
+	_seek(delta, king.global_position, DELIVER_REACH)
 	if global_position.distance_to(king.global_position) < DELIVER_REACH + 0.3:
 		_face(king.global_position)
 		if is_instance_valid(_model):   # a quick bob of a bow as the purse comes off
@@ -615,8 +626,7 @@ func _present(delta: float) -> void:
 		_dump_purse(global_position)
 		_end_errand()
 		return
-	var g := _route(king.global_position)
-	_seek(delta, g, (PRESENT_REACH if g == king.global_position else 0.4))
+	_seek(delta, king.global_position, PRESENT_REACH)
 	if global_position.distance_to(king.global_position) >= PRESENT_REACH + 0.3:
 		return
 
@@ -723,65 +733,34 @@ func _face(p: Vector3) -> void:
 	if is_instance_valid(_model):
 		_model.rotation.y = _yaw
 
-# ---- routing (steer through gates instead of into walls) ----
-
-func _route(final: Vector3) -> Vector3:
-	# Same side of the palisade (or no walls yet) -> head straight there.
-	if not _walls_exist() or _inside(global_position) == _inside(final):
-		_has_gate = false
-		return final
-	# Crossing the wall: commit to one gate (cached so we don't dither at corners)
-	# and aim for a point just past it, so we walk THROUGH rather than stop on it.
-	if not _has_gate:
-		_route_gate = _pick_gate(final)
-		_has_gate = true
-	var inward := final - _route_gate
-	inward.y = 0.0
-	if inward.length() < 0.01:
-		inward = Vector3(0, 0, 1)
-	return _route_gate + inward.normalized() * 2.5
-
-func _inside(p: Vector3) -> bool:
-	return absf(p.x) < WALL_HALF and absf(p.z) < WALL_HALF
-
-func _pick_gate(final: Vector3) -> Vector3:
-	var gates: Array[Vector3] = [
-		Vector3(0, 0, -WALL_HALF), Vector3(0, 0, WALL_HALF),
-		Vector3(WALL_HALF, 0, 0), Vector3(-WALL_HALF, 0, 0),
-	]
-	var best: Vector3 = gates[0]
-	var bd := INF
-	for gp in gates:
-		var d := global_position.distance_to(gp) + gp.distance_to(final)
-		if d < bd:
-			bd = d
-			best = gp
-	return best
-
-func _walls_exist() -> bool:
-	for w in get_tree().get_nodes_in_group("wall_side"):
-		if w.built:
-			return true
-	return false
-
 # ---- movement helpers ----
 
+## Walk toward `goal`, stopping once within `stop` of it. The heading comes from
+## the navmesh ([NavMover]), so huts, trees and walls are gone round rather than
+## walked into, and crossing the palisade finds the gate on its own -- villagers
+## used to be told which gate to aim for by hand.
 func _seek(delta: float, goal: Vector3, stop: float) -> void:
 	var to := goal - global_position
 	to.y = 0.0
 	var tv := Vector3.ZERO
 	if to.length() > stop:
-		tv = _unstick(delta, to.normalized() * SPEED)
+		var dir := _nav.direction_to(goal, delta)
+		# The navmesh has nothing left to offer: either we are standing on the end
+		# of the path already, or the goal is somewhere it can't reach -- a coin
+		# that rolled under a bush. Bear down on it directly and let _unstick cope,
+		# which is what every villager did before there was a navmesh.
+		if dir == Vector3.ZERO:
+			dir = to.normalized()
+		tv = _unstick(delta, dir * SPEED)
 	velocity.x = move_toward(velocity.x, tv.x, ACCEL * delta)
 	velocity.z = move_toward(velocity.z, tv.z, ACCEL * delta)
 	move_and_slide()
 	_animate(delta, Vector2(velocity.x, velocity.z).length() > 0.3)
 
-## Villagers steer straight at whatever they are heading for, with no pathfinding,
-## so a building square in the way pins them against it: `move_and_slide` has
-## nothing to slide along when you walk into a wall dead-on. If we are asking to
-## move and hardly moving, sidestep for a moment and try again -- enough to get
-## round a hut on the way to a tree or a wall site.
+## The navmesh steers round everything solid that was standing when it was last
+## baked, which leaves two ways to still end up wedged: another villager in the
+## doorway, or a goal off the mesh that we are bearing down on directly. If we
+## are asking to move and hardly moving, sidestep for a moment and try again.
 func _unstick(delta: float, want: Vector3) -> Vector3:
 	if _detour_t > 0.0:
 		_detour_t -= delta

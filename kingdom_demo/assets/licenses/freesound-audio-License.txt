@@ -1,0 +1,84 @@
+Audio assets from Freesound.org
+===============================
+
+Sourced CC0 or CC-BY only. Never -SA (share-alike) or -NC (non-commercial).
+
+Files were obtained as Freesound's public high-quality OGG previews (192 kbps),
+which are served unauthenticated from cdn.freesound.org. The original masters sit
+behind an OAuth2 download and were judged not worth the friction: 192k OGG is
+already better than the material it replaced, and the difference is inaudible
+under a stylised low-poly game.
+
+⚠ THE CC-BY FILES BELOW MUST BE CREDITED IN THE SHIPPED GAME.
+   See ATTRIBUTION-REQUIRED.md next to this file — that is the checklist.
+
+
+ambience_day.ogg                                        [CC BY 4.0 — CREDIT]
+--------------------------------------------------------------------------
+Title:    Winter forest NL 1112AM 220124_0326
+Author:   klankbeeld
+Source:   https://freesound.org/s/616354/
+Licence:  Attribution 4.0 — https://creativecommons.org/licenses/by/4.0/
+Length:   212 s
+Used for: the daytime bed (ambience.gd). Winter, so bare trees and wind rather
+          than a dawn chorus -- chosen for bleakness over prettiness.
+
+
+ambience_night.ogg                                      [CC BY 4.0 — CREDIT]
+--------------------------------------------------------------------------
+Title:    230809_2526_FR_Insects-twilight-pi
+Author:   kevp888
+Source:   https://freesound.org/s/700734/
+Licence:  Attribution 4.0
+Length:   219 s
+Used for: the night bed (ambience.gd), crossfaded against the day one at dusk.
+
+
+campfire_loop.ogg                                       [CC BY 4.0 — CREDIT]
+--------------------------------------------------------------------------
+Title:    FIREBurn_Campfire.Close.Long.Crackling
+Author:   newlocknew
+Source:   https://freesound.org/s/730704/
+Licence:  Attribution 4.0
+Length:   157 s
+Used for: the campfire's positional crackle (campfire.tscn). Replaced a 3.5 s
+          clip whose loop was plainly audible -- see ASSETS.md on why a bed
+          needs length.
+
+
+ambience_night_woods_SPARE.ogg                [CC BY 4.0 — NOT CURRENTLY USED]
+--------------------------------------------------------------------------
+Title:    evening woods 01 NL 151009_0806
+Author:   klankbeeld
+Source:   https://freesound.org/s/324409/
+Licence:  Attribution 4.0
+Length:   181 s
+Status:   Was the night bed briefly, then swapped out for the kevp888 insects
+          recording. Kept on request as a held-back alternative. Nothing
+          references it; wiring it in means adding it to the credits block in
+          ATTRIBUTION-REQUIRED.md.
+
+
+owl_hoot.ogg                                         [CC0 — no credit needed]
+--------------------------------------------------------------------------
+Title:    Owl Hoot
+Author:   Breviceps
+Source:   https://freesound.org/s/465697/
+Licence:  CC0 1.0 — https://creativecommons.org/publicdomain/zero/1.0/
+Length:   4.4 s
+Used for: the night one-shot layer (ambience.gd), fired at randomised intervals
+          from randomised bearings around the monarch.
+
+
+tree_creak_a.ogg / _b.ogg / _c.ogg                   [CC0 — no credit needed]
+--------------------------------------------------------------------------
+Titles:   tree_creak.wav (0.4 s), tree_creak_02.wav (1.8 s),
+          tree_creak_04.wav (10.9 s)
+Author:   Department64
+Source:   https://freesound.org/s/95259/ , /95260/ , /95262/
+Licence:  CC0 1.0
+Used for: the daytime one-shot layer (ambience.gd). Three very different
+          lengths on purpose -- a tick, a creak and a long groan -- so the
+          randomiser pool has real variety instead of one recognisable noise.
+          Played out of an actual trunk within earshot of the monarch, so the
+          woods fall quiet in open ground.

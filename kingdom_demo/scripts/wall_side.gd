@@ -263,6 +263,11 @@ func face_point(from: Vector3) -> Vector3:
 func _right() -> Vector3:
 	return global_transform.basis.x.normalized()
 
+## The box that fills the gateway while the gate is shut. [NavWorld] lifts it for
+## the bake so the gap stays walkable -- see there for why.
+func gate_collision() -> CollisionShape3D:
+	return _gate_col
+
 # ---- raising / converting sections ----
 
 ## A section heaves up out of the ground and thumps into place, throwing dirt.
@@ -307,6 +312,9 @@ func _finish() -> void:
 	_clear_site_props()
 	_build_wall_collision()
 	_build_gate()
+	# the run is solid now and the only way through is the gate -- villagers find
+	# it themselves once the navmesh knows the wall is there
+	NavWorld.rebake(self)
 	_celebrate()
 
 func _finish_stone() -> void:

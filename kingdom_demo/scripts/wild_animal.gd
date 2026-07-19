@@ -18,8 +18,10 @@ const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
 @export var spook_range: float = 2.4
 
 @onready var model_root: Node3D = $Model
+@onready var _agent: NavigationAgent3D = $NavAgent
 
 var dead := false
+var _nav: NavMover = null
 
 var _model: Node3D = null
 var _anim: AnimationPlayer = null
@@ -44,7 +46,12 @@ func _ready() -> void:
 		_play_anim(["Walk", "walk", "Gallop", "Idle", "idle"])
 	_base_y = 0.0
 	_home = global_position
+	_nav = NavMover.new(_agent, self)
 	_pick_spot()
+
+func _exit_tree() -> void:
+	if _nav:
+		_nav.cleanup()
 
 func _find_anim(n: Node) -> AnimationPlayer:
 	if n is AnimationPlayer:
@@ -142,13 +149,22 @@ func _pick_spot() -> void:
 	var a := randf() * TAU
 	_target = _home + Vector3(cos(a), 0, sin(a)) * randf_range(0.5, roam_radius)
 
+## Returns how far off `p` still is, which is what the caller watches for arrival.
 func _move_to(p: Vector3, delta: float, speed: float) -> float:
 	var to := p - global_position
 	to.y = 0.0
 	var d := to.length()
 	var tv := Vector3.ZERO
 	if d > 0.05:
-		tv = to.normalized() * speed
+		var dir := _nav.direction_to(p, delta)
+		# Grazing spots and bolt-to points are picked blind, so plenty of them sit
+		# inside a tree. The navmesh walks us as close as it can and then has
+		# nothing more; call that arrived rather than leave the animal shoving at
+		# a trunk until something else interrupts it.
+		if dir == Vector3.ZERO:
+			d = 0.0
+		else:
+			tv = dir * speed
 	velocity.x = move_toward(velocity.x, tv.x, ACCEL * delta)
 	velocity.z = move_toward(velocity.z, tv.z, ACCEL * delta)
 	move_and_slide()

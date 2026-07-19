@@ -10,6 +10,15 @@ const CAULDRON_MAX := 3
 const FEED_COST := 1
 const VILLAGER_COUNT := 5
 
+## How many souls the main building can house, by tier: L1 Tent, L2 Wooden Hall,
+## L3 Stone Hall. Room to grow is what an upgrade buys -- the hall is the reason
+## more people can live here, so the cap reads off its tier rather than sitting
+## in the game manager.
+##
+## Note this counts everyone drawn in, wanderers included, not just citizens who
+## have eaten and taken a job.
+const TIER_CAPS: Array[int] = [6, 9, 12]
+
 # PLACEHOLDER COSTS -- flat 5 so play-testing isn't gated behind grinding gold. These
 # want a real progression curve later; don't read "all tiers cost the same" as intent.
 const WOODEN_HALL_COST := 5   # L2
@@ -33,6 +42,7 @@ const SOUP_FULL_H := 0.44     # matches the CylinderMesh height in the scene
 @onready var _flame: Node3D = $Lit/Flame
 @onready var _soup: MeshInstance3D = $Lit/Cauldron/Soup
 @onready var _prompt: Label3D = $Prompt
+@onready var _crackle: AudioStreamPlayer3D = $Crackle
 
 var lit := false
 var fill := 0
@@ -41,6 +51,7 @@ var cauldron_full := false
 var _busy := false
 var _village_spawned := false
 var _flicker := 0.0
+var _hall: Node3D = null      # the main building, whose tier sets the population cap
 
 func _ready() -> void:
 	add_to_group("campfire")
@@ -62,6 +73,10 @@ func _prompt_text() -> String:
 	if not lit:
 		return "Hold E  Light Fire (%d)" % LIGHT_COST
 	if not cauldron_full:
+		# say when the hall is out of beds, so a full pot that draws nobody isn't
+		# a mystery -- the soup still feeds whoever is already here
+		if village_full():
+			return "Hold E  Fill Cauldron (%d)   village full %d" % [FEED_COST, villager_cap()]
 		return "Hold E  Fill Cauldron (%d)   %d/%d" % [FEED_COST, fill, CAULDRON_MAX]
 	return ""
 
@@ -154,9 +169,34 @@ func take_serving() -> bool:
 			add_to_group("interactable")
 	return true
 
+# ---------------------------------------------------------------- population
+
+## What the main building can house right now. Falls back to the Tent's figure
+## before the village exists at all.
+func villager_cap() -> int:
+	if not is_instance_valid(_hall):
+		return TIER_CAPS[0]
+	if _hall.upgraded2:
+		return TIER_CAPS[2]
+	return TIER_CAPS[1] if _hall.upgraded else TIER_CAPS[0]
+
+func population() -> int:
+	return get_tree().get_nodes_in_group("villager").size()
+
+func village_full() -> bool:
+	return population() >= villager_cap()
+
+## A full pot draws people out of the wild -- but only as many as there is room
+## for. Note this caps *drawing new wanderers*, not filling the pot: wanderers
+## already on their way in still have to eat before they will take a job, and a
+## batch of five outnumbers the three servings the cauldron holds. Refusing the
+## sale at cap would leave those last arrivals hungry for good.
 func _attract_villagers() -> void:
+	var room: int = villager_cap() - population()
+	if room <= 0:
+		return
 	var scene := get_tree().current_scene
-	for i in range(VILLAGER_COUNT):
+	for i in range(mini(VILLAGER_COUNT, room)):
 		var v := VILLAGER_SCENE.instantiate()
 		var a := randf() * TAU
 		var spawn := global_position + Vector3(cos(a), 0, sin(a)) * randf_range(15.0, 19.0)
@@ -175,7 +215,7 @@ func _spawn_village() -> void:
 	# -> L3 Stone Hall -> L4 Castle (not built yet). Lighting the fire raises the
 	# Tent for free; every tier after that is paid for AND raised by a crew, and
 	# reaching the Stone Hall is what opens the walls' own stone upgrade.
-	_spawn_building(TENT_MODEL, "Tent", Vector3(-3.6, 0, -2.6), 1.8, 1.3, "",
+	_hall = _spawn_building(TENT_MODEL, "Tent", Vector3(-3.6, 0, -2.6), 1.8, 1.3, "",
 		WOODEN_HALL_MODEL, "Wooden Hall", 1.4, 2.0, WOODEN_HALL_COST,
 		STONE_HALL_MODEL, "Stone Hall", STONE_HALL_SCALE, STONE_HALL_HEIGHT, STONE_HALL_COST, true)
 	_spawn_building(WORKER_MODEL, "Workers", Vector3(3.6, 0, -2.6), 1.8, 1.4, "worker")
@@ -184,7 +224,7 @@ func _spawn_village() -> void:
 func _spawn_building(scene: PackedScene, bname: String, pos: Vector3, sc: float, height: float, job: String,
 		up_scene: PackedScene = null, up_name := "", up_scale := 1.0, up_height := 0.0, up_cost := 0,
 		up2_scene: PackedScene = null, up2_name := "", up2_scale := 1.0, up2_height := 0.0, up2_cost := 0,
-		up2_unlocks_stone := false) -> void:
+		up2_unlocks_stone := false) -> Node3D:
 	var b := BUILDING_SCENE.instantiate()
 	b.model_scene = scene
 	b.display_name = bname
@@ -204,6 +244,7 @@ func _spawn_building(scene: PackedScene, bname: String, pos: Vector3, sc: float,
 	b.upgrade2_unlocks_stone = up2_unlocks_stone
 	get_tree().current_scene.add_child(b)
 	b.global_position = pos
+	return b
 
 # ---------------------------------------------------------------- state
 
@@ -212,3 +253,10 @@ func _apply_state() -> void:
 	_lit.visible = lit
 	_soup.visible = lit and fill > 0
 	set_process(lit)   # only a burning fire needs a flicker
+	# The crackle is positional, so it grows as the monarch rides in and the fire
+	# becomes something you can hear from across the camp -- the village has an
+	# audible centre, not just a visual one.
+	if lit and not _crackle.playing:
+		_crackle.play()
+	elif not lit and _crackle.playing:
+		_crackle.stop()
