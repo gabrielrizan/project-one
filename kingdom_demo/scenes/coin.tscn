@@ -1,11 +1,11 @@
-[gd_scene format=3 uid="uid://bammeipmjt28v"]
+[gd_scene load_steps=4 format=3 uid="uid://bammeipmjt28v"]
 
 [ext_resource type="Script" uid="uid://vldd37iqjc3" path="res://kingdom_demo/scripts/coin.gd" id="1_ugk17"]
-[ext_resource type="Texture2D" uid="uid://dyf0xh70ryu36" path="res://kingdom_demo/assets/pixel/coin.png" id="2_ph6ix"]
+[ext_resource type="PackedScene" path="res://kingdom_demo/assets/3d/props/coin.glb" id="2_model"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_ph6ix"]
-height = 0.44
-radius = 0.34
+height = 0.55
+radius = 0.42
 
 [node name="Coin" type="Area3D" unique_id=725793279]
 script = ExtResource("1_ugk17")
@@ -13,11 +13,7 @@ script = ExtResource("1_ugk17")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1582258729]
 shape = SubResource("CylinderShape3D_ph6ix")
 
-[node name="Sprite" type="Sprite3D" parent="." unique_id=1875676695]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.14, 0)
-pixel_size = 0.01
-billboard = 2
-shaded = true
-alpha_cut = 1
-texture_filter = 0
-texture = ExtResource("2_ph6ix")
+[node name="Model" type="Node3D" parent="."]
+transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, 0, 0.16, 0)
+
+[node name="Mesh" parent="Model" instance=ExtResource("2_model")]

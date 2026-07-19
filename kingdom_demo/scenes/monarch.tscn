@@ -1,11 +1,11 @@
-[gd_scene format=3 uid="uid://cgqh2mar6ptq"]
+[gd_scene load_steps=4 format=3 uid="uid://cgqh2mar6ptq"]
 
 [ext_resource type="Script" uid="uid://g4okba67ihjc" path="res://kingdom_demo/scripts/monarch.gd" id="1_dptmh"]
-[ext_resource type="Texture2D" uid="uid://v7wlfy25h1iy" path="res://kingdom_demo/assets/pixel/king.png" id="2_kibdt"]
+[ext_resource type="PackedScene" path="res://kingdom_demo/assets/3d/characters/monarch_horse.glb" id="2_king"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_e1gbk"]
-radius = 0.35
-height = 1.6
+radius = 0.45
+height = 1.7
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_qq12p"]
 radius = 1.8
@@ -14,7 +14,7 @@ radius = 1.8
 script = ExtResource("1_dptmh")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1466229316]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
 shape = SubResource("CapsuleShape3D_e1gbk")
 
 [node name="InteractArea" type="Area3D" parent="." unique_id=957581215]
@@ -23,11 +23,6 @@ shape = SubResource("CapsuleShape3D_e1gbk")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
 shape = SubResource("SphereShape3D_qq12p")
 
-[node name="Sprite" type="Sprite3D" parent="." unique_id=123385536]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92, 0)
-pixel_size = 0.009583
-billboard = 2
-shaded = true
-alpha_cut = 1
-texture_filter = 0
-texture = ExtResource("2_kibdt")
+[node name="Model" type="Node3D" parent="."]
+
+[node name="Mount" parent="Model" instance=ExtResource("2_king")]

@@ -1,0 +1,37 @@
+Generated 3D models
+
+Locations:
+  kingdom_demo/assets/3d/characters/  villager, worker, archer, monarch_horse, rabbit
+  kingdom_demo/assets/3d/props/       berry_bush, berry_bush_picked
+
+------------------------------
+
+These glTF models were generated procedurally in-project (Python geometry kit,
+July 2026) for kingdom_demo. They are original works containing no third-party
+geometry, textures or other assets.
+
+License: dedicated to the project without restriction (treat as CC0 within this
+repository). No attribution required.
+
+Why these exist:
+  - villager / worker / archer / monarch_horse - the cast, in one coherent
+    palette. A wanderer carries no tools; taking a job swaps in the model that
+    does, so someone's trade is readable across the camp.
+  - rabbit - the "Ultimate Animated Animals" pack has no hare. (Its Stag is
+    used for deer and keeps that pack's rigged walk cycle.)
+  - berry_bush / berry_bush_picked - the bush was standing in as a Kenney grass
+    tuft, which read as grass rather than as something worth foraging.
+
+Technical notes:
+  - Flat-shaded vertex geometry, one glTF material per palette colour,
+    metallic 0 / roughness 1, colours stored linear. No textures, no rigs.
+  - Authored facing +Z with feet/base at y = 0, matching how villager.gd and
+    wild_animal.gd turn models with atan2(vel.x, vel.z).
+  - Heights: villager 1.20, worker 1.26, archer 1.32, monarch+horse 1.95,
+    rabbit 0.42, berry bush 0.80 world units.
+  - Triangles: 192 / 336 / 342 / 618 / 252 / 562 / 226.
+
+Palette (shared with the whole art direction): moss, forest, sage and olive
+greens; oak and walnut browns; linen; stone; charcoal; muted gold; ember; and
+burgundy, which is the red-family complement that makes the monarch read as the
+focal point against all that green.

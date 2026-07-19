@@ -10,7 +10,7 @@ const GOLD_YIELD := 2
 const CHOPS_TO_FELL := 6
 
 const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
-const AXE_TEX := preload("res://kingdom_demo/assets/pixel/axe.png")
+const AXE_MODEL := preload("res://kingdom_demo/assets/3d/props/axe_marker.glb")
 
 const TRUNK_Y := 0.95         # height the axe bites at / the blaze is painted at
 const TRUNK_BASE_Y := 0.08    # where the trunk meets the grass -- the topple hinge
@@ -30,7 +30,7 @@ var _chops := 0
 var _busy := false
 var _base_x := 0.0
 var _blaze: Sprite3D = null
-var _banner: Sprite3D = null
+var _banner: Node3D = null
 var _banner_t := 0.0
 
 func _ready() -> void:
@@ -79,7 +79,7 @@ func _mark() -> void:
 	MarkFx.shake(self, model, _base_x, 0.09)
 	_blaze = MarkFx.blaze(self, TRUNK_Y, 0.013)
 	MarkFx.face_camera(_blaze, chop_anchor())
-	_banner = MarkFx.banner(self, AXE_TEX, BANNER_Y, 0.012)
+	_banner = MarkFx.banner(self, AXE_MODEL, BANNER_Y, 0.85)
 	MarkFx.leaves(self, global_position, 7, 2.3, 1.7, 0.6)
 	set_process(true)
 

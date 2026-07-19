@@ -4,7 +4,9 @@ extends Node3D
 ## renewable income rather than something you can strip-mine once.
 
 const ANIMAL_SCENE := preload("res://kingdom_demo/scenes/wild_animal.tscn")
-const RABBIT_MODEL := preload("res://kingdom_demo/assets/3d/Ultimate Animated Animals - July 2021-20260718T121948Z-1-001/Ultimate Animated Animals - July 2021/glTF/Fox.gltf")
+# The animal pack has no hare, so the rabbit is one of ours; the stag is theirs
+# and comes rigged, so it keeps its walk cycle.
+const RABBIT_MODEL := preload("res://kingdom_demo/assets/3d/characters/rabbit.glb")
 const DEER_MODEL := preload("res://kingdom_demo/assets/3d/Ultimate Animated Animals - July 2021-20260718T121948Z-1-001/Ultimate Animated Animals - July 2021/glTF/Stag.gltf")
 
 const RABBITS := 6
@@ -41,7 +43,7 @@ func _process(delta: float) -> void:
 		_spawn_stag()
 
 func _spawn_rabbit() -> void:
-	_spawn("rabbit", RABBIT_MODEL, 0.22, 1, 3.4, 5.0, 2.2)
+	_spawn("rabbit", RABBIT_MODEL, 1.0, 1, 3.4, 5.0, 2.2)
 
 func _spawn_stag() -> void:
 	_spawn("stag", DEER_MODEL, 0.38, 2, 2.7, 7.0, 3.4)

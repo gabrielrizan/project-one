@@ -4,8 +4,8 @@ extends CharacterBody3D
 ## and takes it -- swapping into a builder or archer outfit.
 ##
 ## Once employed they run errands between shifts:
-##   workers  -- claim a tree the monarch marked, fell it, haul the gold back and
-##               dump it at his feet.
+##   workers  -- raise a wall the monarch has paid for, or claim a tree he marked,
+##               fell it, haul the gold back and dump it at his feet.
 ##   archers  -- by daylight, strip a marked berry bush or hunt the rabbits and
 ##               stags roaming the woods, then kneel and present the take.
 
@@ -13,6 +13,7 @@ enum State {
 	SEEK_FOOD, EAT, LOYAL, GO_WORK, WORK,
 	GO_CHOP, CHOP, LOOT_WAIT, GATHER, DELIVER,
 	GO_HUNT, SHOOT, GO_FORAGE, FORAGE, PRESENT,
+	GO_BUILD, BUILD,
 }
 
 const SPEED := 3.2
@@ -28,7 +29,7 @@ const GATHER_REACH := 0.55
 const DELIVER_REACH := 1.7
 const ERRAND_SCAN := 1.0   # how often an idle villager looks for something to do
 const LOOT_TIMEOUT := 5.0
-const CARRY_SPACING := 0.24
+const CARRY_SPACING := 0.30
 const CARRY_Y := 1.32
 
 const BOW_RANGE := 4.2     # archers loose from beyond the animals' spook range
@@ -38,16 +39,21 @@ const PICK_TIME := 2.6
 const PICK_BEAT := 0.55
 const PRESENT_REACH := 1.6
 
-const VILLAGER_TEX := preload("res://kingdom_demo/assets/pixel/villager.png")
-const BUILDER_TEX := preload("res://kingdom_demo/assets/pixel/builder.png")
-const ARCHER_TEX := preload("res://kingdom_demo/assets/pixel/archer.png")
-const AXE_TEX := preload("res://kingdom_demo/assets/pixel/axe.png")
-const ARROW_TEX := preload("res://kingdom_demo/assets/pixel/bow.png")   # art is an arrow
-const COIN_TEX := preload("res://kingdom_demo/assets/pixel/coin.png")
-const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
-const LOYAL_TINT := Color(0.55, 0.75, 1.0)
+const BUILD_REACH := 1.4
+const HAMMER_BEAT := 0.42
+const SITE_WALK_TIMEOUT := 25.0   # can't reach the line -> free the slot for someone who can
 
-@onready var sprite: Sprite3D = $Sprite
+## A wanderer carries no tools; taking a job swaps in the model that does, so the
+## job someone holds is readable at a glance from across the camp.
+const VILLAGER_MODEL := preload("res://kingdom_demo/assets/3d/characters/villager.glb")
+const WORKER_MODEL := preload("res://kingdom_demo/assets/3d/characters/worker.glb")
+const ARCHER_MODEL := preload("res://kingdom_demo/assets/3d/characters/archer.glb")
+const ARROW_MODEL := preload("res://kingdom_demo/assets/3d/props/arrow_marker.glb")
+const COIN_MODEL := preload("res://kingdom_demo/assets/3d/props/coin.glb")
+const CARRY_SCALE := 0.75
+const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
+
+@onready var model_root: Node3D = $Model
 
 var target := Vector3.ZERO          # cauldron position, set by spawner
 
@@ -65,9 +71,14 @@ var _has_gate := false
 var _tree: Node3D = null
 var _quarry: Node3D = null
 var _bush: Node3D = null
+var _site: Node3D = null
+var _build_spot := Vector3.ZERO
+var _hammer_t := 0.0
+var _site_t := 0.0
 var _chop_spot := Vector3.ZERO
 var _wait_spot := Vector3.ZERO
-var _axe: Sprite3D = null
+var _model: Node3D = null
+var _yaw := 0.0
 var _swing_t := 0.0
 var _aim_t := 0.0
 var _pick_t := 0.0
@@ -75,12 +86,16 @@ var _beat_t := 0.0
 var _facing := 1.0
 var _scan_t := 0.0
 var _wait_t := 0.0
+var _stuck_t := 0.0
+var _detour := Vector3.ZERO
+var _detour_t := 0.0
 var _loot: Array = []               # coins our kill/tree/bush dropped, not gathered yet
-var _purse: Array = []              # coin sprites bobbing over our head
+var _purse: Array = []              # carried coin models bobbing over our head
 
 func _ready() -> void:
 	add_to_group("villager")
-	_base_y = sprite.position.y
+	_base_y = 0.0
+	_set_model(VILLAGER_MODEL)
 	_mill = target
 
 func _physics_process(delta: float) -> void:
@@ -129,6 +144,10 @@ func _physics_process(delta: float) -> void:
 			_walk_to_bush(delta)
 		State.FORAGE:
 			_forage(delta)
+		State.GO_BUILD:
+			_walk_to_site(delta)
+		State.BUILD:
+			_raise_wall(delta)
 		State.LOOT_WAIT:
 			_seek(delta, _wait_spot, 0.25)
 			_wait_t -= delta
@@ -144,10 +163,13 @@ func _physics_process(delta: float) -> void:
 # ---- transitions ----
 
 func _become_loyal() -> void:
+	# eating is what actually empties the pot -- an emptied cauldron can be
+	# refilled, which is how the camp grows past its first few wanderers
+	var pot = get_tree().get_first_node_in_group("campfire")
+	if pot and pot.has_method("take_serving"):
+		pot.take_serving()
 	_state = State.LOYAL
 	_recheck_t = 0.0
-	sprite.texture = VILLAGER_TEX
-	sprite.modulate = LOYAL_TINT
 
 func _try_take_job() -> void:
 	var best: Node3D = null
@@ -164,8 +186,7 @@ func _try_take_job() -> void:
 
 func _start_working() -> void:
 	_state = State.WORK
-	sprite.modulate = Color(1, 1, 1)
-	sprite.texture = ARCHER_TEX if _workplace.job_type == "archer" else BUILDER_TEX
+	_set_model(ARCHER_MODEL if _workplace.job_type == "archer" else WORKER_MODEL)
 
 func _work_anchor() -> Vector3:
 	return _workplace.work_point() if is_instance_valid(_workplace) else global_position
@@ -179,13 +200,21 @@ func _job_is(kind: String) -> bool:
 func is_free_archer() -> bool:
 	return _state == State.WORK and _job_is("archer")
 
+## Asked by a wall marker before it takes the monarch's gold: a wall he pays for
+## is raised by hand, so with nobody holding a hammer there is nobody to raise it.
+func is_worker() -> bool:
+	return _job_is("worker")
+
 func _is_night() -> bool:
 	var cycle = get_tree().get_first_node_in_group("day_night_cycle")
 	return cycle != null and cycle.is_night()
 
 func _look_for_errand() -> void:
 	if _job_is("worker"):
-		_claim_marked_tree()
+		# a wall the monarch has already paid for is waiting on hands -- that comes
+		# before going off into the woods after timber
+		if not _claim_build_site():
+			_claim_marked_tree()
 	elif _job_is("archer") and not _is_night():
 		# the monarch's marked bushes come first, then whatever is grazing
 		if not _claim_marked_bush():
@@ -223,7 +252,6 @@ func _claim_marked_tree() -> void:
 	_tree = best
 	_chop_spot = _stand_spot(best, CHOP_REACH)
 	_state = State.GO_CHOP
-	_show_axe(true)
 
 func _stand_spot(t: Node3D, reach: float) -> Vector3:
 	var away := global_position - t.global_position
@@ -256,20 +284,21 @@ func _chop(delta: float) -> void:
 		_swing_t = SWING_TIME
 		_swing_axe()
 
+## The worker model carries its own axe, so the swing is the whole body rocking
+## back and driving forward rather than a separate prop being animated.
 func _swing_axe() -> void:
-	if not is_instance_valid(_axe):
+	if not is_instance_valid(_model):
 		return
-	var rest := _axe_rest()
 	var t := create_tween()
-	# wind up over the shoulder...
-	t.tween_property(_axe, "position", rest + Vector3(-0.08 * _facing, 0.30, 0), 0.17).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	t.parallel().tween_property(sprite, "position:y", _base_y + 0.05, 0.17)
+	# rear back over the shoulder...
+	t.tween_property(_model, "rotation:x", deg_to_rad(-15.0), 0.17).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(_model, "position:y", _base_y + 0.05, 0.17)
 	# ...and drive it into the trunk
-	t.tween_property(_axe, "position", rest + Vector3(0.45 * _facing, -0.30, 0), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	t.parallel().tween_property(sprite, "position:y", _base_y - 0.04, 0.07)
+	t.tween_property(_model, "rotation:x", deg_to_rad(28.0), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	t.parallel().tween_property(_model, "position:y", _base_y - 0.04, 0.07)
 	t.tween_callback(_land_blow)
-	t.tween_property(_axe, "position", rest, 0.16).set_trans(Tween.TRANS_SINE)
-	t.parallel().tween_property(sprite, "position:y", _base_y, 0.16)
+	t.tween_property(_model, "rotation:x", 0.0, 0.16).set_trans(Tween.TRANS_SINE)
+	t.parallel().tween_property(_model, "position:y", _base_y, 0.16)
 
 func _land_blow() -> void:
 	if not _tree_standing():
@@ -287,6 +316,87 @@ func _abandon_tree() -> void:
 	if is_instance_valid(_tree) and _tree.has_method("release_cutter"):
 		_tree.release_cutter(self)
 	_tree = null
+	_end_errand()
+
+# ---- raising walls (workers) ----
+
+## A wall the monarch has paid for stands as a bare line of timber until workers
+## walk over and put it up. The nearest free hands go first, up to the site's crew
+## limit -- more of them on the line and it goes up faster.
+func _claim_build_site() -> bool:
+	var best: Node3D = null
+	var best_d := INF
+	for s in get_tree().get_nodes_in_group("build_site"):
+		if not s.has_method("needs_builders") or not s.needs_builders():
+			continue
+		var d := global_position.distance_to(s.global_position)
+		if d < best_d:
+			best_d = d
+			best = s
+	if best == null or not best.claim_builder(self):
+		return false
+	_site = best
+	_build_spot = best.build_spot(self)
+	_site_t = SITE_WALK_TIMEOUT
+	_state = State.GO_BUILD
+	return true
+
+func _site_open() -> bool:
+	return is_instance_valid(_site) and _site.site_active()
+
+func _walk_to_site(delta: float) -> void:
+	if not _site_open():
+		_leave_site()
+		return
+	_site_t -= delta
+	if _site_t <= 0.0:
+		_leave_site()
+		return
+	var g := _route(_build_spot)
+	_seek(delta, g, (0.25 if g == _build_spot else 0.4))
+	if global_position.distance_to(_build_spot) < BUILD_REACH:
+		_state = State.BUILD
+		_hammer_t = 0.2
+		_face(_site.face_point(global_position))
+		_site.builder_ready(self)
+
+func _raise_wall(delta: float) -> void:
+	if not _site_open():
+		_leave_site()
+		return
+	_stand(delta)
+	_hammer_t -= delta
+	if _hammer_t <= 0.0:
+		_hammer_t = HAMMER_BEAT
+		_swing_hammer()
+
+## The same rock-back-and-drive as felling, but shorter and quicker: driving
+## stakes into the line rather than burying an axe in a trunk.
+func _swing_hammer() -> void:
+	if not is_instance_valid(_model):
+		return
+	var t := create_tween()
+	t.tween_property(_model, "rotation:x", deg_to_rad(-12.0), 0.13).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(_model, "position:y", _base_y + 0.04, 0.13)
+	t.tween_property(_model, "rotation:x", deg_to_rad(24.0), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	t.parallel().tween_property(_model, "position:y", _base_y - 0.03, 0.07)
+	t.tween_callback(_land_hammer)
+	t.tween_property(_model, "rotation:x", 0.0, 0.14).set_trans(Tween.TRANS_SINE)
+	t.parallel().tween_property(_model, "position:y", _base_y, 0.14)
+
+func _land_hammer() -> void:
+	if not _site_open():
+		return
+	var at: Vector3 = _site.face_point(global_position)
+	at.y = 0.1
+	var dir := at - global_position
+	dir.y = 0.0
+	MarkFx.debris(self, at, dir.normalized(), 2, Color(0.72, 0.62, 0.44, 1.0), 0.012, 0.35)
+
+func _leave_site() -> void:
+	if is_instance_valid(_site) and _site.has_method("release_builder"):
+		_site.release_builder(self)
+	_site = null
 	_end_errand()
 
 # ---- the hunt (archers) ----
@@ -345,15 +455,11 @@ func _loose_arrow() -> void:
 	var from := global_position + Vector3(0, 0.7, 0)
 	var to: Vector3 = quarry.global_position + Vector3(0, 0.2, 0)
 
-	var arrow := Sprite3D.new()
-	arrow.texture = ARROW_TEX
-	arrow.pixel_size = 0.01
-	arrow.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
-	arrow.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	arrow.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
-	arrow.flip_h = _facing < 0.0
+	var arrow := MarkFx.model(ARROW_MODEL, 0.7)
 	get_tree().current_scene.add_child(arrow)
 	arrow.global_position = from
+	arrow.look_at(to, Vector3.UP)     # the model points down +X, so aim it along the flight
+	arrow.rotate_object_local(Vector3.UP, -PI / 2.0)
 
 	var t := arrow.create_tween()
 	t.tween_property(arrow, "global_position", to, 0.22).set_trans(Tween.TRANS_LINEAR)
@@ -364,9 +470,10 @@ func _loose_arrow() -> void:
 	)
 
 	# loose: the archer rocks back with the release
-	var r := create_tween()
-	r.tween_property(sprite, "position:x", sprite.position.x - 0.06 * _facing, 0.07)
-	r.tween_property(sprite, "position:x", sprite.position.x, 0.16)
+	if is_instance_valid(_model):
+		var r := create_tween()
+		r.tween_property(_model, "rotation:x", deg_to_rad(-9.0), 0.07)
+		r.tween_property(_model, "rotation:x", 0.0, 0.16)
 
 	_wait_spot = global_position
 	_quarry = null
@@ -426,9 +533,12 @@ func _forage(delta: float) -> void:
 		_beat_t = PICK_BEAT
 		_bush.rustle(global_position)
 		# stoop into the bush and come back up with a handful
-		var t := create_tween()
-		t.tween_property(sprite, "position:y", _base_y - 0.09, 0.16).set_trans(Tween.TRANS_SINE)
-		t.tween_property(sprite, "position:y", _base_y, 0.22).set_trans(Tween.TRANS_SINE)
+		if is_instance_valid(_model):
+			var t := create_tween()
+			t.tween_property(_model, "position:y", _base_y - 0.09, 0.16).set_trans(Tween.TRANS_SINE)
+			t.parallel().tween_property(_model, "rotation:x", deg_to_rad(22.0), 0.16)
+			t.tween_property(_model, "position:y", _base_y, 0.22).set_trans(Tween.TRANS_SINE)
+			t.parallel().tween_property(_model, "rotation:x", 0.0, 0.22)
 	_pick_t -= delta
 	if _pick_t <= 0.0:
 		var bush: Node3D = _bush
@@ -448,7 +558,7 @@ func _abandon_bush() -> void:
 func _wait_for_loot() -> void:
 	_state = State.LOOT_WAIT
 	_wait_t = LOOT_TIMEOUT
-	sprite.position.y = _base_y
+	_reset_pose()
 
 ## Called by the tree / bush / animal once its coins are on the ground.
 func receive_loot(coins: Array) -> void:
@@ -490,9 +600,10 @@ func _deliver(delta: float) -> void:
 	_seek(delta, g, (DELIVER_REACH if g == king.global_position else 0.4))
 	if global_position.distance_to(king.global_position) < DELIVER_REACH + 0.3:
 		_face(king.global_position)
-		var t := create_tween()   # a quick bob of a bow as the purse comes off
-		t.tween_property(sprite, "scale", Vector3(1.12, 0.86, 1.0), 0.1)
-		t.tween_property(sprite, "scale", Vector3.ONE, 0.16)
+		if is_instance_valid(_model):   # a quick bob of a bow as the purse comes off
+			var t := create_tween()
+			t.tween_property(_model, "rotation:x", deg_to_rad(20.0), 0.1)
+			t.tween_property(_model, "rotation:x", 0.0, 0.16)
 		_dump_purse(king.global_position)
 		_end_errand()
 
@@ -510,10 +621,14 @@ func _present(delta: float) -> void:
 		return
 
 	_face(king.global_position)
-	var t := create_tween()
-	t.tween_property(sprite, "scale", Vector3(1.18, 0.68, 1.0), 0.16).set_trans(Tween.TRANS_SINE)
-	t.tween_interval(0.34)
-	t.tween_property(sprite, "scale", Vector3.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if is_instance_valid(_model):
+		# down on one knee: sink and bow the torso, hold, then rise
+		var t := create_tween()
+		t.tween_property(_model, "position:y", _base_y - 0.22, 0.16).set_trans(Tween.TRANS_SINE)
+		t.parallel().tween_property(_model, "rotation:x", deg_to_rad(16.0), 0.16)
+		t.tween_interval(0.34)
+		t.tween_property(_model, "position:y", _base_y, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(_model, "rotation:x", 0.0, 0.22)
 	for i in range(_purse.size()):
 		_offer_coin(_purse[i], king, 0.12 + i * 0.1)
 	_purse.clear()
@@ -521,7 +636,7 @@ func _present(delta: float) -> void:
 		king.receive_tribute()
 	_end_errand()
 
-func _offer_coin(coin: Sprite3D, king: Node3D, delay: float) -> void:
+func _offer_coin(coin: Node3D, king: Node3D, delay: float) -> void:
 	if not is_instance_valid(coin):
 		return
 	var world := coin.global_position
@@ -538,7 +653,7 @@ func _offer_coin(coin: Sprite3D, king: Node3D, delay: float) -> void:
 			coin.global_position = world.lerp(peak, p).lerp(peak.lerp(dest, p), p),
 		0.0, 1.0, 0.42
 	).set_trans(Tween.TRANS_SINE)
-	t.parallel().tween_property(coin, "scale", Vector3(1.6, 1.6, 1.6), 0.42)
+	t.parallel().tween_property(coin, "scale", Vector3.ONE * CARRY_SCALE * 1.6, 0.42)
 	t.tween_callback(func() -> void:
 		if gm:
 			gm.add_coins(1)
@@ -546,27 +661,20 @@ func _offer_coin(coin: Sprite3D, king: Node3D, delay: float) -> void:
 	)
 
 func _end_errand() -> void:
-	_show_axe(false)
 	_loot.clear()
 	_scan_t = ERRAND_SCAN
-	sprite.position.y = _base_y
+	_reset_pose()
 	_state = State.WORK if is_instance_valid(_workplace) else State.LOYAL
 
 # ---- carried gold ----
 
 func _pocket_coin() -> void:
-	var c := Sprite3D.new()
-	c.texture = COIN_TEX
-	c.pixel_size = 0.009
-	c.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	c.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	c.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
-	c.no_depth_test = true
+	var c := MarkFx.model(COIN_MODEL, CARRY_SCALE)
 	add_child(c)
 	_purse.append(c)
 	_layout_purse()
 	c.scale = Vector3.ZERO
-	c.create_tween().tween_property(c, "scale", Vector3.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	c.create_tween().tween_property(c, "scale", Vector3.ONE * CARRY_SCALE, 0.22) 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _layout_purse() -> void:
 	var n := _purse.size()
@@ -588,42 +696,32 @@ func _dump_purse(toward: Vector3) -> void:
 		c.queue_free()
 	_purse.clear()
 
-# ---- tools ----
+# ---- body ----
 
-func _show_axe(on: bool) -> void:
-	if on:
-		if is_instance_valid(_axe):
-			return
-		_axe = Sprite3D.new()
-		_axe.texture = AXE_TEX
-		_axe.pixel_size = 0.011
-		_axe.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
-		_axe.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-		_axe.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
-		_axe.shaded = true
-		add_child(_axe)
-		_axe.position = _axe_rest()
-	elif is_instance_valid(_axe):
-		_axe.queue_free()
-		_axe = null
+## Swap which model is worn. Models are authored facing +Z with feet at y=0.
+func _set_model(scene: PackedScene) -> void:
+	if is_instance_valid(_model):
+		_model.queue_free()
+	_model = scene.instantiate()
+	model_root.add_child(_model)
+	_model.position.y = _base_y
+	_model.rotation.y = _yaw
 
-func _axe_rest() -> Vector3:
-	return Vector3(0.20 * _facing, 0.78, 0)
+## Undo any lean/crouch a work animation left behind.
+func _reset_pose() -> void:
+	if is_instance_valid(_model):
+		_model.position.y = _base_y
+		_model.rotation.x = 0.0
 
 func _face(p: Vector3) -> void:
-	# flip toward the target in *screen* space, so it still reads once the player
-	# has spun the camera around
 	var to := p - global_position
 	to.y = 0.0
-	var right := Vector3.RIGHT
-	var cam := get_viewport().get_camera_3d()
-	if cam:
-		right = cam.global_transform.basis.x
-	_facing = 1.0 if right.dot(to) >= 0.0 else -1.0
-	sprite.flip_h = _facing < 0.0
-	if is_instance_valid(_axe):
-		_axe.flip_h = _facing < 0.0
-		_axe.position = _axe_rest()
+	if to.length() < 0.01:
+		return
+	_yaw = atan2(to.x, to.z)
+	_facing = 1.0 if to.x >= 0.0 else -1.0
+	if is_instance_valid(_model):
+		_model.rotation.y = _yaw
 
 # ---- routing (steer through gates instead of into walls) ----
 
@@ -673,13 +771,37 @@ func _seek(delta: float, goal: Vector3, stop: float) -> void:
 	to.y = 0.0
 	var tv := Vector3.ZERO
 	if to.length() > stop:
-		tv = to.normalized() * SPEED
+		tv = _unstick(delta, to.normalized() * SPEED)
 	velocity.x = move_toward(velocity.x, tv.x, ACCEL * delta)
 	velocity.z = move_toward(velocity.z, tv.z, ACCEL * delta)
 	move_and_slide()
 	_animate(delta, Vector2(velocity.x, velocity.z).length() > 0.3)
 
-## Hold position -- the working tween owns the sprite bob while we do.
+## Villagers steer straight at whatever they are heading for, with no pathfinding,
+## so a building square in the way pins them against it: `move_and_slide` has
+## nothing to slide along when you walk into a wall dead-on. If we are asking to
+## move and hardly moving, sidestep for a moment and try again -- enough to get
+## round a hut on the way to a tree or a wall site.
+func _unstick(delta: float, want: Vector3) -> Vector3:
+	if _detour_t > 0.0:
+		_detour_t -= delta
+		return _detour * SPEED
+	if Vector2(velocity.x, velocity.z).length() > SPEED * 0.35:
+		_stuck_t = 0.0
+		return want
+	_stuck_t += delta
+	if _stuck_t < 0.45:
+		return want
+	_stuck_t = 0.0
+	_detour_t = 0.7
+	# strike off to one side, still leaning the way we were going
+	var side := Vector3(-want.z, 0.0, want.x).normalized()
+	if randf() < 0.5:
+		side = -side
+	_detour = (side * 1.3 + want.normalized()).normalized()
+	return _detour * SPEED
+
+## Hold position -- the working tween owns the body pose while we do.
 func _stand(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, 0.0, ACCEL * delta)
 	velocity.z = move_toward(velocity.z, 0.0, ACCEL * delta)
@@ -694,15 +816,20 @@ func _mill_near(delta: float, center: Vector3, radius: float) -> void:
 	_seek(delta, _mill, 0.25)
 
 func _animate(delta: float, moving: bool) -> void:
+	if not is_instance_valid(_model):
+		return
 	if moving:
 		_bob += delta * 10.0
-		sprite.position.y = _base_y + abs(sin(_bob)) * 0.06
-		if absf(velocity.x) > 0.1:
-			sprite.flip_h = velocity.x < 0.0
+		_model.position.y = _base_y + abs(sin(_bob)) * 0.06
+		# turn to face the way we're walking, easing round rather than snapping
+		if Vector2(velocity.x, velocity.z).length() > 0.1:
+			_yaw = lerp_angle(_yaw, atan2(velocity.x, velocity.z), 0.2)
+			_model.rotation.y = _yaw
+			_facing = 1.0 if velocity.x >= 0.0 else -1.0
 	else:
-		sprite.position.y = move_toward(sprite.position.y, _base_y, delta * 0.5)
+		_model.position.y = move_toward(_model.position.y, _base_y, delta * 0.5)
 	# carried gold rides along with the bob
-	var lift := sprite.position.y - _base_y
+	var lift := _model.position.y - _base_y
 	for c in _purse:
 		if is_instance_valid(c):
 			c.position.y = CARRY_Y + lift

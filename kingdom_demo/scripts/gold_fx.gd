@@ -11,13 +11,15 @@ extends Node
 ## screen; the monarch stays locked on its target until it resolves.
 ## `await GoldFx.pay(...)` returns true only once fully paid.
 
-const COIN_TEX := preload("res://kingdom_demo/assets/pixel/coin.png")
+const COIN_MODEL := preload("res://kingdom_demo/assets/3d/props/coin.glb")
 const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
 const HOLD_ACTION := "interact"
-const PIP_SPACING := 0.44
-const PIP_ROW_SPACING := 0.42
+const PIP_SPACING := 0.55
+const PIP_ROW_SPACING := 0.53
 const PIPS_PER_ROW := 8      # bigger asks stack into rows instead of one long line
-const PIP_UNPAID := Color(0.24, 0.23, 0.26, 1.0)
+const PIP_UNPAID := Color(0.24, 0.23, 0.26)   # a coin not yet handed over
+const PIP_SCALE := 0.69
+const FLYING_SCALE := 0.94
 const COIN_FLIGHT := 0.34
 const COIN_GAP := 0.1
 const MAX_RANGE := 4.0       # step further than this from the anchor and the deal is off
@@ -33,10 +35,6 @@ func can_afford(cost: int) -> bool:
 ## True while a tally is up. The monarch reads this to stay locked on target.
 func is_paying() -> bool:
 	return _paying
-
-## What is currently being paid for, if anything.
-func target() -> Node3D:
-	return _target
 
 func pay(payer: Node3D, anchor: Node3D, cost: int, tally_y := 1.9) -> bool:
 	var gm = _gm()
@@ -98,7 +96,7 @@ func _committed() -> bool:
 ## the anchor as loose coins rather than quietly vanishing.
 func _spill(pips: Array, paid: int, anchor: Node3D) -> void:
 	for i in range(paid):
-		var p: Sprite3D = pips[i]
+		var p: Node3D = pips[i]
 		if not is_instance_valid(p):
 			continue
 		var coin := COIN_SCENE.instantiate()
@@ -122,23 +120,23 @@ func _spawn_tally(anchor: Node3D, n: int, tally_y: float) -> Array:
 		var count: int = mini(PIPS_PER_ROW, n - r * PIPS_PER_ROW)
 		var start_x := -PIP_SPACING * (count - 1) * 0.5
 		for c in range(count):
-			var p := _coin_sprite(0.011)
-			p.modulate = PIP_UNPAID
+			var p := MarkFx.model(COIN_MODEL, PIP_SCALE)
+			MarkFx.tint(p, PIP_UNPAID)
 			get_tree().current_scene.add_child(p)
 			p.global_position = base + Vector3(start_x + c * PIP_SPACING, r * PIP_ROW_SPACING, 0)
 			pips.append(p)
 	return pips
 
-func _fill_pip(p: Sprite3D) -> void:
+func _fill_pip(p: Node3D) -> void:
 	if not is_instance_valid(p):
 		return
-	p.modulate = Color(1, 1, 1, 1)
+	MarkFx.untint(p)      # back to gold: this one's been paid
 	var t := create_tween()
-	t.tween_property(p, "scale", Vector3(1.5, 1.5, 1.5), 0.08).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.tween_property(p, "scale", Vector3.ONE, 0.1)
+	t.tween_property(p, "scale", Vector3.ONE * PIP_SCALE * 1.5, 0.08).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(p, "scale", Vector3.ONE * PIP_SCALE, 0.1)
 
 func _fly_coin(payer: Node3D, anchor: Node3D, tally_y: float) -> bool:
-	var coin := _coin_sprite(0.014)
+	var coin := MarkFx.model(COIN_MODEL, FLYING_SCALE)
 	get_tree().current_scene.add_child(coin)
 	var start: Vector3 = payer.global_position + Vector3(0, 1.0, 0)
 	var target_pos: Vector3 = anchor.global_position + Vector3(0, tally_y * 0.7, 0)
@@ -155,13 +153,3 @@ func _fly_coin(payer: Node3D, anchor: Node3D, tally_y: float) -> bool:
 		t.kill()
 	coin.queue_free()
 	return held
-
-func _coin_sprite(px: float) -> Sprite3D:
-	var s := Sprite3D.new()
-	s.texture = COIN_TEX
-	s.pixel_size = px
-	s.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	s.no_depth_test = true
-	s.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
-	return s

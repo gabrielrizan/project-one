@@ -1,9 +1,15 @@
 extends StaticBody3D
-## A village building. The Tent is decorative but can be rebuilt into the Town
-## Hall; the Workers and Archers huts are workplaces: the monarch pays gold to
-## create jobs and loyal villagers walk over to fill them. The hammer / bow icons
-## over the roof count the positions still *open*, so they tick down as villagers
-## take work.
+## A village building. The Tent is the main building at L1 and climbs the ladder
+## (Tent -> Wooden Hall -> Stone Hall); the Workers and Archers huts are
+## workplaces: the monarch pays gold to create jobs and loyal villagers walk over
+## to fill them. The hammer / bow icons over the roof count the positions still
+## *open*, so they tick down as villagers take work.
+##
+## No upgrade tier is instant. Paying opens a construction site just like a wall
+## does (see [BuildCrew], [WallSide]) and it sits there at whatever percentage
+## the crew has managed until workers walk over and finish it. Adding a job
+## position *is* instant -- that's a decision, not construction; the villager
+## walking over is the delay.
 
 @export var model_scene: PackedScene            # the 3D model this building shows
 @export var display_name: String = ""
@@ -11,19 +17,30 @@ extends StaticBody3D
 @export var model_height: float = 1.5           # used to seat prompts / label / collision
 @export var job_type: String = ""              # "worker" | "archer" | "" (no jobs)
 
-@export var upgrade_model_scene: PackedScene    # set to make this building upgradeable
+@export var upgrade_model_scene: PackedScene    # tier 1 -- crew-built, e.g. Tent -> Wooden Hall
 @export var upgrade_display_name: String = ""
 @export var upgrade_scale: float = 1.0
 @export var upgrade_height: float = 0.0
 @export var upgrade_cost: int = 0
-@export var upgrade_raises_castle: bool = false # Town Hall: turns the palisade to stone
+
+@export var upgrade2_model_scene: PackedScene   # tier 2 -- built by a crew, e.g. Wooden Hall -> Stone Hall
+@export var upgrade2_display_name: String = ""
+@export var upgrade2_scale: float = 1.0
+@export var upgrade2_height: float = 0.0
+@export var upgrade2_cost: int = 0
+@export var upgrade2_unlocks_stone: bool = false   # Stone Hall: opens the wall stone upgrade
 
 const MAX_JOBS := 4
 const JOB_COST := 3
-# despite the filenames, these two are a log and an arrow
-const LOG_TEX := preload("res://kingdom_demo/assets/pixel/hammer.png")
-const ARROW_TEX := preload("res://kingdom_demo/assets/pixel/bow.png")
+const LOG_MODEL := preload("res://kingdom_demo/assets/3d/props/log_marker.glb")
+const ARROW_MODEL := preload("res://kingdom_demo/assets/3d/props/arrow_marker.glb")
+const HAMMER_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tool-hammer.glb")
+const ICON_SCALE := 0.45
 const DUST_TEX := preload("res://kingdom_demo/assets/pixel/wood_chip.png")
+const BANNER_SCALE := 5.0
+## Base seconds for one worker to raise each tier; a crew scales it (see [BuildCrew]).
+const TIER1_BUILD_TIME := 25.0
+const TIER2_BUILD_TIME := 40.0
 
 @onready var model_root: Node3D = $Model
 @onready var label: Label3D = $Label
@@ -33,7 +50,13 @@ const DUST_TEX := preload("res://kingdom_demo/assets/pixel/wood_chip.png")
 
 var jobs := 0          # positions created (paid for)
 var filled := 0        # positions taken by loyal villagers
-var upgraded := false
+var upgraded := false      # tier 1 reached
+var upgraded2 := false     # tier 2 reached
+var _building_tier := 0    # 0 = no site open; 1 or 2 = the tier a crew is raising
+var _progress := 0.0
+var _crew: BuildCrew = null
+var _banner: Node3D = null
+var _banner_t := 0.0
 var _model: Node3D = null
 var _height := 1.5
 var _busy := false
@@ -45,8 +68,8 @@ func _ready() -> void:
 	label.text = display_name
 	if job_type != "":
 		add_to_group("workplace")
-	if job_type != "" or _can_upgrade():
-		add_to_group("interactable")
+	set_process(false)
+	_update_interactable()
 
 # ---- layout ----
 
@@ -98,11 +121,38 @@ func work_point() -> Vector3:
 # ---- interaction ----
 
 func _can_upgrade() -> bool:
-	return upgrade_cost > 0 and upgrade_model_scene != null and not upgraded
+	return _building_tier == 0 and not upgraded \
+		and upgrade_cost > 0 and upgrade_model_scene != null
+
+func _can_upgrade2() -> bool:
+	return _building_tier == 0 and upgraded and not upgraded2 \
+		and upgrade2_cost > 0 and upgrade2_model_scene != null
+
+func _update_interactable() -> void:
+	var should_be := job_type != "" or _can_upgrade() or _can_upgrade2()
+	if should_be and not is_in_group("interactable"):
+		add_to_group("interactable")
+	elif not should_be and is_in_group("interactable"):
+		remove_from_group("interactable")
+
+## Every tier is raised by a crew, so with nobody holding a hammer there is nobody
+## to raise it. Say so rather than taking gold for a site that would sit untouched.
+func _workers_exist() -> bool:
+	for v in get_tree().get_nodes_in_group("villager"):
+		if v.has_method("is_worker") and v.is_worker():
+			return true
+	return false
+
+func _upgrade_offer(dname: String, cost: int) -> String:
+	return ("Hold E  %s (%d)" % [dname, cost]) if _workers_exist() else "%s  needs a worker" % dname
 
 func _prompt_text() -> String:
+	if _building_tier > 0:
+		return ""   # the site status line takes over the prompt while building
 	if _can_upgrade():
-		return "Hold E  %s (%d)" % [upgrade_display_name, upgrade_cost]
+		return _upgrade_offer(upgrade_display_name, upgrade_cost)
+	if _can_upgrade2():
+		return _upgrade_offer(upgrade2_display_name, upgrade2_cost)
 	if job_type == "":
 		return ""
 	if jobs >= MAX_JOBS:
@@ -123,10 +173,14 @@ func _refresh_prompt() -> void:
 		_prompt.text = _prompt_text()
 
 func interact(who: Node3D) -> void:
-	if _busy:
+	if _busy or _building_tier > 0:
 		return
 	if _can_upgrade():
-		await _buy(who, upgrade_cost, _raise_upgrade)
+		if _workers_exist():
+			await _buy(who, upgrade_cost, _open_upgrade_site.bind(1))
+	elif _can_upgrade2():
+		if _workers_exist():
+			await _buy(who, upgrade2_cost, _open_upgrade_site.bind(2))
 	elif job_type != "" and jobs < MAX_JOBS:
 		await _buy(who, JOB_COST, _add_job)
 
@@ -149,17 +203,11 @@ func _add_job() -> void:
 	_add_job_icon()
 
 func _add_job_icon() -> void:
-	var s := Sprite3D.new()
-	s.texture = ARROW_TEX if job_type == "archer" else LOG_TEX
-	s.pixel_size = 0.0075
-	s.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	s.no_depth_test = true
+	var s := MarkFx.model(ARROW_MODEL if job_type == "archer" else LOG_MODEL, ICON_SCALE)
 	_icons.add_child(s)
 	_layout_icons()
-	var t := create_tween()
 	s.scale = Vector3.ZERO
-	t.tween_property(s, "scale", Vector3.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	create_tween().tween_property(s, "scale", Vector3.ONE * ICON_SCALE, 0.15) 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 ## A villager just took this post, so its icon lifts off the roof and the row
 ## closes up -- what's left is the count of vacancies.
@@ -180,32 +228,34 @@ func _take_job_icon() -> void:
 
 func _layout_icons() -> void:
 	var n := _icons.get_child_count()
-	var spacing := 0.52     # wide enough that the tools never pile into each other
+	if n == 0:
+		return
+	# A shallow fan, not a ruler-straight row: identical props lined up dead level
+	# read as a UI widget bolted to the roof. Dipping and tilting them at the ends
+	# makes it look like things propped up on a board.
+	var spacing := 0.40
 	var start_x := -spacing * (n - 1) * 0.5
 	for i in range(n):
-		_icons.get_child(i).position = Vector3(start_x + i * spacing, 0, 0)
+		var t := 0.0 if n == 1 else (float(i) / float(n - 1)) * 2.0 - 1.0   # -1..1
+		var c: Node3D = _icons.get_child(i)
+		c.position = Vector3(start_x + i * spacing, -absf(t) * 0.09, 0.0)
+		c.rotation = Vector3(0.0, t * 0.30, -t * 0.34)
 
-# ---- upgrade ----
+# ---- finishing a tier ----
 
-func _raise_upgrade() -> void:
-	upgraded = true
-	display_name = upgrade_display_name
-	_show_model(upgrade_model_scene, upgrade_scale)
-	_fit(upgrade_height if upgrade_height > 0.0 else _height)
+## The new building heaves up out of the ground, the grass hiding the join --
+## the moment a crew finishes either tier.
+func _swap_and_heave(scene: PackedScene, dname: String, sc: float, height: float) -> void:
+	display_name = dname
+	_show_model(scene, sc)
+	_fit(height if height > 0.0 else _height)
 	label.text = display_name
-	if job_type == "":
-		remove_from_group("interactable")
-	if upgrade_raises_castle:
-		var gm := get_tree().get_first_node_in_group("game_manager")
-		if gm and gm.has_method("raise_castle_age"):
-			gm.raise_castle_age()
 	_dust()
-	# the new hall heaves up out of the ground, the grass hiding the join
 	_model.position.y = -_height * 0.7
-	_model.scale = Vector3(upgrade_scale * 1.1, upgrade_scale * 0.4, upgrade_scale * 1.1)
+	_model.scale = Vector3(sc * 1.1, sc * 0.4, sc * 1.1)
 	var t := create_tween()
 	t.tween_property(_model, "position:y", 0.0, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.parallel().tween_property(_model, "scale", Vector3(upgrade_scale, upgrade_scale, upgrade_scale), 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(_model, "scale", Vector3(sc, sc, sc), 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _dust() -> void:
 	for i in range(10):
@@ -225,3 +275,89 @@ func _dust() -> void:
 		t.parallel().tween_property(p, "scale", Vector3(2.0, 2.0, 2.0), 0.6)
 		t.parallel().tween_property(p, "modulate:a", 0.0, 0.6)
 		t.tween_callback(p.queue_free)
+
+# ---- upgrades (every tier is built by a crew) ----
+
+## Paying doesn't raise the building -- it opens a site. Workers walk over and
+## put it up; see [BuildCrew] for the pace.
+func _open_upgrade_site(tier: int) -> void:
+	_building_tier = tier
+	_progress = 0.0
+	_crew = BuildCrew.new()
+	add_to_group("build_site")
+	_banner = MarkFx.banner(self, HAMMER_MODEL, _height + 1.6, BANNER_SCALE)
+	_banner_t = 0.0
+	set_process(true)
+	_update_interactable()
+
+func _build_time() -> float:
+	return TIER1_BUILD_TIME if _building_tier == 1 else TIER2_BUILD_TIME
+
+func _process(delta: float) -> void:
+	if _building_tier == 0:
+		return
+	if is_instance_valid(_banner):
+		_banner_t += delta
+		if _banner_t > 0.4:
+			_banner.position.y = _height + 1.6 + sin((_banner_t - 0.4) * 2.6) * 0.08
+	var hands := _crew.hands()
+	_prompt.text = "Needs workers" if hands == 0 else "Building  %d%%   x%d" % [int(_progress * 100.0), hands]
+	_prompt.visible = true
+	if hands <= 0:
+		return
+	_progress += delta * _crew.speed() / _build_time()
+	if _progress >= 1.0:
+		_finish_upgrade()
+
+func _finish_upgrade() -> void:
+	var tier := _building_tier
+	_building_tier = 0
+	set_process(false)
+	remove_from_group("build_site")
+	hide_prompt()
+	if is_instance_valid(_banner):
+		_banner.queue_free()
+	_banner = null
+	_crew = BuildCrew.new()
+	if tier == 1:
+		upgraded = true
+		_swap_and_heave(upgrade_model_scene, upgrade_display_name, upgrade_scale, upgrade_height)
+	else:
+		upgraded2 = true
+		_swap_and_heave(upgrade2_model_scene, upgrade2_display_name, upgrade2_scale, upgrade2_height)
+		if upgrade2_unlocks_stone:
+			var gm := get_tree().get_first_node_in_group("game_manager")
+			if gm and gm.has_method("unlock_stone_walls"):
+				gm.unlock_stone_walls()
+	_update_interactable()
+
+# ---- the crew (asked by villagers, same duck-typed interface as a wall site) ----
+
+func site_active() -> bool:
+	return _building_tier > 0
+
+func needs_builders() -> bool:
+	return _building_tier > 0 and _crew.needs_more()
+
+func claim_builder(who: Node3D) -> bool:
+	if not needs_builders():
+		return false
+	return _crew.claim(who)
+
+func release_builder(who: Node3D) -> void:
+	if _crew:
+		_crew.release(who)
+
+func builder_ready(who: Node3D) -> void:
+	if _crew:
+		_crew.arrived(who)
+
+## Builders ring the building rather than lining up along it.
+func build_spot(who: Node3D) -> Vector3:
+	var i: int = _crew.station(who) if _crew else 0
+	var angle := (float(i) / 3.0) * TAU
+	var radius := _height * 0.6 + 1.6
+	return global_position + Vector3(cos(angle), 0, sin(angle)) * radius
+
+func face_point(_from: Vector3) -> Vector3:
+	return global_position

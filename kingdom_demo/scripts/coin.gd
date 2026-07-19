@@ -7,23 +7,24 @@ const RISE_HEIGHT := 0.7
 const POP_DURATION := 0.4
 const BOB_SPEED := 3.0
 const BOB_HEIGHT := 0.07
-const SPIN_SPEED := 2.4
-const SPIN_MIN := 0.45     # never edge-on enough to disappear
+const SPIN_SPEED := 1.9   # radians/sec; a real turn now that it's a model
 const MAGNET_RANGE := 1.5
 const MAGNET_TIME := 0.16
 const SCOOP_TIME := 0.2
 const VALUE := 1
 
-@onready var sprite: Sprite3D = $Sprite
+@onready var model: Node3D = $Model
 
 var _settled := false
 var _taken := false
 var _base_y := 0.0
 var _time := 0.0
 var _pop: Tween = null
+var _base_scale := Vector3.ONE   # the scene sets the coin's size; flourishes scale off it
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
+	_base_scale = model.scale
 	# stagger the spin/bob so a handful dropped at once doesn't pulse in lockstep
 	_time = randf() * TAU
 
@@ -41,9 +42,9 @@ func pop(landing_position: Vector3) -> void:
 func _process(delta: float) -> void:
 	if _taken:
 		return
-	# squashing the billboard horizontally reads as a coin turning flat-on
+	# an actual turn, rather than the squash a billboard needed
 	_time += delta
-	sprite.scale.x = maxf(SPIN_MIN, absf(cos(_time * SPIN_SPEED)))
+	model.rotation.y = _time * SPIN_SPEED
 	if not _settled:
 		return
 	var king := get_tree().get_first_node_in_group("monarch")
@@ -66,7 +67,7 @@ func _fly_to(target: Node3D, duration: float, bank: bool) -> void:
 	var dest: Vector3 = target.global_position + Vector3(0, (0.9 if bank else 1.25), 0)
 	var t := create_tween()
 	t.tween_property(self, "global_position", dest, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	t.parallel().tween_property(sprite, "scale", (Vector3(1.4, 1.4, 1.4) if bank else Vector3.ZERO), duration)
+	t.parallel().tween_property(model, "scale", (_base_scale * 1.4 if bank else Vector3.ZERO), duration)
 	t.tween_callback(_bank_it if bank else queue_free)
 
 func _bank_it() -> void:

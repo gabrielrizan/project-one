@@ -12,6 +12,37 @@ const CHIP_TEX := preload("res://kingdom_demo/assets/pixel/wood_chip.png")
 
 const BLAZE_LIFT := 0.16
 
+## Instantiate a model at a uniform scale.
+static func model(scene: PackedScene, scale: float) -> Node3D:
+	var n: Node3D = scene.instantiate()
+	n.scale = Vector3.ONE * scale
+	return n
+
+## Force every mesh under `node` to one flat colour. 3D has no `modulate`, so
+## this is how a model is greyed out -- fine for single-colour props like a coin
+## pip, wrong for anything whose own palette matters.
+static func tint(node: Node3D, color: Color) -> void:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.roughness = 1.0
+	for m in meshes(node):
+		m.material_override = mat
+
+static func untint(node: Node3D) -> void:
+	for m in meshes(node):
+		m.material_override = null
+
+static func meshes(n: Node) -> Array:
+	var out: Array = []
+	var stack: Array = [n]
+	while not stack.is_empty():
+		var c = stack.pop_back()
+		if c is MeshInstance3D:
+			out.append(c)
+		for k in c.get_children():
+			stack.append(k)
+	return out
+
 static func sprite(tex: Texture2D, px: float) -> Sprite3D:
 	var s := Sprite3D.new()
 	s.texture = tex
@@ -52,14 +83,16 @@ static func face_camera(b: Sprite3D, anchor: Vector3) -> void:
 		return
 	b.global_position = anchor + to_cam.normalized() * BLAZE_LIFT
 
-static func banner(owner: Node3D, tex: Texture2D, y: float, px: float) -> Sprite3D:
-	var s := sprite(tex, px)
+## The floating marker that says which crew a marked thing is waiting on. It
+## rises and pops in -- a model can't fade, so scale carries the entrance.
+static func banner(owner: Node3D, scene: PackedScene, y: float, scale: float) -> Node3D:
+	var s := model(scene, scale)
 	owner.add_child(s)
 	s.position = Vector3(0, y - 0.4, 0)
-	s.modulate = Color(1, 1, 1, 0)
+	s.scale = Vector3.ZERO
 	var t := owner.create_tween().set_parallel(true)
 	t.tween_property(s, "position:y", y, 0.38).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.tween_property(s, "modulate:a", 1.0, 0.26)
+	t.tween_property(s, "scale", Vector3.ONE * scale, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	return s
 
 static func shake(owner: Node3D, s: Node3D, base_x: float, amount: float) -> void:
@@ -97,10 +130,10 @@ static func leaves(owner: Node3D, at: Vector3, n: int, high: float, low: float, 
 		t.tween_callback(leaf.queue_free)
 
 ## Chips / dust thrown out from a point, biased along `dir`.
-static func debris(owner: Node3D, at: Vector3, dir: Vector3, n: int, tint: Color, px: float, reach: float) -> void:
+static func debris(owner: Node3D, at: Vector3, dir: Vector3, n: int, color: Color, px: float, reach: float) -> void:
 	for i in range(n):
 		var p := particle(CHIP_TEX, px)
-		p.modulate = tint
+		p.modulate = color
 		owner.get_tree().current_scene.add_child(p)
 		p.global_position = at
 		var d := (dir + Vector3(randf_range(-0.7, 0.7), 0, randf_range(-0.7, 0.7))).normalized()

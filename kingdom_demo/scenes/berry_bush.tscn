@@ -1,7 +1,6 @@
-[gd_scene load_steps=4 format=3 uid="uid://l3xnslje6465"]
+[gd_scene load_steps=3 format=3 uid="uid://l3xnslje6465"]
 
 [ext_resource type="Script" uid="uid://d3da1t23l4kkw" path="res://kingdom_demo/scripts/berry_bush.gd" id="1_bb"]
-[ext_resource type="PackedScene" uid="uid://dcwgtu1qgcyts" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/grass-large.glb" id="2_bb"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_bb"]
 height = 0.7
@@ -26,5 +25,4 @@ text = "Hold E  Mark Berries"
 font_size = 50
 outline_size = 14
 
-[node name="Model" parent="." instance=ExtResource("2_bb")]
-transform = Transform3D(1.3, 0, 0, 0, 1.3, 0, 0, 0, 1.3, 0, 0, 0)
+[node name="Model" type="Node3D" parent="."]

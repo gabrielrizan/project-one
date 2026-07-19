@@ -9,14 +9,18 @@ const GOLD_YIELD := 2
 const REGROW_TIME := 45.0     # the archer owns how long picking takes
 
 const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
-const BASKET_TEX := preload("res://kingdom_demo/assets/pixel/basket.png")
+const BASKET_MODEL := preload("res://kingdom_demo/assets/3d/props/basket_marker.glb")
+
+const RIPE_MODEL := preload("res://kingdom_demo/assets/3d/props/berry_bush.glb")
+const PICKED_MODEL := preload("res://kingdom_demo/assets/3d/props/berry_bush_picked.glb")
 
 const BLAZE_Y := 0.45
 const BANNER_Y := 1.35
-const PICKED_FACTOR := 0.45    # how far the shrub shrinks once stripped bare
 
 @onready var model: Node3D = $Model
 @onready var prompt: Label3D = $Prompt
+
+var _mesh: Node3D = null
 
 var marked := false
 var picked := false
@@ -26,7 +30,7 @@ var _busy := false
 var _base_x := 0.0
 var _ripe_scale := Vector3.ONE
 var _blaze: Sprite3D = null
-var _banner: Sprite3D = null
+var _banner: Node3D = null
 var _banner_t := 0.0
 var _regrow := 0.0
 
@@ -35,7 +39,17 @@ func _ready() -> void:
 	add_to_group("bush")
 	_base_x = model.position.x
 	_ripe_scale = model.scale
+	# a touch of variety so a row of bushes doesn't look stamped out
+	model.rotation.y = randf() * TAU
+	_set_mesh(RIPE_MODEL)
 	set_process(false)
+
+## Swap the foliage under the holder; the holder keeps the shake/squash tweens.
+func _set_mesh(scene: PackedScene) -> void:
+	if is_instance_valid(_mesh):
+		_mesh.queue_free()
+	_mesh = scene.instantiate()
+	model.add_child(_mesh)
 
 func _process(delta: float) -> void:
 	if is_instance_valid(_banner):
@@ -81,7 +95,7 @@ func _mark() -> void:
 	MarkFx.shake(self, model, _base_x, 0.07)
 	_blaze = MarkFx.blaze(self, BLAZE_Y, 0.011)
 	MarkFx.face_camera(_blaze, global_position + Vector3(0, BLAZE_Y, 0))
-	_banner = MarkFx.banner(self, BASKET_TEX, BANNER_Y, 0.013)
+	_banner = MarkFx.banner(self, BASKET_MODEL, BANNER_Y, 0.8)
 	MarkFx.leaves(self, global_position, 5, 0.9, 0.4, 0.4)
 	set_process(true)
 
@@ -126,9 +140,11 @@ func strip() -> void:
 	_regrow = REGROW_TIME
 	set_process(true)
 
+	# rummaged flat, the berries come off, then it settles back bare
 	var t := create_tween()
-	t.tween_property(model, "scale", _ripe_scale * Vector3(1.15, 0.85, 1.15), 0.1)
-	t.tween_property(model, "scale", _ripe_scale * PICKED_FACTOR, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(model, "scale", _ripe_scale * Vector3(1.18, 0.62, 1.18), 0.12).set_trans(Tween.TRANS_SINE)
+	t.tween_callback(func() -> void: _set_mesh(PICKED_MODEL))
+	t.tween_property(model, "scale", _ripe_scale, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	MarkFx.leaves(self, global_position, 6, 0.9, 0.35, 0.45)
 	_drop_gold()
 
@@ -159,5 +175,7 @@ func _fruit() -> void:
 	picked = false
 	add_to_group("interactable")
 	set_process(false)
+	_set_mesh(RIPE_MODEL)
+	model.scale = _ripe_scale * 0.7
 	var t := create_tween()
 	t.tween_property(model, "scale", _ripe_scale, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

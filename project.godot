@@ -11,13 +11,14 @@ config_version=5
 [application]
 
 config/name="ProjectOne"
-run/main_scene="res://kingdom_demo/kingdom_demo.tscn"
+run/main_scene="res://kingdom_demo/scenes/menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [autoload]
 
-_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 GoldFx="*res://kingdom_demo/scripts/gold_fx.gd"
+Settings="*res://kingdom_demo/scripts/settings.gd"
+_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [display]
 

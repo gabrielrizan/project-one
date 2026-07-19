@@ -4,19 +4,19 @@ const SPEED := 5.0
 const ACCEL := 60.0
 
 @onready var interact_area: Area3D = $InteractArea
-@onready var sprite: Sprite3D = $Sprite
+@onready var model: Node3D = $Model
 
-var followers: Array = []
 var _nearby: Array = []
 var _highlighted: Node3D = null
 var _bob := 0.0
-var _sprite_base_y := 0.0
+var _base_y := 0.0
+var _yaw := 0.0
 
 func _ready() -> void:
 	add_to_group("monarch")
 	interact_area.body_entered.connect(_on_body_entered)
 	interact_area.body_exited.connect(_on_body_exited)
-	_sprite_base_y = sprite.position.y
+	_base_y = model.position.y
 
 func _physics_process(delta: float) -> void:
 	var input_dir := Vector3.ZERO
@@ -28,7 +28,6 @@ func _physics_process(delta: float) -> void:
 		input_dir.x -= 1.0
 	if Input.is_action_pressed("move_right"):
 		input_dir.x += 1.0
-	var screen_x := input_dir.x       # for sprite facing, before camera rotation
 	input_dir = input_dir.normalized()
 
 	# move relative to where the camera is looking (Thronefall-style)
@@ -41,8 +40,6 @@ func _physics_process(delta: float) -> void:
 	velocity.z = move_toward(velocity.z, target_velocity.z, ACCEL * delta)
 	move_and_slide()
 
-	if absf(screen_x) > 0.1:
-		sprite.flip_h = screen_x < 0.0
 	_animate(delta, input_dir.length() > 0.1)
 	_update_highlight()
 
@@ -51,22 +48,26 @@ func _physics_process(delta: float) -> void:
 
 func _animate(delta: float, moving: bool) -> void:
 	if moving:
+		# the horse's gait, plus turning to face the way we ride
 		_bob += delta * 12.0
-		sprite.position.y = _sprite_base_y + abs(sin(_bob)) * 0.08
+		model.position.y = _base_y + abs(sin(_bob)) * 0.06
+		if Vector2(velocity.x, velocity.z).length() > 0.1:
+			_yaw = lerp_angle(_yaw, atan2(velocity.x, velocity.z), 0.2)
+			model.rotation.y = _yaw
 	else:
-		sprite.position.y = move_toward(sprite.position.y, _sprite_base_y, delta * 0.6)
+		model.position.y = move_toward(model.position.y, _base_y, delta * 0.6)
 
-## A subject kneeling to present their take -- the king straightens and accepts it.
+## A subject kneeling to present their take -- the king rises in the saddle and a
+## glint of gold goes up as he accepts it.
 func receive_tribute() -> void:
 	_punch()
-	var t := create_tween()
-	t.tween_property(sprite, "modulate", Color(1.9, 1.7, 1.15, 1.0), 0.1)
-	t.tween_property(sprite, "modulate", Color(1, 1, 1, 1), 0.4)
+	MarkFx.debris(self, global_position + Vector3(0, 1.5, 0), Vector3.ZERO,
+		6, Color(0.86, 0.70, 0.32, 1.0), 0.012, 0.7)
 
 func _punch() -> void:
 	var t := create_tween()
-	t.tween_property(sprite, "scale", Vector3(1.25, 0.8, 1.25), 0.06)
-	t.tween_property(sprite, "scale", Vector3.ONE, 0.12)
+	t.tween_property(model, "position:y", _base_y + 0.14, 0.06).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(model, "position:y", _base_y, 0.14).set_trans(Tween.TRANS_SINE)
 
 func _on_body_entered(body: Node3D) -> void:
 	if body.is_in_group("interactable") and body not in _nearby:
@@ -110,14 +111,3 @@ func _try_interact() -> void:
 	_highlighted.interact(self)
 	_punch()
 
-func add_follower(unit: Node3D) -> void:
-	followers.append(unit)
-
-func remove_follower(unit: Node3D) -> void:
-	followers.erase(unit)
-
-func get_leader_for(unit: Node3D) -> Node3D:
-	var idx := followers.find(unit)
-	if idx <= 0:
-		return self
-	return followers[idx - 1]
