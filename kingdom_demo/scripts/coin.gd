@@ -13,6 +13,22 @@ const MAGNET_TIME := 0.16
 const SCOOP_TIME := 0.2
 const VALUE := 1
 
+## The same coins-in-cloth takes the tally spends out of -- see `_purse_sound`.
+const PURSE_CLIPS := [
+	preload("res://kingdom_demo/assets/audio/coin_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/coin_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/coin_3.ogg"),
+	preload("res://kingdom_demo/assets/audio/coin_4.ogg"),
+	preload("res://kingdom_demo/assets/audio/coin_5.ogg"),
+]
+const PURSE_DB := -12.0
+## Lower than any note in the tally's rising ramp (0.80 .. 1.22), so gold coming
+## in never gets mistaken for gold going out.
+const PURSE_PITCH := 0.74
+const PURSE_PITCH_JITTER := 1.07
+
+static var _purse_pool: AudioStreamRandomizer = null
+
 @onready var model: Node3D = $Model
 
 var _settled := false
@@ -74,7 +90,33 @@ func _bank_it() -> void:
 	var game_manager := get_tree().get_first_node_in_group("game_manager")
 	if game_manager:
 		game_manager.add_coins(VALUE)
+	_purse_sound()
 	queue_free()
+
+## Gold going *into* the purse, using the same coins-in-cloth clips the tally
+## spends out of -- one material for one substance. Pitched down and quieter than
+## a tally pip so taking and paying stay distinguishable.
+##
+## Needs its own emitter parented to the scene: the coin queue_frees on this very
+## frame and would take a child player with it.
+func _purse_sound() -> void:
+	if _purse_pool == null:
+		_purse_pool = AudioStreamRandomizer.new()
+		for i in range(PURSE_CLIPS.size()):
+			_purse_pool.add_stream(i, PURSE_CLIPS[i])
+		_purse_pool.random_pitch = PURSE_PITCH_JITTER
+		_purse_pool.playback_mode = AudioStreamRandomizer.PLAYBACK_RANDOM_NO_REPEATS
+	var p := AudioStreamPlayer3D.new()
+	p.stream = _purse_pool
+	p.bus = &"SFX"
+	p.volume_db = PURSE_DB
+	p.pitch_scale = PURSE_PITCH
+	p.unit_size = 3.0
+	p.max_distance = 18.0
+	get_tree().current_scene.add_child(p)
+	p.global_position = global_position
+	p.finished.connect(p.queue_free)
+	p.play()
 
 func _on_body_entered(body: Node3D) -> void:
 	if body.is_in_group("monarch"):

@@ -7,7 +7,10 @@ extends StaticBody3D
 
 const MARK_COST := 1
 const GOLD_YIELD := 2
-const CHOPS_TO_FELL := 6
+## Paired with `villager.gd::SWING_TIME` -- together these set how long a tree
+## takes to come down (8 x 1.1s ~= 9s). Felling is meant to feel earned; at the
+## old 6 blows a 0.46s apart a whole trunk was gone in under three seconds.
+const CHOPS_TO_FELL := 8
 
 const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
 const AXE_MODEL := preload("res://kingdom_demo/assets/3d/props/axe_marker.glb")
@@ -16,6 +19,21 @@ const TRUNK_Y := 0.95         # height the axe bites at / the blaze is painted a
 const TRUNK_BASE_Y := 0.08    # where the trunk meets the grass -- the topple hinge
 const BANNER_Y := 2.95
 const FALL_TIME := 0.85
+
+## Both clips were trimmed so their loudest moment sits exactly 1.09s in, which is
+## when the trunk hits the grass here: 0.24s of lean plus FALL_TIME. So the sound
+## starts with the topple and the crash lands *with* the impact rather than near
+## it. **If the lean or FALL_TIME change, the clips need re-aligning** -- see
+## ASSETS.md.
+const FALL_CLIPS := [
+	preload("res://kingdom_demo/assets/audio/tree_fall_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/tree_fall_2.ogg"),
+]
+const FALL_DB := -3.0
+const FALL_PITCH := 1.06
+const FALL_REACH := 50.0
+
+static var _fall_pool: AudioStreamRandomizer = null
 
 @onready var model: Node3D = $Model
 @onready var stump: Node3D = $Stump
@@ -145,8 +163,29 @@ func _fell(from: Vector3) -> void:
 	stump.visible = true
 	_topple(from)
 
+## Starts with the topple, not with the landing -- the clip carries its own creak
+## and whoosh before the crash, and that lead-in is what sells the fall.
+func _fall_sound() -> void:
+	if _fall_pool == null:
+		_fall_pool = AudioStreamRandomizer.new()
+		for i in range(FALL_CLIPS.size()):
+			_fall_pool.add_stream(i, FALL_CLIPS[i])
+		_fall_pool.random_pitch = FALL_PITCH
+		_fall_pool.playback_mode = AudioStreamRandomizer.PLAYBACK_RANDOM_NO_REPEATS
+	var p := AudioStreamPlayer3D.new()
+	p.stream = _fall_pool
+	p.bus = &"SFX"
+	p.volume_db = FALL_DB
+	p.unit_size = 13.0
+	p.max_distance = FALL_REACH
+	add_child(p)
+	p.global_position = global_position + Vector3(0, 1.2, 0)
+	p.finished.connect(p.queue_free)
+	p.play()
+
 ## Tip the whole 3D trunk over on a hinge at its base, falling away from the cutter.
 func _topple(from: Vector3) -> void:
+	_fall_sound()
 	var away := global_position - from
 	away.y = 0.0
 	var fall_dir := away.normalized() if away.length() > 0.01 else Vector3.BACK

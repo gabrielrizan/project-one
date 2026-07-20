@@ -6,11 +6,16 @@ extends Node3D
 ## and dusk/dawn are eased with a golden hour in the middle rather than a linear
 ## fade. Dawn is deliberately longer than dusk -- waking up is the nicer moment.
 
-const DAY_DURATION := 60.0
-const NIGHT_DURATION := 30.0
+const DAY_DURATION := 120.0
+const NIGHT_DURATION := 120.0
 const CYCLE_DURATION := DAY_DURATION + NIGHT_DURATION
-const DUSK := 9.0       # final seconds of the day
-const DAWN := 14.0      # final seconds of the night
+## Both are absolute seconds, so they do NOT scale when the phases change -- at
+## the old 60s/30s cycle these were 15% of the day and 47% of the night, and
+## doubling the phases quietly cut them to 7.5% and 12%. Widened to keep the
+## transitions readable: dusk long enough to be a warning, dawn longer still,
+## because waking up is the nicer moment.
+const DUSK := 20.0      # final seconds of the day
+const DAWN := 28.0      # final seconds of the night
 
 const DAY_ENERGY := 1.2
 const NIGHT_ENERGY := 0.35

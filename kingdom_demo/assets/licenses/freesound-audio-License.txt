@@ -82,3 +82,227 @@ Used for: the daytime one-shot layer (ambience.gd). Three very different
           randomiser pool has real variety instead of one recognisable noise.
           Played out of an actual trunk within earshot of the monarch, so the
           woods fall quiet in open ground.
+
+
+crow_a.ogg / crow_b.ogg / crow_c.ogg      [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Titles:   crow_a  <- CrowOrRaven2.wav by iwanPlays   https://freesound.org/s/512780/
+          crow_b  <- Corbeau 1.wav by trouxel        https://freesound.org/s/250095/
+          crow_c  <- Corbeau 1.wav by trouxel        (a second call from the same file)
+Licence:  CC0 1.0 (both sources)
+Edited:   crow_a is the source used whole (it already held exactly one call).
+          crow_b/c are two calls cut out of Corbeau 1. All tail-trimmed, 8 ms
+          fades, peak normalised.
+Why:      Third attempt. The first pool held SEQUENCES (one file had nine calls,
+          so a 1-3 burst came out as 4-5+). The second was cut into true singles
+          but they were only 0.34s each -- sharp, close "CAH" sounds. These are
+          0.80-1.33s: long drawn-out calls, which is what was wanted.
+          MEASURE THE LENGTH OF THE CALL ITSELF, not just the file.
+Used for: the daytime crow burst (ambience.gd::_crow_burst), 1-3 calls weighted
+          towards one, spaced 1.15-1.9s so drawn-out calls do not stack.
+
+
+axe_chop_1..5.ogg                                    [CC0 — no credit needed]
+--------------------------------------------------------------------------
+Titles:   TreeChop1..5.wav (0.5-0.7 s each)
+Author:   super8ude
+Source:   https://freesound.org/s/442536/ , /442535/ , /442534/ , /442533/ ,
+          /442538/
+Licence:  CC0 1.0
+Used for: the axe landing in a trunk (villager.gd::_land_blow). Five takes from
+          one session, so the material is consistent but no two blows are the
+          same -- felling a tree is six swings, which machine-guns badly off a
+          single clip.
+
+
+coin_1..5.ogg                                        [CC0 — no credit needed]
+--------------------------------------------------------------------------
+Titles:   coins - in cloth 08 / 05 / 03 / 04 / 01  (0.63-0.74 s each)
+Author:   Anthousai
+Source:   https://freesound.org/s/336576/ , /336579/ , /336573/ , /336572/ ,
+          /336575/
+Licence:  CC0 1.0
+Used for: one clink per pip as the tally fills (gold_fx.gd::_fill_pip), played
+          positionally at the pip.
+Note:     REPLACED cabled_mess's Coin_C set, which was bright metallic pings --
+          they read as arcade ("sounds like Mario"), wrong register for a
+          medieval game. Coins landing in cloth are muted and low, closer to
+          Kingdom Two Crowns. The pitch also now CLIMBS across a purchase
+          (COIN_PITCH_START -> COIN_PITCH_END) so a long tally builds, with the
+          per-coin jitter kept narrow so it cannot smear that climb.
+
+
+hammer_1..5.ogg                                         [CC BY 4.0 — CREDIT]
+--------------------------------------------------------------------------
+Titles:   Hammer Blows 9 / 2 / 10 / 5 / 1  (0.90-1.06 s each)
+Author:   AleXZavesa
+Source:   https://freesound.org/s/853866/ , /853859/ , /853857/ , /853862/ ,
+          /853856/
+Licence:  Attribution 4.0
+Used for: workers raising walls and buildings (villager.gd::_land_hammer).
+Note:     There is no usable CC0 hammer-on-WOOD on Freesound -- searches return
+          metal-on-metal (blacksmith, anvil, plate), which is the wrong material
+          for driving timber stakes. This CC-BY set is one consistent session,
+          so it was taken in preference to gluing together mismatched CC0 clips.
+
+
+bow_1..3.ogg                                         [CC0 — no credit needed]
+--------------------------------------------------------------------------
+Titles:   Bow Release (Bow and Arrow) 1 / 2 / 3   (0.75-1.00 s)
+Author:   Ali_6868
+Source:   https://freesound.org/s/384915/ , /384916/ , /384918/
+Licence:  CC0 1.0
+Used for: an archer loosing at game (villager.gd::_loose_arrow).
+
+
+arrow_hit_1..3.ogg                        [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Titles:   ARROW_TARGET_IMPACT_SINGLE_ARCHERY by JoeDinesSound  (/534952/)
+          ARROW_WOOD_IMPACT_SINGLE_ARCHERY  by JoeDinesSound   (/534956/)
+          Fruit Impact 1                    by OwlStorm        (/209012/)
+Licence:  CC0 1.0 (all three)
+Edited:   Tail-trimmed to ~0.3 s and peak normalised. Nothing else -- these are
+          real recorded archery impacts and need no doctoring.
+Why:      Second attempt. The first set was flesh/gore samples (magnuswaker,
+          modusmogulus) which read as "too bloody"; pitching them down and
+          low-passing to a thump only made them sound bad. Purpose-recorded
+          arrow impacts were the answer -- JoeDinesSound's are pristine
+          (-81 dB noise floor). The fruit impact is the classic stand-in for
+          arrow-into-animal without any gore in it.
+Used for: the arrow landing, on its own emitter at the target.
+
+
+gate_slam_1.ogg / gate_slam_2.ogg         [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Titles:   gate_slam_1 <- "Door close" by Checkseven        (/245823/)
+          gate_slam_2 <- "Heavy_wooden_door_close_mansion"
+                         by elliott.klein                  (/367221/)
+Licence:  CC0 1.0 (both)
+Edited:   The single loudest transient cut out of each, with a short run-up and
+          its decay; peak normalised, 12 ms fade out. elliott.klein's source is
+          3.12 s of swing-then-close, so only the close was kept.
+Chosen:   Lowest spectral centroids of the candidates (1645 and 1764 Hz = heavy
+          wood rather than a light door), and elliott.klein's has a -73 dB noise
+          floor. Sharp attack, short decay, which is what syncs to a camera shake.
+Used for: the gate dropping into a finished wall (wall_side.gd::_gate_landed),
+          on the same frame as the shake and the dust.
+
+
+ui_click.ogg / ui_click_alt_cloth.ogg     [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Titles:   ui_click           <- "Turned page" by MBPL              (/667180/)
+          ui_click_alt_cloth <- "Clothes Rustling Movement 13_2"
+                                by Joao_Janz                       (/493504/)
+Licence:  CC0 1.0 (both)
+Edited:   Peak normalised with short fades. Otherwise untouched.
+Chosen:   Measured ATTACK TIME, not material. The first attempt was a 60 ms wood
+          tick whose attack measured 0.000s -- a pure transient, which IS a click
+          by construction and read as "a sharp clicky mouse wheel" no matter how
+          woody the sample. A page turn attacks over 0.112s and has body behind
+          it: parchment suits a monarch's ledger. The cloth one (0.104s attack)
+          is kept as a wired-in-one-line alternative and is NOT currently used.
+Used for: every menu button, via menu.gd::_button -- press at -9 dB, hover the
+          same clip at -22 dB pitched up, so both are the same material.
+
+
+gate_open.ogg / gate_close.ogg            [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    cemeterygate16.aif
+Author:   celadon_noise
+Source:   https://freesound.org/s/399449/
+Licence:  CC0 1.0
+Edited:   Two slices of one 3.19 s recording -- 0.02-1.45 s is the swing creak
+          (open), 2.28-3.10 s is the softer creak settling (close). Normalised,
+          40 ms fade out. BOTH FROM THE SAME GATE, so they match each other.
+Chosen:   1312 Hz centroid, lowest of the candidates = the heaviest, most
+          gate-like of them.
+Status:   PARKED. The creak was wrong and is disabled (GATE_SWING_SOUND in
+          wall_side.gd). The gate opens whenever anyone walks near it, so a
+          mediocre creak grates within a minute. Clips kept for a second attempt;
+          the completion slam is unaffected.
+
+
+
+
+build_raise_wood_1/2.ogg, build_raise_stone_1/2.ogg
+                                          [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+wood_1  <- "drop-item-heavy2" by rottako          https://freesound.org/s/693582/
+wood_2  <- "Rubble Trouble 3" by magnuswaker      https://freesound.org/s/758582/
+stone_1 <- "Stein Aufschlag mit langem Decay"
+           by mbezzola                            https://freesound.org/s/105278/
+stone_2 <- same series                            https://freesound.org/s/105282/
+Licence:  CC0 1.0 (all four)
+Edited:   Trimmed (stone capped at 1.7 s from 2.3-2.7 s), normalised, 45 ms fade.
+Used for: a hall tier landing (building.gd::_swap_and_heave), fired with the dust
+          rather than after it.
+Note:     THIS IS THE MATERIAL-TIER IDEA MADE REAL. The Wooden Hall lands as
+          timber and rubble; the Stone Hall lands as stone with a long decay --
+          genuinely different recordings, not one sound reused. `RAISE_SFX` is
+          keyed by material and falls back to wood, so L4 Castle only needs its
+          own key adding. Same pattern as GATE_SFX in wall_side.gd.
+
+
+coin pickup — no new files
+--------------------------------------------------------------------------
+The monarch banking a loose coin (coin.gd::_bank_it) reuses the SAME
+coins-in-cloth takes the tally spends out of -- one material for one substance.
+It is pitched to 0.74, below the tally's whole rising ramp (0.80 .. 1.22), and
+sits at -12 dB, so gold coming in never gets mistaken for gold going out.
+
+
+tree_fall_1.ogg / tree_fall_2.ogg         [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Titles:   "A Tree Falling Down.wav" by ecfike       https://freesound.org/s/139952/
+          "timber tree falling 2" by matt_beer      https://freesound.org/s/515312/
+Licence:  CC0 1.0 (both)
+Edited:   ALIGNED TO THE ANIMATION. Each clip's loudest moment was measured and
+          the head trimmed so the crash sits exactly 1.09 s in -- which is when
+          the trunk hits the grass in tree_resource.gd (0.24 s of lean plus
+          FALL_TIME 0.85 s). The sound starts with the topple, so its creak and
+          whoosh cover the fall and the crash lands ON the impact.
+          ecfike's crash was at 1.35 s, matt_beer's at 3.18 s; both now 1.09 s.
+          They were also REBALANCED after sounding "watery", like a tree falling
+          into a lake. Measured, they were low/high 0.13 -- almost pure swish,
+          no weight. Fix was a spectral tilt (+4 dB under 900 Hz, -9 dB above)
+          plus a heavy wood impact mixed in ON the crash frame:
+            "Iron-Wood Slam" by Hakren  https://freesound.org/s/372877/  CC0 1.0
+          Now 0.46 and 1.46. The lead-in is also ducked to 0.72x the crash --
+          boosting the lows otherwise let an earlier crack become the loudest
+          moment, which silently broke the alignment.
+⚠ If the lean or FALL_TIME ever change, THESE CLIPS MUST BE RE-ALIGNED.
+Used for: tree_resource.gd::_topple.
+
+
+fire_light.ogg                            [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    "Fireblast med.wav"
+Author:   cribbler
+Source:   https://freesound.org/s/381855/
+Licence:  CC0 1.0
+Edited:   High-passed below 150 Hz, long fades in and out, trimmed to 1.9 s.
+Chosen:   0.49 s attack -- a swell rather than a hit.
+Why:      REPLACED lollosound's torch pass, which read as an explosion. The
+          measurement explained it: that clip's low/high energy ratio was 11.57,
+          i.e. almost all sub-bass, and a bass-heavy burst IS a boom however slow
+          its attack. Stripping the sub took the new one to 3.32 and turned the
+          bang into air moving.
+Used for: campfire.gd::light. Its own emitter, so the catch rings over the
+          crackle loop starting rather than cutting it off.
+
+
+job_tools_1.ogg / job_tools_2.ogg         [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Titles:   "Tool-case - Open" by ldezem            https://freesound.org/s/386401/
+          "Light_Metal_Rattle_Very_Short" by
+          mickyman5000                            https://freesound.org/s/340506/
+Licence:  CC0 1.0 (both)
+Edited:   Normalised with short fades.
+Status:   PARKED (JOB_SOUND_ENABLED in villager.gd) pending a decision on what
+          taking a post should sound like. Clips and wiring kept.
+Used for: a wanderer taking a post (villager.gd::_start_working), on the same
+          frame the model swaps to one carrying tools.
+Note:     Workers play at pitch 0.92, archers at 1.06 -- the cheapest way to make
+          the two jobs distinguishable without two clip sets. Real per-role kit
+          (a bowstring, a quiver) would follow the material-tier pattern used by
+          building.gd::RAISE_SFX.

@@ -4,7 +4,7 @@ extends Node
 
 const PATH := "user://settings.cfg"
 
-var volume: float = 0.8       # 0..1, master bus
+var volume: float = 0.88      # 0..1, master bus
 var fullscreen: bool = false
 
 func _ready() -> void:

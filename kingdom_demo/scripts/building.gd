@@ -42,6 +42,30 @@ const BANNER_SCALE := 5.0
 const TIER1_BUILD_TIME := 25.0
 const TIER2_BUILD_TIME := 40.0
 
+# ---- the sound of a tier landing ----
+#
+## **A building should sound like what it is made of**, the same way the gate does
+## (see `wall_side.gd::GATE_SFX`). The Wooden Hall lands as timber and rubble; the
+## Stone Hall lands as stone with a long decay. When L4 Castle arrives, adding a
+## `"castle"` key here is the whole change -- `_raise_sfx()` falls back to wood for
+## any material with no set of its own, so nothing breaks in the meantime.
+const RAISE_SFX := {
+	"wood": [
+		preload("res://kingdom_demo/assets/audio/build_raise_wood_1.ogg"),
+		preload("res://kingdom_demo/assets/audio/build_raise_wood_2.ogg"),
+	],
+	"stone": [
+		preload("res://kingdom_demo/assets/audio/build_raise_stone_1.ogg"),
+		preload("res://kingdom_demo/assets/audio/build_raise_stone_2.ogg"),
+	],
+	# "castle": [ ... ]   <- L4, when it exists
+}
+const RAISE_DB := -2.0
+const RAISE_PITCH := 1.07
+const RAISE_REACH := 45.0
+
+static var _raise_pools := {}
+
 @onready var model_root: Node3D = $Model
 @onready var label: Label3D = $Label
 @onready var _prompt: Label3D = $Prompt
@@ -248,17 +272,47 @@ func _layout_icons() -> void:
 
 ## The new building heaves up out of the ground, the grass hiding the join --
 ## the moment a crew finishes either tier.
-func _swap_and_heave(scene: PackedScene, dname: String, sc: float, height: float) -> void:
+func _swap_and_heave(scene: PackedScene, dname: String, sc: float, height: float,
+		material := "wood") -> void:
 	display_name = dname
 	_show_model(scene, sc)
 	_fit(height if height > 0.0 else _height)
 	label.text = display_name
 	_dust()
+	# with the dust, not after it -- the sound and the heave are one event
+	_raise_sound(material)
 	_model.position.y = -_height * 0.7
 	_model.scale = Vector3(sc * 1.1, sc * 0.4, sc * 1.1)
 	var t := create_tween()
 	t.tween_property(_model, "position:y", 0.0, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.parallel().tween_property(_model, "scale", Vector3(sc, sc, sc), 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+## Falls back to wood for any material without its own set, so a new tier can be
+## added to `RAISE_SFX` whenever its recordings turn up rather than up front.
+func _raise_sfx(material: String) -> AudioStreamRandomizer:
+	var key: String = material if RAISE_SFX.has(material) else "wood"
+	if not _raise_pools.has(key):
+		var pool := AudioStreamRandomizer.new()
+		var clips: Array = RAISE_SFX[key]
+		for i in range(clips.size()):
+			pool.add_stream(i, clips[i])
+		pool.random_pitch = RAISE_PITCH
+		pool.playback_mode = AudioStreamRandomizer.PLAYBACK_RANDOM_NO_REPEATS
+		_raise_pools[key] = pool
+	return _raise_pools[key]
+
+## Its own emitter, because the building is mid-tween and the sound outlives it.
+func _raise_sound(material: String) -> void:
+	var p := AudioStreamPlayer3D.new()
+	p.stream = _raise_sfx(material)
+	p.bus = &"SFX"
+	p.volume_db = RAISE_DB
+	p.unit_size = 12.0
+	p.max_distance = RAISE_REACH
+	get_tree().current_scene.add_child(p)
+	p.global_position = global_position + Vector3(0, 0.6, 0)
+	p.finished.connect(p.queue_free)
+	p.play()
 
 func _dust() -> void:
 	for i in range(10):
@@ -324,10 +378,12 @@ func _finish_upgrade() -> void:
 	_crew = BuildCrew.new()
 	if tier == 1:
 		upgraded = true
-		_swap_and_heave(upgrade_model_scene, upgrade_display_name, upgrade_scale, upgrade_height)
+		_swap_and_heave(upgrade_model_scene, upgrade_display_name, upgrade_scale,
+			upgrade_height, "wood")
 	else:
 		upgraded2 = true
-		_swap_and_heave(upgrade2_model_scene, upgrade2_display_name, upgrade2_scale, upgrade2_height)
+		_swap_and_heave(upgrade2_model_scene, upgrade2_display_name, upgrade2_scale,
+			upgrade2_height, "stone")
 		if upgrade2_unlocks_stone:
 			var gm := get_tree().get_first_node_in_group("game_manager")
 			if gm and gm.has_method("unlock_stone_walls"):

@@ -229,7 +229,56 @@ func _button(text: String, on_press: Callable) -> Button:
 	b.custom_minimum_size = BTN_MIN
 	b.add_theme_font_size_override("font_size", 22)
 	b.pressed.connect(on_press)
+	b.pressed.connect(_click)
+	b.mouse_entered.connect(_hover)
 	return b
+
+# ---- button sound ----
+#
+# Parchment, not a click. The first attempt used a 60 ms wood tick, and a 60 ms
+# transient IS a click by construction -- measured attack was 0.000s, which reads
+# as a mouse wheel however nice the material is. This is a page turning: a soft
+# 0.11s attack with some body behind it, which suits a monarch's ledger.
+#
+# Hover is the same clip much quieter and pitched up, so press and hover are
+# unmistakably the same material -- a UI that mixes two sound families reads as
+# two different interfaces.
+
+const CLICK := preload("res://kingdom_demo/assets/audio/ui_click.ogg")
+const CLICK_DB := -9.0
+const HOVER_DB := -22.0
+const HOVER_PITCH := 1.18
+## Heard thousands of times, so it gets a little jitter or it starts to sound
+## mechanical. Kept small -- a click that wobbles is worse than one that doesn't.
+const CLICK_PITCH_JITTER := 1.05
+
+var _ui_sfx: AudioStreamPlayer = null
+
+func _ui_player() -> AudioStreamPlayer:
+	if is_instance_valid(_ui_sfx):
+		return _ui_sfx
+	var pool := AudioStreamRandomizer.new()
+	pool.add_stream(0, CLICK)
+	pool.random_pitch = CLICK_PITCH_JITTER
+	_ui_sfx = AudioStreamPlayer.new()
+	_ui_sfx.stream = pool
+	_ui_sfx.bus = &"SFX"
+	# the pause menu runs with the tree paused, and a paused player is a silent one
+	_ui_sfx.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(_ui_sfx)
+	return _ui_sfx
+
+func _click() -> void:
+	var p := _ui_player()
+	p.pitch_scale = 1.0
+	p.volume_db = CLICK_DB
+	p.play()
+
+func _hover() -> void:
+	var p := _ui_player()
+	p.pitch_scale = HOVER_PITCH
+	p.volume_db = HOVER_DB
+	p.play()
 
 func _spacer(h: int) -> Control:
 	var c := Control.new()

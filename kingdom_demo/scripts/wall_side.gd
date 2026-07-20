@@ -255,6 +255,75 @@ func build_spot(who: Node3D) -> Vector3:
 	inward = inward.normalized() if inward.length() > 0.01 else Vector3.FORWARD
 	return global_position + _right() * STATIONS[i] + inward * 1.1
 
+# ---- gate sound ----
+#
+## **A gate should sound like what it is made of.** Right now every wall in the
+## game is timber, so there is one entry here; when the stone upgrade (and later
+## a castle) gets its own recordings, adding a `"stone"` key beside `"wood"` is
+## the entire change -- `_gate_sfx()` already picks by material and falls back to
+## wood for any tier that has no set of its own. Nothing else needs touching.
+##
+## The same idea applies to the main building's ladder (Tent -> Wooden Hall ->
+## Stone Hall -> Castle); see `GAME_DESIGN.md`.
+const GATE_SFX := {
+	"wood": {
+		"open": [preload("res://kingdom_demo/assets/audio/gate_open.ogg")],
+		"close": [preload("res://kingdom_demo/assets/audio/gate_close.ogg")],
+		"slam": [
+			preload("res://kingdom_demo/assets/audio/gate_slam_1.ogg"),
+			preload("res://kingdom_demo/assets/audio/gate_slam_2.ogg"),
+		],
+	},
+	# "stone": { ... }   <- when the castle-kit gate gets its own recordings
+}
+
+## PARKED. The creak on every swing was wrong and is off until we find a better
+## one -- the gate opens whenever anyone walks near it, so it fires constantly and
+## a mediocre creak grates fast. The slam on completion is unaffected. Clips and
+## wiring are still here; flip this back on once there is a creak worth using.
+const GATE_SWING_SOUND := false
+
+## Swinging is everyday and happens whenever anyone walks up; the slam happens
+## once, when the wall is finished, and is meant to carry across camp.
+const GATE_DB := {"open": -9.0, "close": -11.0, "slam": -1.0}
+const GATE_REACH := {"open": 26.0, "close": 26.0, "slam": 55.0}
+const GATE_PITCH := 1.08
+
+static var _gate_pools := {}
+
+## The material this wall currently is. `_style_castle` already tracks the wood ->
+## stone upgrade for the models, so the sound follows the same flag.
+func _material() -> String:
+	return "stone" if _style_castle else "wood"
+
+func _gate_sfx(kind: String) -> AudioStreamRandomizer:
+	var mat := _material()
+	var set_for: Dictionary = GATE_SFX.get(mat, GATE_SFX["wood"])
+	if not set_for.has(kind):
+		set_for = GATE_SFX["wood"]
+	var key := "%s/%s" % [mat, kind]
+	if not _gate_pools.has(key):
+		var pool := AudioStreamRandomizer.new()
+		var clips: Array = set_for[kind]
+		for i in range(clips.size()):
+			pool.add_stream(i, clips[i])
+		pool.random_pitch = GATE_PITCH
+		pool.playback_mode = AudioStreamRandomizer.PLAYBACK_RANDOM_NO_REPEATS
+		_gate_pools[key] = pool
+	return _gate_pools[key]
+
+func _gate_sound(kind: String) -> void:
+	var p := AudioStreamPlayer3D.new()
+	p.stream = _gate_sfx(kind)
+	p.bus = &"SFX"
+	p.volume_db = GATE_DB[kind]
+	p.unit_size = 14.0
+	p.max_distance = GATE_REACH[kind]
+	add_child(p)
+	p.global_position = global_position + Vector3(0, 1.0, 0)
+	p.finished.connect(p.queue_free)
+	p.play()
+
 ## The point on the wall line nearest `from` -- what a builder faces and swings at.
 func face_point(from: Vector3) -> Vector3:
 	var d: float = clampf((from - global_position).dot(_right()), -HALF, HALF)
@@ -389,6 +458,9 @@ func _gate_landed() -> void:
 	var rig := get_tree().get_first_node_in_group("camera_rig")
 	if rig and rig.has_method("shake"):
 		rig.shake(0.3, 0.1)
+	# on the same frame as the shake and the dust -- the thump you feel and the
+	# thump you hear have to be the same event or the wall never lands properly
+	_gate_sound("slam")
 	# swing wide in salute, then fall shut
 	for pair in [[_left_leaf, -OPEN_ANGLE], [_right_leaf, OPEN_ANGLE]]:
 		var leaf: Node3D = pair[0]
@@ -527,6 +599,8 @@ func _on_gate_body_exit(body: Node3D) -> void:
 func _set_gate_open(open: bool) -> void:
 	if _saluting:
 		return
+	if GATE_SWING_SOUND:
+		_gate_sound("open" if open else "close")
 	if _gate_col:
 		_gate_col.set_deferred("disabled", open)
 	if _left_leaf:

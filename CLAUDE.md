@@ -93,6 +93,10 @@ on an unresolved fork, check **§12 (Open questions)** and raise it rather than 
 - **Audio is CC0 or CC-BY only** — never `-SA` or `-NC`. Claude cannot hear anything, so
   Andrei does every ear test: send candidates out for audition with the per-role criteria
   from `ASSETS.md` ("What to listen for"), restated each batch.
+- **Every new sound gets a row in `kingdom_demo/audio_review.html`** in the same pass that
+  wires it. That page is Andrei's listening desk — open it in a browser and every clip in
+  the game plays inline, with how often it fires and where it came from. A sound that isn't
+  on it can't be reviewed.
 - **No full end-to-end tests.** Go straight at the feature; don't re-verify things that
   already worked. See "Running and verifying".
 - **Hand finished features to Andrei to play-test**, and ask him to report back using the

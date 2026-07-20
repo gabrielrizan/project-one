@@ -15,6 +15,12 @@ shape = SubResource("CapsuleShape3D_v")
 
 [node name="Model" type="Node3D" parent="."]
 
+[node name="Sfx" type="AudioStreamPlayer3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+unit_size = 5.0
+max_distance = 32.0
+bus = &"SFX"
+
 [node name="NavAgent" type="NavigationAgent3D" parent="."]
 radius = 0.35
 height = 1.5

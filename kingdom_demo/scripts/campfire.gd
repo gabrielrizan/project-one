@@ -44,6 +44,21 @@ const SOUP_FULL_H := 0.44     # matches the CylinderMesh height in the scene
 @onready var _prompt: Label3D = $Prompt
 @onready var _crackle: AudioStreamPlayer3D = $Crackle
 
+## The fire is the centre of the camp after dark and just a cooking fire by day,
+## so it pulls back when the sun is up rather than roaring through the birdsong.
+## These are node gain on top of the Ambience bus. That bus just came up 5 dB to
+## rescue the beds and one-shots, so the night figure drops by the same 5 to
+## leave the fire sounding exactly as it did -- only the daytime level changes.
+const CRACKLE_NIGHT_DB := -9.0
+const CRACKLE_DAY_DB := -18.0
+const CRACKLE_FADE := 3.0    # dB per second, eased across dusk with everything else
+
+## Trimmed so the whoosh peaks 0.18s in, which is about when the flame appears --
+## lighting the fire is the first thing the player ever does, and it should land.
+const LIGHT_CLIP := preload("res://kingdom_demo/assets/audio/fire_light.ogg")
+const LIGHT_DB := -4.0
+const LIGHT_REACH := 40.0
+
 var lit := false
 var fill := 0
 var cauldron_full := false
@@ -66,6 +81,12 @@ func _process(delta: float) -> void:
 	var s := 1.0 + sin(_flicker) * 0.06 + sin(_flicker * 2.7) * 0.03
 	_flame.scale = Vector3(1.0, s, 1.0) * 0.5
 	_flame.rotation.y += delta * 0.6
+	var want := CRACKLE_NIGHT_DB if _is_night() else CRACKLE_DAY_DB
+	_crackle.volume_db = move_toward(_crackle.volume_db, want, CRACKLE_FADE * delta)
+
+func _is_night() -> bool:
+	var cycle := get_tree().get_first_node_in_group("day_night_cycle")
+	return cycle != null and cycle.is_night()
 
 # ---------------------------------------------------------------- interaction
 
@@ -128,8 +149,23 @@ func light() -> void:
 	if lit:
 		return
 	lit = true
+	_light_sound()
 	_apply_state()
 	_spawn_village()
+
+## Its own emitter rather than the crackle player, so the catch rings over the top
+## of the loop starting instead of cutting it off.
+func _light_sound() -> void:
+	var p := AudioStreamPlayer3D.new()
+	p.stream = LIGHT_CLIP
+	p.bus = &"SFX"
+	p.volume_db = LIGHT_DB
+	p.unit_size = 10.0
+	p.max_distance = LIGHT_REACH
+	add_child(p)
+	p.global_position = global_position + Vector3(0, 0.5, 0)
+	p.finished.connect(p.queue_free)
+	p.play()
 
 # ---------------------------------------------------------------- cauldron
 

@@ -27,6 +27,9 @@ SOUND
 
   "FIREBurn_Campfire.Close.Long.Crackling" by newlocknew
       freesound.org/s/730704/ — CC BY 4.0
+
+  "Hammer Blows" by AleXZavesa
+      freesound.org/people/AleXZavesa/ — CC BY 4.0
 ```
 
 ---
@@ -38,6 +41,7 @@ SOUND
 | `audio/ambience_day.ogg` | Winter forest NL 1112AM 220124_0326 | klankbeeld | CC BY 4.0 | [freesound.org/s/616354](https://freesound.org/s/616354/) |
 | `audio/ambience_night.ogg` | 230809_2526_FR_Insects-twilight-pi | kevp888 | CC BY 4.0 | [freesound.org/s/700734](https://freesound.org/s/700734/) |
 | `audio/campfire_loop.ogg` | FIREBurn_Campfire.Close.Long.Crackling | newlocknew | CC BY 4.0 | [freesound.org/s/730704](https://freesound.org/s/730704/) |
+| `audio/hammer_1..5.ogg` | Hammer Blows 9 / 2 / 10 / 5 / 1 | AleXZavesa | CC BY 4.0 | [freesound.org/s/853866](https://freesound.org/s/853866/) |
 | `audio/ambience_night_woods_SPARE.ogg` | evening woods 01 NL 151009_0806 | klankbeeld | CC BY 4.0 | [freesound.org/s/324409](https://freesound.org/s/324409/) |
 
 ⚠ The `_SPARE` file is **downloaded but deliberately not wired into the game** —
@@ -48,7 +52,10 @@ dropped for good, delete the file and this row together.
 
 Not listed above because they are **CC0** and need no credit:
 `audio/owl_hoot.ogg` ("Owl Hoot" by Breviceps), and
-`audio/tree_creak_a|b|c.ogg` (tree_creak / _02 / _04 by Department64).
+`audio/tree_creak_a|b|c.ogg` (Department64), `audio/crow_a|b|c.ogg` (iwanPlays,
+trouxel), `audio/axe_chop_1..5.ogg` (super8ude), `audio/coin_1..5.ogg` (Anthousai),
+`audio/bow_1..3.ogg` (Ali_6868), `audio/arrow_hit_1..3.ogg` (JoeDinesSound,
+OwlStorm).
 
 ---
 

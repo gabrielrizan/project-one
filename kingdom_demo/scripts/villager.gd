@@ -23,7 +23,11 @@ const WORK_ARRIVE := 0.7
 const EAT_TIME := 2.5
 
 const CHOP_REACH := 1.15   # where a worker plants their feet to swing
-const SWING_TIME := 0.46
+## Seconds between blows. The swing animation itself is ~0.4s, so the rest is the
+## worker gathering themselves for the next one -- felling should read as heavy
+## work, not a woodpecker. Every axe hit is also a sound, so this is what stops
+## the chop sample machine-gunning.
+const SWING_TIME := 1.1
 const GATHER_REACH := 0.55
 const DELIVER_REACH := 1.7
 const ERRAND_SCAN := 1.0   # how often an idle villager looks for something to do
@@ -44,7 +48,10 @@ const PICK_BEAT := 0.55
 const PRESENT_REACH := 1.6
 
 const BUILD_REACH := 1.4
-const HAMMER_BEAT := 0.42
+## Same reasoning as SWING_TIME: every beat is now a sound, and at 0.42s it
+## machine-gunned. Still quicker than the axe -- tapping stakes into a line is
+## lighter work than burying a blade in a trunk.
+const HAMMER_BEAT := 0.72
 const SITE_WALK_TIMEOUT := 25.0   # can't reach the line -> free the slot for someone who can
 
 ## A wanderer carries no tools; taking a job swaps in the model that does, so the
@@ -57,8 +64,76 @@ const COIN_MODEL := preload("res://kingdom_demo/assets/3d/props/coin.glb")
 const CARRY_SCALE := 0.75
 const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
 
+## Five takes of the same axe, so a worker felling a tree doesn't machine-gun one
+## noise six times over. Shared by every villager -- an [AudioStreamRandomizer] is
+## a stateless resource, so there is no reason to build one per body.
+const AXE_CLIPS := [
+	preload("res://kingdom_demo/assets/audio/axe_chop_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/axe_chop_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/axe_chop_3.ogg"),
+	preload("res://kingdom_demo/assets/audio/axe_chop_4.ogg"),
+	preload("res://kingdom_demo/assets/audio/axe_chop_5.ogg"),
+]
+const AXE_PITCH := 1.16
+const AXE_VOL_JITTER := 3.0
+
+## Driving stakes into a line, so lighter and quicker than the axe.
+const HAMMER_CLIPS := [
+	preload("res://kingdom_demo/assets/audio/hammer_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/hammer_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/hammer_3.ogg"),
+	preload("res://kingdom_demo/assets/audio/hammer_4.ogg"),
+	preload("res://kingdom_demo/assets/audio/hammer_5.ogg"),
+]
+const HAMMER_PITCH := 1.14
+const HAMMER_VOL_JITTER := 3.0
+## Raising a wall is a long job with a beat every 0.72s, so it sits well back --
+## it should be the sound of work going on nearby, not the loudest thing in camp.
+const HAMMER_DB := -7.0
+
+const BOW_CLIPS := [
+	preload("res://kingdom_demo/assets/audio/bow_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/bow_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/bow_3.ogg"),
+]
+const BOW_PITCH := 1.1
+const BOW_VOL_JITTER := 2.5
+
+## Played where the arrow lands, not where it was loosed -- see [_loose_arrow].
+const ARROW_HIT_CLIPS := [
+	preload("res://kingdom_demo/assets/audio/arrow_hit_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/arrow_hit_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/arrow_hit_3.ogg"),
+]
+const ARROW_HIT_PITCH := 1.12
+const ARROW_HIT_VOL_JITTER := 2.5
+
+## A wanderer taking a post picks up the tools that come with it -- the model swaps
+## to one carrying an axe or a bow on the same frame, and this is that moment.
+## Workers get it a touch lower than archers, which is the cheapest way to make the
+## two jobs sound different without two clip sets; real per-role kit (a bowstring,
+## a quiver) would follow the material-tier pattern in `building.gd::RAISE_SFX`.
+const JOB_CLIPS := [
+	preload("res://kingdom_demo/assets/audio/job_tools_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/job_tools_2.ogg"),
+]
+const JOB_PITCH_JITTER := 1.1
+const JOB_DB := -8.0
+const JOB_PITCH := {"worker": 0.92, "archer": 1.06}
+
+## PARKED pending a decision on what taking a post should actually sound like.
+## Clips, pitching and wiring all stay; flip this back on to hear it again.
+const JOB_SOUND_ENABLED := false
+
+static var _axe_pool: AudioStreamRandomizer = null
+static var _hammer_pool: AudioStreamRandomizer = null
+static var _bow_pool: AudioStreamRandomizer = null
+static var _arrow_hit_pool: AudioStreamRandomizer = null
+static var _job_pool: AudioStreamRandomizer = null
+
 @onready var model_root: Node3D = $Model
 @onready var _agent: NavigationAgent3D = $NavAgent
+@onready var _sfx: AudioStreamPlayer3D = $Sfx
 
 var target := Vector3.ZERO          # cauldron position, set by spawner
 
@@ -103,6 +178,51 @@ func _ready() -> void:
 	_set_model(VILLAGER_MODEL)
 	_mill = target
 	_nav = NavMover.new(_agent, self)
+	if _axe_pool == null:
+		_axe_pool = _build_pool(AXE_CLIPS, AXE_PITCH, AXE_VOL_JITTER)
+	if _hammer_pool == null:
+		_hammer_pool = _build_pool(HAMMER_CLIPS, HAMMER_PITCH, HAMMER_VOL_JITTER)
+	if _bow_pool == null:
+		_bow_pool = _build_pool(BOW_CLIPS, BOW_PITCH, BOW_VOL_JITTER)
+	if _arrow_hit_pool == null:
+		_arrow_hit_pool = _build_pool(ARROW_HIT_CLIPS, ARROW_HIT_PITCH, ARROW_HIT_VOL_JITTER)
+	if _job_pool == null:
+		_job_pool = _build_pool(JOB_CLIPS, JOB_PITCH_JITTER, 2.0)
+
+## One randomiser per kind of sound, built once and shared. Picks a clip at random
+## and jitters pitch and volume, so repeated blows never land identically.
+static func _build_pool(clips: Array, pitch: float, vol_jitter: float) -> AudioStreamRandomizer:
+	var pool := AudioStreamRandomizer.new()
+	for i in range(clips.size()):
+		pool.add_stream(i, clips[i])
+	pool.random_pitch = pitch
+	pool.random_volume_offset_db = vol_jitter
+	pool.playback_mode = AudioStreamRandomizer.PLAYBACK_RANDOM_NO_REPEATS
+	return pool
+
+## `pitch` is set per call rather than left on the player -- it applies to the
+## stream while it is playing, so resetting it afterwards would undo it, and
+## leaving it set would colour whatever this villager plays next.
+func _play(pool: AudioStreamRandomizer, db := 0.0, pitch := 1.0) -> void:
+	if not is_instance_valid(_sfx):
+		return
+	_sfx.stream = pool
+	_sfx.volume_db = db
+	_sfx.pitch_scale = pitch
+	_sfx.play()
+
+## A one-shot at a point in the world, on its own throwaway emitter. Used where
+## the sound does not belong to this body -- an arrow landing on its target.
+func _thud_at(at: Vector3) -> void:
+	var p := AudioStreamPlayer3D.new()
+	p.stream = _arrow_hit_pool
+	p.bus = &"SFX"
+	p.unit_size = 5.0
+	p.max_distance = 32.0
+	get_tree().current_scene.add_child(p)
+	p.global_position = at
+	p.finished.connect(p.queue_free)
+	p.play()
 
 func _exit_tree() -> void:
 	if _nav:
@@ -194,7 +314,11 @@ func _try_take_job() -> void:
 
 func _start_working() -> void:
 	_state = State.WORK
-	_set_model(ARCHER_MODEL if _workplace.job_type == "archer" else WORKER_MODEL)
+	var job: String = _workplace.job_type
+	_set_model(ARCHER_MODEL if job == "archer" else WORKER_MODEL)
+	if JOB_SOUND_ENABLED:
+		# on the same frame the model swaps to one carrying tools
+		_play(_job_pool, JOB_DB, JOB_PITCH.get(job, 1.0))
 
 func _work_anchor() -> Vector3:
 	return _workplace.work_point() if is_instance_valid(_workplace) else global_position
@@ -310,6 +434,9 @@ func _swing_axe() -> void:
 func _land_blow() -> void:
 	if not _tree_standing():
 		return
+	# on every blow, not just the one that brings it down -- this is the frame the
+	# swing tween drives the axe into the trunk, so the hit and the sound agree
+	_play(_axe_pool)
 	if not _tree.take_chop(global_position):
 		return
 	# timber -- back off and watch it come down
@@ -393,6 +520,7 @@ func _swing_hammer() -> void:
 func _land_hammer() -> void:
 	if not _site_open():
 		return
+	_play(_hammer_pool, HAMMER_DB)
 	var at: Vector3 = _site.face_point(global_position)
 	at.y = 0.1
 	var dir := at - global_position
@@ -460,6 +588,7 @@ func _loose_arrow() -> void:
 	var from := global_position + Vector3(0, 0.7, 0)
 	var to: Vector3 = quarry.global_position + Vector3(0, 0.2, 0)
 
+	_play(_bow_pool)
 	var arrow := MarkFx.model(ARROW_MODEL, 0.7)
 	get_tree().current_scene.add_child(arrow)
 	arrow.global_position = from
@@ -470,6 +599,10 @@ func _loose_arrow() -> void:
 	t.tween_property(arrow, "global_position", to, 0.22).set_trans(Tween.TRANS_LINEAR)
 	t.tween_callback(func() -> void:
 		arrow.queue_free()
+		# the thud belongs where the arrow lands, which can be four metres from
+		# the archer -- so it gets its own emitter out at the target rather than
+		# coming from the bow that fired it
+		_thud_at(to)
 		if is_instance_valid(quarry) and quarry.has_method("take_arrow"):
 			quarry.take_arrow(from)
 	)

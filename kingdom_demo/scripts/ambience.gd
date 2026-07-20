@@ -23,6 +23,13 @@ const CREAKS := [
 	preload("res://kingdom_demo/assets/audio/tree_creak_b.ogg"),
 	preload("res://kingdom_demo/assets/audio/tree_creak_c.ogg"),
 ]
+## Long drawn-out calls only. A short clipped "cah" reads as a different bird
+## entirely and stuck out badly against these.
+const CROWS := [
+	preload("res://kingdom_demo/assets/audio/crow_a.ogg"),
+	preload("res://kingdom_demo/assets/audio/crow_b.ogg"),
+	preload("res://kingdom_demo/assets/audio/crow_c.ogg"),
+]
 
 const BED_DB := -2.0
 ## far enough down to be inaudible without the cost of stopping and restarting
@@ -49,20 +56,46 @@ const CREAK_PITCH := 1.2
 const CREAK_VOL_JITTER := 4.0
 const CREAK_RANGE := 17.0     # how close a trunk has to be to be worth creaking
 
+## PARKED. The day bed already has crows in it, distant and behind the wind, and
+## those sound right. Anything we add on top arrives closer and sharper than the
+## ones already in the recording, and reads as a second, wrong bird -- three
+## different clip sets all failed the same way. Flip this to re-enable; the
+## assets and the burst logic are all still here.
+const CROWS_ENABLED := false
+
+## A crow is the loudest thing in the daytime mix, so it is the rarest -- roughly
+## once or twice across a two-minute day. Thrown to a bearing like the owl rather
+## than pinned to a trunk: the bird is somewhere out there, not in a specific tree.
+const CROW_GAP := Vector2(45.0, 130.0)
+const CROW_PITCH := 1.12
+const CROW_VOL_JITTER := 4.0
+const CROW_DISTANCE := Vector2(12.0, 34.0)
+## A real crow rarely calls just once, but it doesn't rattle off ten either.
+## Weighted so one call is the common case, two is second, three is uncommon --
+## and never more, so it can't turn into a racket.
+const CROW_CALL_WEIGHTS := [60, 28, 12]      # 1x, 2x, 3x
+## Pause between calls in a burst. Has to clear the clip length -- the calls are
+## drawn-out (0.8-1.3s), and a shorter gap stacks them into a racket.
+const CROW_CALL_GAP := Vector2(1.15, 1.9)
+
 var _day: AudioStreamPlayer = null
 var _night: AudioStreamPlayer = null
 var _owl: AudioStreamPlayer3D = null
 var _creak: AudioStreamPlayer3D = null
+var _crow: AudioStreamPlayer3D = null
 var _owl_t := 0.0
 var _creak_t := 0.0
+var _crow_t := 0.0
 
 func _ready() -> void:
 	_day = _make_bed(DAY_BED, BED_DB)
 	_night = _make_bed(NIGHT_BED, BED_OFF_DB)
 	_owl = _make_voice([OWL], OWL_PITCH, OWL_VOL_JITTER, 18.0, 60.0)
 	_creak = _make_voice(CREAKS, CREAK_PITCH, CREAK_VOL_JITTER, 6.0, 28.0)
+	_crow = _make_voice(CROWS, CROW_PITCH, CROW_VOL_JITTER, 16.0, 60.0)
 	_owl_t = randf_range(OWL_GAP.x, OWL_GAP.y)
 	_creak_t = randf_range(CREAK_GAP.x, CREAK_GAP.y)
+	_crow_t = randf_range(CROW_GAP.x, CROW_GAP.y)
 
 func _process(delta: float) -> void:
 	var night := _is_night()
@@ -73,12 +106,17 @@ func _process(delta: float) -> void:
 		_owl_t -= delta
 		if _owl_t <= 0.0:
 			_owl_t = randf_range(OWL_GAP.x, OWL_GAP.y)
-			_call_from_the_dark(_owl, OWL_DISTANCE)
+			_call_from_a_bearing(_owl, OWL_DISTANCE)
 	else:
 		_creak_t -= delta
 		if _creak_t <= 0.0:
 			_creak_t = randf_range(CREAK_GAP.x, CREAK_GAP.y)
 			_creak_from_a_tree()
+		if CROWS_ENABLED:
+			_crow_t -= delta
+			if _crow_t <= 0.0:
+				_crow_t = randf_range(CROW_GAP.x, CROW_GAP.y)
+				_crow_burst()
 
 # ---- beds ----
 
@@ -116,14 +154,39 @@ func _make_voice(streams: Array, pitch: float, vol_jitter: float,
 	return p
 
 ## Throw the voice to a random bearing at a random distance from the monarch, so
-## it comes out of the dark from somewhere new each time.
-func _call_from_the_dark(p: AudioStreamPlayer3D, distance: Vector2) -> void:
+## it arrives from somewhere new each time. Used by anything that is "out there
+## somewhere" rather than attached to a thing you can see -- owl, crow.
+func _call_from_a_bearing(p: AudioStreamPlayer3D, distance: Vector2) -> void:
 	var king := get_tree().get_first_node_in_group("monarch")
 	var from: Vector3 = king.global_position if king else Vector3.ZERO
 	var angle := randf() * TAU
 	var r := randf_range(distance.x, distance.y)
 	p.global_position = from + Vector3(cos(angle), 0.0, sin(angle)) * r
 	p.play()
+
+## One crow, calling once, twice or (rarely) three times from the same spot --
+## the bird doesn't move between calls, so the bearing is picked once and the
+## repeats come from there. Awaits between calls rather than queueing timers.
+func _crow_burst() -> void:
+	_call_from_a_bearing(_crow, CROW_DISTANCE)
+	var calls := _weighted_pick(CROW_CALL_WEIGHTS) + 1
+	for i in range(calls - 1):
+		await get_tree().create_timer(randf_range(CROW_CALL_GAP.x, CROW_CALL_GAP.y)).timeout
+		if not is_instance_valid(_crow) or _is_night():
+			return                      # dusk landed mid-burst; let it drop
+		_crow.play()
+
+## Index into `weights`, chosen in proportion to them.
+func _weighted_pick(weights: Array) -> int:
+	var total := 0
+	for w in weights:
+		total += int(w)
+	var roll := randi() % maxi(total, 1)
+	for i in range(weights.size()):
+		roll -= int(weights[i])
+		if roll < 0:
+			return i
+	return weights.size() - 1
 
 ## Pick a standing trunk within earshot and groan out of that one. Nothing plays
 ## when there is no tree near enough -- the sound has to have a source.
