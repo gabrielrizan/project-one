@@ -56,6 +56,9 @@ All Freesound, fetched as public 192 kbps OGG previews. ⚠ = must be credited.
 | `tree_fall_1/2.ogg` | a marked tree coming down — **crash aligned to 1.09s** | ecfike, matt_beer | CC0 |
 | `fire_light.ogg` | campfire catching — a whoosh, sub stripped | cribbler | CC0 |
 | `job_tools_1/2.ogg` | **parked** — taking a post | ldezem, mickyman5000 | CC0 |
+| `rain_light.ogg` | drizzle bed, 40s seamless loop | craigsmith | CC0 |
+| `rain_heavy.ogg` | downpour bed, 200s seamless loop, stereo | kyles | CC0 |
+| `thunder_1..4.ogg` | distant thunder — 4 cuts from **one** recording | richwise | CC0 |
 | `ui_click.ogg` | every menu button — parchment page turn | MBPL | CC0 |
 | `ui_click_alt_cloth.ogg` | **alternative, not wired** — cloth rustle | Joao_Janz | CC0 |
 | `ambience_night_woods_SPARE.ogg` | **held back, not wired** — spare night bed | klankbeeld | ⚠ CC BY 4.0 |
@@ -74,6 +77,26 @@ rewiring anything.
 `wind.gd` is the visual half: every tree leans and rocks along one shared wind
 bearing, and gusts blow leaves through camp. **No art was downloaded for it** —
 the leaves reuse `MarkFx.particle` with the same chip texture the axe throws.
+
+**Rain is two beds, layered, not one turned up.** A drizzle and a downpour are
+different sounds, so `rain_light` fades up across intensity 0.02–0.30 and
+`rain_heavy` across 0.35–0.95 — in a downpour both are playing. Rain also
+**ducks the day/night bed** by up to 9 dB, because heavy rain really does drown
+out birdsong, and without the duck the layers just pile up.
+
+**All four thunders are cut from one recording** (`richwise` 361401). That is
+deliberate: thunder taken from four different sources sits in four different
+weathers — different distance, air and microphone — and the pool stops sounding
+like one storm. The events were located by measuring the source rather than by
+ear, and picked for isolation and a spread of lengths.
+
+### Weather visuals — no art was downloaded for these either
+
+`weather.gd` builds all three particle layers in code, and the pools are a
+shader on a MultiMesh (`assets/shaders/puddle.gdshader`). The only texture
+involved is a **soft radial dot generated at runtime** with `GradientTexture2D`
+— flat-alpha quads show their own square edges where they overlap, which turned
+the mist layer into a visible grid of rectangles until the falloff went in.
 
 ### Audio — where it got to, and what is left
 

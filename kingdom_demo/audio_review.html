@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <title>Kingdom demo — audio review</title>
 <style>
-  body { font: 15px/1.5 system-ui, sans-serif; max-width: 980px; margin: 2rem auto;
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 1320px; margin: 2rem auto;
          padding: 0 1rem; background: #14140f; color: #e8e4d8; }
   h1 { font-size: 1.4rem; margin-bottom: .2rem; }
   h2 { font-size: 1.05rem; margin: 2rem 0 .4rem; color: #d8c98a;
@@ -13,7 +13,11 @@
            text-align: left; }
   th { color: #9a9382; font-weight: 600; font-size: .85rem; text-transform: uppercase;
        letter-spacing: .04em; }
-  audio { height: 32px; width: 230px; }
+  /* Wide on purpose. At 230px the scrub bar on a 200-second bed was a few pixels
+     per minute and you couldn't drag to a given point at all. The Listen column
+     is sized to match so the players actually get the room. */
+  audio { height: 40px; width: 100%; min-width: 460px; }
+  td:nth-child(2) { width: 480px; }
   .name { font-family: ui-monospace, Consolas, monospace; font-size: .88rem; color: #cfe0a8; }
   .when { color: #9a9382; font-size: .88rem; }
   a { color: #8fb3d9; }
@@ -85,6 +89,66 @@
     <td><audio controls preload="none" src="assets/audio/campfire_loop.ogg"></audio></td>
     <td class="when">Always once lit, positional. <b>-18 dB by day</b>, -9 dB at night.</td>
     <td><a href="https://freesound.org/s/730704/">newlocknew</a></td>
+  </tr>
+</table>
+
+<h2>Weather — rain &amp; distant thunder <span class="tag">NEW — needs your ears</span></h2>
+
+<div class="note">
+  <b>What to listen for in this batch.</b> The two rain files are <i>beds</i>, so judge them
+  the way you judged the day/night beds: is it <b>boring</b>? Can you name an event in it
+  (a car, a gutter drip, one dramatic gust)? Does it have <b>even energy</b> throughout?
+  Both were cut to loop seamlessly — the last few seconds are crossfaded back over the
+  first — so <b>listen right across the loop point</b> and tell me if you hear a seam.
+  <br><br>
+  The four thunders are <i>one-shots</i>, and the criteria flip: each must be <b>one event</b>
+  with <b>clean isolation</b> (no rain, birds or crickets baked in — they play <i>over</i>
+  the rain bed, and anything extra will fight it). They're all cut from a single 7-minute
+  recording of genuinely distant thunder, so they should sit in the same weather as each
+  other. <b>They are meant to sound far away</b>, not overhead.
+  <br><br>
+  Measured before they got here, so you don't have to check: rain beds vary by
+  <b>0.3 dB and 1.0 dB</b> across their length (dead even), with no energy spikes.
+  <code>thunder_1</code> measures as a single event with its noise floor at 1% of peak.
+</div>
+
+<table>
+  <tr><th>Sound</th><th>Listen</th><th>When it fires</th><th>Source</th></tr>
+  <tr>
+    <td class="name">rain_light.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/rain_light.ogg"></audio></td>
+    <td class="when">Bed. Fades up across intensity <b>0.02–0.30</b>, then stays.
+        This is the whole sound of a drizzle. 40s loop.</td>
+    <td><a href="https://freesound.org/s/486272/">craigsmith</a> · CC0</td>
+  </tr>
+  <tr>
+    <td class="name">rain_heavy.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/rain_heavy.ogg"></audio></td>
+    <td class="when">Bed. Fades up across <b>0.35–0.95</b>, layering <i>on top of</i> the
+        light one rather than replacing it — both are up in a downpour. 200s loop, stereo.</td>
+    <td><a href="https://freesound.org/s/454128/">kyles</a> · CC0</td>
+  </tr>
+  <tr>
+    <td class="name">thunder_1.ogg <span class="tag">1 of 4</span></td>
+    <td><audio controls preload="none" src="assets/audio/thunder_1.ogg"></audio></td>
+    <td class="when" rowspan="4">Only in a <b>thundery</b> storm past intensity 0.45, every
+        9–34s. Thrown to a random bearing 26–48m out. The flash comes first and the sound
+        arrives <b>2.5–9s later</b> — the longer the wait, the quieter it lands.
+        <br>Lengths differ on purpose: 7.6s / 5.9s / 6.3s / 13s.</td>
+    <td rowspan="4"><a href="https://freesound.org/s/361401/">richwise</a> · CC0
+        <br><span class="tag">cut from one 7-min recording</span></td>
+  </tr>
+  <tr>
+    <td class="name">thunder_2.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/thunder_2.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">thunder_3.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/thunder_3.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">thunder_4.ogg <span class="tag">the long roll</span></td>
+    <td><audio controls preload="none" src="assets/audio/thunder_4.ogg"></audio></td>
   </tr>
 </table>
 

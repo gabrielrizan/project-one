@@ -53,6 +53,9 @@ var _angle := 0.0          # wind bearing, radians
 var _leaf_t := 0.0
 
 func _ready() -> void:
+	# `weather.gd` leans the rain along this same bearing, so the group is how it
+	# finds us -- a storm blowing across the wind would read as two weathers.
+	add_to_group("wind")
 	_angle = randf() * TAU
 	_leaf_t = randf_range(LEAF_GAP.x, LEAF_GAP.y)
 
