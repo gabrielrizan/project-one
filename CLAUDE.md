@@ -50,8 +50,10 @@ each session. `GAME_DESIGN.md` §13 lists rough priorities, but treat it as idea
 wanderers → they eat, become citizens, take jobs · workers fell marked trees · archers hunt
 and forage by daylight · crew construction for walls, wall→stone, and both hall tiers ·
 main building L1 Tent → L2 Wooden Hall → L3 Stone Hall · day/night with real camp lighting ·
+**weather: rain, overcast skies, water pools, distant thunderstorms, on a season clock** ·
 navmesh pathfinding round everything solid, re-baked as the village changes ·
-title + pause menus, settings persist.
+title + pause menus, settings persist · **a dev overlay on F1** for reaching any of it
+instantly.
 
 **⚠️ Nothing can go wrong yet.** There are no enemies, no night waves, no combat, and no
 lose condition. The walls, gates, archers and day/night cycle are all *setup* for a threat
@@ -183,6 +185,49 @@ construction, and the villager walking over is the delay. Anything crew-built re
 sale outright when no worker is alive to build it ("needs a worker"), so gold can't vanish
 into a site that would never be worked.
 
+### Weather & seasons (`weather.gd`)
+
+One node drives rain, sky, pools, mist and lightning off a single **intensity** (0..1),
+the same way `wind.gd` sweeps every tree. It is **atmosphere only — nothing about it
+touches gameplay yet**, by decision, not oversight.
+
+Two clocks, deliberately separate: **`intensity()`** is what is falling right now;
+**`wetness()`** is how saturated the ground is and lags a long way behind, so pools keep
+filling after a shower peaks and are still there well after the last drop. Tying pools
+straight to intensity made rain look like a light switch.
+
+**The season clock gates rain and nothing else.** Four seasons, `CYCLES_PER_SEASON` day/night
+cycles each, with their own rain odds, strength and thunder odds. **Winter is dry** — that
+is a placeholder for snow, not a design statement. Seasons have *no visual identity yet*:
+no tree recolouring, no snow, palette unchanged. That was Andrei's call — keep it simple
+for now.
+
+`day_night_cycle.gd` owns the environment; weather never writes it directly. It sets
+`cycle.storm` and `cycle.flash` and the cycle blends them in **after** the time-of-day
+colours, so a storm at noon still reads as noon. Two scripts writing `background_color`
+in one frame would fight and flicker.
+
+**Rain leans along `wind.gd`'s bearing**, which is why `wind` is now a group — a storm
+blowing across the wind reads as two weathers at once.
+
+### Dev overlay (`dev_menu.gd`) — F1
+
+Weather is random and nightfall is minutes away, so tuning either by waiting is hopeless.
+Every key reaches into a system directly:
+
+| Key | |
+|---|---|
+| **F1** | show/hide the overlay (live time, season, weather readout) |
+| **F2** | skip to night / day |
+| **F4** | step rain: off → light → steady → downpour |
+| **F5** | lightning now |
+| **F6** | next season |
+| **F7** | dry the ground (F4-off leaves pools to dry on their own) |
+| F3 | navmesh debug — **already taken** by `nav_world.gd` |
+
+⚠️ It is a **dev tool with no release gate**. Wrap it in `OS.is_debug_build()` before
+shipping.
+
 ### The tally (agreed vocabulary — use these words)
 
 The row of coin markers that rises over something you are buying is the **tally**; each
@@ -203,7 +248,7 @@ for the duration, so the king stays **locked on target** and a second tally can 
   closest one in its `InteractArea` and drives it.
 - **Groups are the wiring**: `monarch`, `game_manager`, `interactable`, `workplace`,
   `villager`, `tree`, `marked_tree`, `bush`, `marked_bush`, `wild_game`, `wall_side`,
-  `build_site`, `day_night_cycle`, `camera_rig`.
+  `build_site`, `day_night_cycle`, `camera_rig`, `wind`, `weather`, `wind_sway`.
 - **Models face +Z with feet/base at y = 0**, and live under a `Model` holder node the
   script populates. Scripts turn them with `atan2(vel.x, vel.z)` and animate them by
   moving/rotating that holder. `villager.gd::_set_model()` swaps which model is worn — a
@@ -271,6 +316,39 @@ for the duration, so the king stays **locked on target** and a second tally can 
   box across the only gap in the palisade; baked in, it seals the village and nothing ever
   gets out. `NavWorld._lift_gates()` drops them for the bake and puts them straight back.
   Anything else that is solid-but-meant-to-be-passable needs the same treatment.
+- **The editor will silently overwrite your `.tscn` text edits.** The godot-ai MCP plugin
+  keeps an editor session open; when it saves, it writes the scene from *its* in-memory
+  copy and everything you edited by hand is gone. This ate the `Weather` and `DevMenu`
+  nodes once — scripts all present on disk, feature simply not in the scene and therefore
+  dead. After editing a `.tscn` by hand, **grep it back** to confirm the change survived.
+- **`gl_compatibility` has no volumetric fog, no decals and no SSR** (`project.godot`
+  sets the renderer; confirmed against the 4.7 docs). Anything "atmospheric" has to be
+  faked: depth+height fog and a mist particle layer instead of volumetrics, flat quads on
+  the slab instead of decals. Depth texture, screen texture, glow and SSAO *are* available.
+  Compatibility is also the **only renderer that exports to web**, so switching to Forward+
+  costs a browser demo as well as a full re-tune of `day_night_cycle.gd`.
+- **A failed `assert()` in a `--script` SceneTree hangs the run forever.** It kills the
+  coroutine, so `quit()` is never reached, and the process sits there until killed —
+  taking every buffered `print` with it, so the output looks empty and you blame the
+  wrong thing. In throwaway verify scripts **collect failures and print them**, don't
+  assert. Also don't test `AudioStreamPlayer.playing` headless: the dummy audio driver
+  makes it unreliable. Assert on `volume_db`, which is pure logic.
+- **A radial term in a shader draws concentric rings.** `sin(r * k)` over a round quad is
+  a bullseye — the puddles looked like scorch marks with targets painted on them until
+  the chop was rebuilt from two crossed axis waves instead.
+- **Standing water reads *lighter* than the ground, not darker.** From a high steep camera
+  what you see in a puddle is the sky, so the shader mixes heavily toward the sky colour.
+  The first version used a near-black tint at high alpha and looked like burn marks.
+- **A flat-alpha quad shows its own square edges where it overlaps another.** With 90 mist
+  quads the haze came out as a grid of visible rectangles. Soft particles need a radial
+  alpha falloff — `GradientTexture2D` with `FILL_RADIAL` generates one at runtime, no
+  asset and no licence.
+- **Lightning has to lift the *ambient*, not the sun.** Driving a flash through
+  `light_energy` only brightens faces pointing at the sun, does nothing at night when the
+  sun is under the map, and turns the grass fully saturated so it reads as the clouds
+  parting. A blue-white ambient lift is both truer and far more readable.
+- **`sf.write()` segfaults on long OGG encodes** (libsndfile, ~8s+ at 48 kHz). Write
+  block-wise through `sf.SoundFile` instead. Relevant whenever audio is being cut up.
 - **Holding "interact" for a fixed 1–2s is not enough for a big tally.** Each coin takes
   `COIN_FLIGHT + COIN_GAP` ≈ 0.44s, so a 30-gold purchase needs ~14s of holding. Size the
   hold off the cost or the purchase silently never completes.

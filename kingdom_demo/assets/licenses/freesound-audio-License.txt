@@ -306,3 +306,54 @@ Note:     Workers play at pitch 0.92, archers at 1.06 -- the cheapest way to mak
           the two jobs distinguishable without two clip sets. Real per-role kit
           (a bowstring, a quiver) would follow the material-tier pattern used by
           building.gd::RAISE_SFX.
+
+
+rain_light.ogg                                       [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    R30-25a-Steady Heavy Rain.wav
+Author:   craigsmith
+Source:   https://freesound.org/s/486272/
+Licence:  CC0 1.0 — https://creativecommons.org/publicdomain/zero/1.0/
+Length:   40 s (from a 46 s source)
+Edited:   Trimmed to a seamless loop -- the last 4 s are crossfaded back over the
+          first 4 s, so the join is continuous and the file loops without a click.
+          Normalised to -3 dBFS.
+Used for: the light rain bed (ambience.gd), fading up across weather intensity
+          0.02-0.30. Thin and hissy, which is what a drizzle is.
+
+
+rain_heavy.ogg                                       [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    rain heavy porch full steady.flac
+Author:   kyles
+Source:   https://freesound.org/s/454128/
+Licence:  CC0 1.0
+Length:   200 s, stereo (from a 306 s source)
+Edited:   The most even 205 s window in the source was found by measurement --
+          its energy varies by 0.29 dB across the whole length -- then looped
+          seamlessly with a 5 s crossfade and normalised to -3 dBFS.
+Used for: the heavy rain bed (ambience.gd), fading up across 0.35-0.95. Layers
+          on top of the light bed rather than replacing it; carries roughly
+          twice the low-end weight, which is what makes a downpour feel heavy.
+
+
+thunder_1..4.ogg                                     [CC0 — no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    Distant Thunder (distant thunder rumbling, recorded Southampton UK)
+Author:   richwise
+Source:   https://freesound.org/s/361401/
+Licence:  CC0 1.0
+Lengths:  7.6 s / 5.9 s / 6.3 s / 13.0 s
+Edited:   All four are cut from the one 7-minute recording. Its 23 discrete
+          events were located by measurement and four were chosen for isolation
+          and for a spread of lengths -- a mid rumble, a short one, a soft
+          distant one, and a long roll. Each has a 60 ms fade in, a ~1 s fade
+          out, and is normalised to -4 dBFS.
+Why one source: thunder from four different recordings sits in four different
+          weathers -- different distance, air and mic. Cutting one recording
+          keeps the whole storm coherent.
+Used for: distant thunder (ambience.gd::_on_lightning), thrown to a random
+          bearing 26-48 m out and delayed 2.5-9 s behind the flash.
+
+Note: everything in this weather batch is CC0, so none of it is added to
+      ATTRIBUTION-REQUIRED.md.

@@ -261,6 +261,30 @@ leave, not a failure state.
 
 **Open:** what the objectives are, and exactly what carries over. See §12.
 
+## §10a. Weather & seasons  ⚠️ partial
+
+*Numbered `10a` so §11–§13 keep the numbers the rest of the docs reference.*
+
+**Rain, overcast skies, water pools and distant thunderstorms, gated by a season clock.**
+Built, and **atmosphere only** — it is seen and heard, and changes nothing you can play.
+That was a deliberate scoping call, not an oversight.
+
+The register is the same one §4 sets for everything else: **stylised, not photoreal.** The
+renderer has no volumetric fog, so the haze is depth fog plus a drifting mist layer, and
+the pools are shader-driven quads rather than decals. That is a fit with the art direction
+rather than a compromise forced by it — the storm is art-directable, which a physical one
+would not be.
+
+**Seasons currently gate rain and nothing else.** Four of them, three day/night cycles
+each. Spring is wet and mild, summer rarer but violent and thundery, autumn steady and
+grey, and **winter is dry** — a placeholder standing in for snow, which is not built.
+Seasons have no visual identity yet: no tree recolouring, no palette shift. Andrei's call
+was to keep it simple for now and let snow and colour come later.
+
+**🔮 Future:** snow and per-season colour · the gameplay hooks in §12 · weather as a
+*told* thing rather than only a seen one (a horn, villagers reacting), if it ever earns a
+gameplay role.
+
 ---
 
 # PART C — THE RECORD
@@ -285,6 +309,11 @@ reading the reason.**
 | Getting hit costs no gold | Deferred until the purse cap exists — with an uncapped purse a single hit could scatter an entire run's income. |
 | `villager.gd` is one big state machine | The whole civilian life cycle belongs in one readable flow. Keep it commented, don't split it across files. |
 | Crew speed is a **percentage**, not flat seconds | So the same rule applies to every build regardless of its base duration. |
+| Weather is **atmosphere only** | Scoped that way on purpose. Rain that slows building or spoils food is a real balance decision and belongs in §12, not smuggled in alongside the visuals. |
+| **Winter has no weather at all** | It is a placeholder for snow, which isn't built. A dry season is the honest stand-in; faking winter with rain would be worse. |
+| Wetness is a **separate clock** from rain intensity | Pools that appear and vanish with the rain read as a light switch. Lagging saturation is what gives a shower an aftermath. |
+| Rain leans along the **existing** wind bearing | `wind.gd` already owns one shared bearing for the trees and leaves. A storm with its own direction would read as two weathers at once. |
+| All four thunder clips come from **one** recording | Thunder from four sources sits in four different distances and airs, and the pool stops sounding like a single storm. |
 
 ## §12. Open questions
 
@@ -309,6 +338,22 @@ Genuine forks. **Do not silently pick one** — raise it.
 8. **Do the tier build-times need a curve?** Currently L2 is 25s and L3 is 40s, set by
    feel. L4 Castle will need a number, and the ladder may want a rule rather than
    hand-picked values.
+9. **Should weather ever affect play, and how much?** It is atmosphere only today
+   (§10a). The candidates, roughly in order of how much they'd change the game: archers
+   not hunting in rain · builders slower or sheltering · the campfire guttering and
+   needing tending · rain helping or hindering a night attack once combat exists. The
+   risk is the pillar in §1.3 — the day/night cycle is the heartbeat, and a second
+   uncontrollable clock that gates your economy could easily feel like being punished by
+   the sky rather than being tested by it. **A weather effect the player can do nothing
+   about is a tax, not a mechanic.** Anything adopted here probably needs a response the
+   monarch can actually buy.
+10. **What is winter?** Snow is the obvious answer, but snow is a bigger job than rain
+    (ground cover, tree caps, a palette shift) and it raises the same question as §12.9 —
+    does a season *do* anything, or is it only a change of clothes? Right now winter is
+    simply a dry spell.
+11. **How long should a season be?** Three day/night cycles (~12 min) was picked so a
+    test session sees more than one, not from any feel for pacing. It has never been
+    played against the map run in §10.
 
 ## §13. Build order
 

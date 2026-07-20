@@ -31,11 +31,63 @@ const CROWS := [
 	preload("res://kingdom_demo/assets/audio/crow_c.ogg"),
 ]
 
+## Rain is **two** beds, not one turned up. A drizzle and a downpour are
+## different sounds, not the same sound at different volumes: the light bed is a
+## thin hiss, the heavy one carries roughly twice the low-end weight. They layer
+## rather than crossfade -- at full intensity both are up, which is what gives a
+## downpour its body.
+const RAIN_LIGHT := preload("res://kingdom_demo/assets/audio/rain_light.ogg")
+const RAIN_HEAVY := preload("res://kingdom_demo/assets/audio/rain_heavy.ogg")
+## Distant thunder, four cuts from one long recording so they all sit in the
+## same weather. Lengths vary on purpose (5.9s / 6.3s / 7.6s / 13s) -- one deep
+## roll among shorter rumbles, the same reasoning as the tree creaks.
+const THUNDER := [
+	preload("res://kingdom_demo/assets/audio/thunder_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/thunder_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/thunder_3.ogg"),
+	preload("res://kingdom_demo/assets/audio/thunder_4.ogg"),
+]
+## The near one, cut from the same recording as the other four but from an event
+## with a 5 ms crack on the front and noticeably more high frequency in it --
+## distance low-passes thunder, so "close" is a measurable thing, not a louder
+## version of the same sound.
+const THUNDER_NEAR := preload("res://kingdom_demo/assets/audio/thunder_near.ogg")
+
 const BED_DB := -2.0
 ## far enough down to be inaudible without the cost of stopping and restarting
 const BED_OFF_DB := -45.0
 ## dB per second -- dusk eases the beds across rather than snapping
 const FADE_RATE := 3.0
+
+const RAIN_DB := -3.0
+## Rain fades faster than the day/night beds. Those cross over a 20s dusk and
+## want to be imperceptible; rain has to keep up with weather that ramps 0..1 in
+## about seven seconds, and at the beds' 3 dB/s it was still climbing out of the
+## silent floor long after the downpour was on screen.
+const RAIN_FADE_RATE := 10.0
+## Where each rain bed comes in. The light one is most of the way up before the
+## heavy one starts, so intensifying rain thickens rather than swaps.
+const RAIN_LIGHT_IN := Vector2(0.02, 0.30)
+const RAIN_HEAVY_IN := Vector2(0.35, 0.95)
+## How far the day/night bed is pushed down under a downpour. Heavy rain really
+## does drown out birdsong and insects; without this the two layers just pile up
+## and the mix turns to mush.
+const RAIN_DUCK := 9.0
+
+## Thunder is thrown to a bearing like the owl -- the storm is somewhere out
+## there rather than overhead. Distances are large and `unit_size` with it, so
+## it reads as far away without becoming inaudible.
+const THUNDER_DB := -5.0
+const THUNDER_PITCH := 1.1
+const THUNDER_VOL_JITTER := 3.0
+const THUNDER_DISTANCE := Vector2(26.0, 48.0)
+
+## A strike whose sound arrives within this many seconds was close, so it gets
+## the near clip and a nearer position. **The pick is driven by the delay rather
+## than rolled separately** -- a sharp crack arriving nine seconds after the
+## flash would put the strike miles away and sound wrong for what you saw.
+const NEAR_DELAY := 4.0
+const THUNDER_NEAR_DISTANCE := Vector2(12.0, 22.0)
 
 ## An owl should be noticed, then forgotten, then surprise you again. That needs a
 ## gap wide enough that you stop expecting it: anywhere from half a minute to over
@@ -80,6 +132,10 @@ const CROW_CALL_GAP := Vector2(1.15, 1.9)
 
 var _day: AudioStreamPlayer = null
 var _night: AudioStreamPlayer = null
+var _rain_light: AudioStreamPlayer = null
+var _rain_heavy: AudioStreamPlayer = null
+var _thunder: AudioStreamPlayer3D = null
+var _thunder_near: AudioStreamPlayer3D = null
 var _owl: AudioStreamPlayer3D = null
 var _creak: AudioStreamPlayer3D = null
 var _crow: AudioStreamPlayer3D = null
@@ -90,6 +146,14 @@ var _crow_t := 0.0
 func _ready() -> void:
 	_day = _make_bed(DAY_BED, BED_DB)
 	_night = _make_bed(NIGHT_BED, BED_OFF_DB)
+	_rain_light = _make_bed(RAIN_LIGHT, BED_OFF_DB)
+	_rain_heavy = _make_bed(RAIN_HEAVY, BED_OFF_DB)
+	_thunder = _make_voice(THUNDER, THUNDER_PITCH, THUNDER_VOL_JITTER, 45.0, 140.0)
+	# A one-clip pool, so it still gets the randomiser's pitch and volume jitter
+	# and never lands twice the same way.
+	_thunder_near = _make_voice([THUNDER_NEAR], THUNDER_PITCH, THUNDER_VOL_JITTER, 30.0, 120.0)
+	# Weather may not have run `_ready` yet, so the hookup waits a frame.
+	call_deferred("_hook_weather")
 	_owl = _make_voice([OWL], OWL_PITCH, OWL_VOL_JITTER, 18.0, 60.0)
 	_creak = _make_voice(CREAKS, CREAK_PITCH, CREAK_VOL_JITTER, 6.0, 28.0)
 	_crow = _make_voice(CROWS, CROW_PITCH, CROW_VOL_JITTER, 16.0, 60.0)
@@ -99,8 +163,15 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	var night := _is_night()
-	_fade(_day, BED_OFF_DB if night else BED_DB, delta)
-	_fade(_night, BED_DB if night else BED_OFF_DB, delta)
+	var rain := _rain_intensity()
+	# Rain sits on top of whichever bed is playing, and pushes it down as it
+	# gets heavier -- so a downpour at night is rain over a hint of insects,
+	# not rain and insects at equal weight.
+	var duck := RAIN_DUCK * clampf(rain, 0.0, 1.0)
+	_fade(_day, BED_OFF_DB if night else BED_DB - duck, delta)
+	_fade(_night, BED_DB - duck if night else BED_OFF_DB, delta)
+	_fade(_rain_light, _rain_db(rain, RAIN_LIGHT_IN), delta, RAIN_FADE_RATE)
+	_fade(_rain_heavy, _rain_db(rain, RAIN_HEAVY_IN), delta, RAIN_FADE_RATE)
 
 	if night:
 		_owl_t -= delta
@@ -129,8 +200,46 @@ func _make_bed(stream: AudioStream, db: float) -> AudioStreamPlayer:
 	p.play()
 	return p
 
-func _fade(p: AudioStreamPlayer, want: float, delta: float) -> void:
-	p.volume_db = move_toward(p.volume_db, want, FADE_RATE * delta)
+func _fade(p: AudioStreamPlayer, want: float, delta: float, rate: float = FADE_RATE) -> void:
+	p.volume_db = move_toward(p.volume_db, want, rate * delta)
+
+# ---- rain ----
+
+func _rain_intensity() -> float:
+	var wx := get_tree().get_first_node_in_group("weather")
+	return wx.intensity() if wx else 0.0
+
+## Where one rain bed should sit for the current intensity. `band` is the window
+## it fades up across; below it the bed is parked at the silent floor rather
+## than stopped, so it never has to restart mid-storm.
+func _rain_db(rain: float, band: Vector2) -> float:
+	var gain := smoothstep(band.x, band.y, rain)
+	if gain <= 0.001:
+		return BED_OFF_DB
+	return RAIN_DB + linear_to_db(gain)
+
+# ---- thunder ----
+
+func _hook_weather() -> void:
+	var wx := get_tree().get_first_node_in_group("weather")
+	if wx and not wx.lightning.is_connected(_on_lightning):
+		wx.lightning.connect(_on_lightning)
+
+## The flash has already happened -- `weather.gd` hands us how long the sound
+## takes to arrive and how loud it should be when it does, both derived from the
+## same distance. Waiting out the gap is the whole effect: seeing a storm light
+## up and *then* hearing it is what puts it on the horizon rather than overhead.
+func _on_lightning(delay: float, loudness: float) -> void:
+	# Which clip is decided *before* the wait, off the same delay that sets how
+	# long the wait is -- a short gap means the strike was close, so it gets the
+	# clip with the crack on it and a nearer bearing.
+	var near := delay <= NEAR_DELAY
+	await get_tree().create_timer(delay).timeout
+	var voice: AudioStreamPlayer3D = _thunder_near if near else _thunder
+	if not is_instance_valid(voice):
+		return
+	voice.volume_db = THUNDER_DB + linear_to_db(clampf(loudness, 0.05, 1.0))
+	_call_from_a_bearing(voice, THUNDER_NEAR_DISTANCE if near else THUNDER_DISTANCE)
 
 # ---- one-shots ----
 
