@@ -224,31 +224,262 @@ The coin-fuelled counterweight to slow citizen growth: strong, pre-trained, temp
 
 > **Blocked on §9.** Hiring is meaningless until there is a night threat. Do not start here.
 
+**Cousins in §9:** 🔮 **hermits** are the peaceful half of this idea — rescue NPCs found at
+the map edge who settle for a one-off price and bend a single rule, rather than fighting
+for wages. And 🔮 **destroyable bandit camps** are what mercenaries are *for*: the first
+thing worth marching out to do.
+
 ## §9. Night, threat & the two hearts  ❌ not built
 
 **This is the single biggest gap. Nothing can currently go wrong.** The walls, the
 day/night cycle, the archer class and the gates all exist as setup for a threat that
-does not exist yet.
+does not exist yet. This section is the design for that threat; nothing in it is built.
 
-**What the enemy does.** Bandits come down corridors at night and:
-- **destroy walls and buildings** — damage persists and must be repaired with gold + a crew
-- **kill citizens** — the slowest, most expensive loss, since replacing them needs soup
+**The fantasy.** Build by day, survive by night. The dusk horn tells you what kind of
+night this is. Bandits march up the corridor from a camp you can see on the horizon.
+Archers climb the wall and shoot down into them. The rooster ends it, and dawn is for
+repairs and re-recruiting the people who were robbed.
 
-They do **not** drop gold and do **not** steal from the purse. Night is pure cost.
+### Bandits — who they are
 
-**Repair is construction.** A damaged wall or building becomes a construction site again —
-same crew mechanic, same 3-worker cap. This makes repair one of the cheapest features to
-add once combat exists, since `build_crew.gd` already does the work.
+The night's answer to wanderers: raiders who come for your people's **tools**, not your
+gold. The purse is never touched (§5), and there is no corpse-gold (§11).
 
-**Lose conditions — two hearts:**
+**Visuals are placeholder-then-pack.** For now: `villager.glb` flat-tinted charcoal with
+`MarkFx.tint` — the palette-flattening that makes tint wrong for most models is exactly
+right here, giving featureless dark silhouettes in Kingdom's Greed register — carrying a
+Kenney pickaxe or club scaled into the hands. The final look is a downloaded character
+pack, chosen later with Andrei under the usual ask-first, record-the-licence rule.
+
+### The night clock
+
+A raid director (`night_raids.gd`, built like `wildlife.gd`) owns a **night counter**,
+ticked off the same `darkness()` threshold the horn watches — **never off the clock**,
+since day and night durations are placeholder. Nights 1–2 are a grace period. From night 3
+waves grow on a data table: roughly 2 bandits, +1 every couple of nights, capping around 8.
+
+> ⚠️ Those are **placeholder numbers**, exactly like the flat-5 hall costs. Wave sizes are
+> a tuning pass, not a design statement.
+
+**Every 15th night is a blood moon.** Horn ×3 at dusk, the night sky blended toward deep
+red, waves 2.5–3× arriving in two or three pulses, mixed with Brutes. The red is a `blood`
+factor in `day_night_cycle.gd` built exactly parallel to `storm`: the cycle stays the one
+owner of the environment, and it is applied *after* the time-of-day blend so a blood moon
+still reads as night. At the current cycle length that is roughly an hour of play between
+blood moons — see §12 for whether the cadence or the cycle length is the number that moves.
+
+### The dusk horn announces the night
+
+The blast-count vocabulary already exists and was built for exactly this:
+
+| Blasts | Means |
+|---|---|
+| 1 | a quiet night |
+| 2 | a raid is coming |
+| 3 | blood moon |
+
+`sound_alarm()` (two blasts) stays available for a mid-night surprise. Telegraphing
+*where* is the camp's own fire flaring at dusk — ember particles and an omni light out at
+the treeline, no new assets, and nothing volumetric that `gl_compatibility` can't do.
+
+### The map is terrain-gated
+
+Kingdom's world is linear, so it only ever has two fronts. This game gets the same
+property by **closing bearings of every map with impassable terrain**: a mountain, a
+river, a wood too dense to pass.
+
+Implementation truth: a terrain gate is **one invisible box collider dressed in scenery**.
+The navmesh bakes from static collision, so a single hidden box seals a bearing with no
+per-prop bookkeeping, and the world stays one flat slab — there is no elevation anywhere,
+and a "cliff" is a rock mass standing on flat ground. **Closed bearings carry no wall
+offers at all** — their `WallSide` markers are simply not in that map — so every wall you
+*can* buy is a wall that can matter.
+
+**The first map is a mountain U with a single entry.** Three bearings sealed by the
+mountain, one open corridor, the bandit camp beyond its mouth, and the one surviving
+`WallSide` across it. A pure siege map, and the clearest possible teaching shape: one
+door, one wall, one fight. Later maps take their identity from how many openings they
+have — a two-opening river map plays front-and-flank, a three-opening plain plays thin.
+
+Side effects to honour: wanderers, wildlife and the walk-in ring belong on open ground,
+and 🔮 a mountain pass (or a castle-kit bridge on a river map) is the natural place to put
+the §10 "leave the map" exit.
+
+### Fronts — where raids come from
+
+Raids never come from nowhere. Every wave marches from a visible **bandit camp** — a
+survival-kit tent and fire pit, ember-lit — sitting on an **open** bearing. Map 1 has one
+opening, so it has exactly one camp, and its blood moons escalate that same front.
+
+On a multi-opening map a blood moon may establish a **new camp, found smoking at dawn** on
+another open bearing; the camp appearing *is* the telegraph. Archers are mobile between
+walls, so one corps covers whichever front wakes up.
+
+> 🔮 **The payoff loop: camps become destroyable.** Ride out with mercenaries (§8), burn
+> one, and that front closes for good. That is the strongest candidate for the map
+> objectives §12 is still missing, and the first reason the military ever leaves home.
+
+### Openings and bandit patience — why the second wall matters
+
+Terrain answers most of the redundancy problem; what is left is the open bearing you have
+not walled yet. An unwalled open side is an *entrance*, not scenery — the village centre
+is the target, and a raid that starts east can walk in through an open south.
+
+This is staged so walls gain value in the same order you can afford them. Early bandits
+are **Thugs**: impatient, they hammer whatever is directly in front of them, so one wall
+on the camp's bearing genuinely is enough. Later waves mix in **Flankers**, patient
+raiders whose rule is "find an unbuilt open side or a breach and walk in" — a small
+targeting rule, since the *movement* is free: the navmesh already flows through any gap
+after a re-bake. Enclosing the open bearings becomes a mid-game goal rather than an
+up-front tax. **Where a raid starts is the camp's choice; where it gets in is yours.**
+
+Two reinforcements come for free. Timber depletion marches the loggers toward the
+treeline — that is, toward the camps — so the bearing you are currently logging is
+naturally the hot one, and workers in the field are robbery bait. And 🔮 the archers' hut
+is already a tower model, so it can voice the watch at dusk ("camps: E, S") and let you
+build exactly what the information justifies.
+
+### What bandits do — priorities
+
+**1. Rob.** Any *employed* citizen within reach is knocked down, and their tools are torn
+off: the model swaps back to the bare villager, the workplace's `filled` count drops so
+its vacancy icon returns, and the victim gets up as a hungry wanderer who must eat again
+before working. Wanderers carry nothing and are ignored — your **workforce** is the
+target, and a posted archer is the richest prize on the map. A thief who succeeds
+shoulders the bundle and **leaves, satisfied**: every bandit wants one theft.
+
+**2. Smash what blocks the way.** Paths route through gateways, so it is the *shut gate*
+that physically stops a raider — which makes the gate the weak point with no targeting
+code at all. Raiders hammer whatever they are wedged against (the wants-to-move-but-isn't
+signature `_unstick` already detects), and a crowded gate spills onto the wall sections
+either side.
+
+**3. Vandalise.** Inside, with nothing robbable in sight, they attack the nearest
+building. Huts fall and are rebuilt; **the hall falling is existential** (below).
+
+**4. Rout at dawn.** At first light survivors turn and run for their camp, and despawn at
+the edge. Being shot in the back on the way out is fine and satisfying.
+
+Bandits **ignore the monarch entirely** for now — the crown is the Stealer's job, and that
+archetype waits on the purse cap (§11).
+
+### Structure damage, breach, repair
+
+Walls, gates, huts and the hall carry HP, scaled by material. Damage is **visible per
+section**: wood sections tilt and sink away (the reverse of how they went up), and stone
+swaps `wall.glb` for `wall-half.glb`, which the castle kit ships as a ready-made ruin. A
+gate at zero loses its leaves; a wall arc at zero loses its collision box. Either way
+`NavWorld.rebake()` makes the hole real and raiders stream through it.
+
+**Repair is construction.** A damaged thing re-enters `build_site` at a progress equal to
+the fraction still standing, and costs `ceil(build cost × missing fraction)` — a
+percentage rule, per the house rules, so one rule covers every structure in the game.
+`build_crew.gd` does the rest unchanged, which is what makes this cheap. Paying for
+repairs *during* a raid is allowed, dramatic, and dangerous.
+
+### Citizens at night
+
+They organise themselves — pillar 1 applies to fear as much as to work. At the dusk horn
+idle civilians drift inside the walls and toward the fire; a bandit within a few metres
+sends any civilian running for it, the same way wildlife spooks. Workers on a paid site
+keep working. Anyone knocked down gets up a few seconds later and flees as a wanderer.
+
+### The army
+
+**v1 — archers mount the walls.** When the dusk horn counts a raid, or bandits turn up
+mid-night, free archers claim **wall perches**: predefined spots along the top of each
+built wall side, **six per side, filled centre-first**. The literal centre is the gate
+opening, so the spots flank it — and fire concentrates exactly where raiders mass.
+Claiming runs through the same duck-typed flow as every other errand; there is never a
+player order.
+
+Getting up there is a walk to the wall's inner face on the ground mesh, then a **scripted
+climb tween** onto the marker. Perches are parked stations, **never walkable navmesh**
+(§11). From up top the existing hunt loop does the shooting, against the `bandit` group at
+a longer defensive range; the height means arrows clear the wall with no special casing.
+
+**When the last bandit falls or flees they climb down** and drift back to the fire. On a
+quiet night they never mount at all — so *archers on the walls* is itself the picture that
+says a raid is coming. With no wall on the raided side they ring the campfire instead: the
+fire is the last line. If the section under a perch breaks, or a bandit reaches them after
+a breach, an archer hops down and flees like any civilian, re-posting once it is clear —
+so a fallen wall scatters your army, the Kingdom disaster spiral, out of two simple rules.
+
+> ⚠️ **The wood tier will look wrong first.** The wood palisade's visual is `fence.glb` at
+> 0.52m against a 1.5m collision box, so an archer perched on it half-floats. Either the
+> wood wall's visual gets raised in an art pass or the float is accepted as placeholder
+> until the stone upgrade, whose `wall.glb` has a real parapet and reads perfectly. §12.
+> The perch *system* is identical either way.
+
+**🔮 Watchtowers.** A later flank upgrade per wall side, crew-built from the castle-kit
+tower stack, exposing two elevated stations each. Posting stays automatic and claim-based:
+archers fill **every tower's first slot before any tower's second**, and overflow takes
+the wall perches — so three towers and four archers puts one archer on each tower and the
+fourth doubled up or on a wall. Entry is the same walk-then-climb-tween; still no wall-top
+navmesh, ever. Archers are **visibly parked** up there, because a garrison whose window
+merely spits arrows costs you the ability to see your own defence. Perks: more range, and
+melee immunity until siege units exist to threaten them.
+
+**🔮 Knights.** A later melee job — `job_type: "knight"` drops straight into the existing
+workplace string system — from a Barracks or a hall unlock, holding the gateway line.
+Waits on the same character-pack decision as the bandits.
+
+**🔮 The one tactical lever** remains the rally banner (§3): when it exists, planting one
+biases which sides get posted. Not designed further here.
+
+### 🔮 Escalation roster
+
+Archetypes as a stat-block dictionary, the way `GAITS` and the animal species already
+work — adding one should cost an entry, not a rewrite.
+
+| Archetype | When | What it does |
+|---|---|---|
+| **Thug** | from night 3 | The baseline. Impatient: hits what is in front of it. |
+| **Flanker** | mid-game | Patient. Seeks unbuilt open sides and breaches — the reason full enclosure earns its gold. |
+| **Prowler** | any night, 1–2 | Circles and probes off-front sides. Never breaches a wall; robs stragglers on open ones. |
+| **Brute** | blood moons | ~1.3× scale, slow, several arrows to drop, heavy structure damage. |
+| **Stealer** | with the purse cap | Fast, avoids fights, snatches loose coin — and eventually the Crown itself. The reserved lose-condition-#1 threat. |
+| **Siege** | late blood moons | A crewed ram for gates, perhaps a catapult lobbing from range. The castle kit ships ram, catapult and trebuchet **with demolished variants**, so a destroyed state costs nothing. |
+
+> Player-side artillery, if it ever exists, must be a paid emplacement that works by
+> itself. An orderable siege unit is an RTS unit (§2).
+
+**🔮 Hermits.** Rescue NPCs found at the map edge by day: ride out, pay their asking
+price, and they settle by the fire and bend exactly one rule — a mage lighting arrows, a
+warden adding a station to each tower, a cook adding to the pot. Same
+buy-by-standing-in-front-of-it grammar as everything else, and a close cousin of the merc
+camps in §8.
+
+### Audio
+
+Most of a bad night can be built from clips already in the project: the horn's two- and
+three-blast signals (wired), bow and arrow-hit, the axe pool pitched down for blows on
+timber, `animal_drop` near unity pitch for a body hitting the ground, `tree_fall` for a
+wall section going over, and the gate slam as breach punctuation.
+
+Genuinely missing, and to be sourced with Andrei when the time comes: stone impacts, a
+breach crash, a knockdown thump, bandit vocalisations, and a blood-moon layer under the
+night bed. `ASSETS.md`'s standing warning applies — there is no ducking and no limiter, so
+a night wave will fight the ambience beds with nothing arbitrating between them.
+
+### Lose conditions — two hearts
+
 - **The Crown.** Your body. No health bar. A stealer who takes the crown and sprints it to
-  a portal ends the run — but your troops can intercept, and you can chase.
+  a portal ends the run — but your troops can intercept, and you can chase. **Not in v1:**
+  bandits ignore the monarch until the Stealer archetype and the purse cap exist.
 - **The main building.** Walls, huts and districts can fall and be rebuilt; only losing the
   hall is existential.
 
 **Day/night cycle** ✅ is built — continuous sun sweep, eased dusk/dawn, golden hour, and
 the campfire genuinely lights the camp. The **dusk supper ritual** ❌ and **night waves**
 ❌ are not.
+
+### Dev tools
+
+Waves and blood moons are minutes apart, so every one of them needs to be reachable
+instantly from the F1 overlay — one `ACTIONS` entry each: raid now · blood moon now ·
+clear all bandits · advance the night counter. The readout gains the night number and how
+many nights until the next blood moon.
 
 ## §10. The map run  ❌ not built
 
@@ -318,6 +549,19 @@ reading the reason.**
 | Most storms **never reach full intensity** | Peak is drawn per storm from the season's band, and only summer's reaches 1.0. A true downpour should be an event, not the default. |
 | The near thunder is picked by **distance, not at random** | The one clip with a crack on it would otherwise land on a storm sitting on the horizon. A sharp report arriving nine seconds after the flash contradicts what you just saw. |
 | Lighting the campfire has **no sound of its own** | Andrei's call. The crackle loop starting is enough of an event; a whoosh on top read as a sound effect rather than a fire. |
+| Bandits **rob citizens, they don't kill them** | Recoverable losses are what pillar 4 asks for. Each robbery costs a serving of soup and the walk back, so night pressure drains the cauldron — a legible economic wound rather than a body count. **Supersedes** an earlier draft of §9 in which bandits killed citizens outright. |
+| A thief who has robbed someone **leaves** | Every bandit wants one theft, so a wave resolves without requiring total slaughter. That is the Kingdom rhythm: you are surviving a night, not clearing a level. |
+| Bandit art is **placeholder-then-pack** | The character generator is gone, so nothing new can be generated. Tinted villager silhouettes unblock the whole design while the character-pack choice goes through the ask-first licence flow. |
+| The **gate is the weak point by physics**, not by script | Bakes route paths through gateways and the shut gate is what stops bodies, so raiders mass there on their own. Writing a "target the gate" rule would be re-implementing something the navmesh already does. |
+| The **dusk horn announces the night type** (1 / 2 / 3) | The blast-count vocabulary was built for exactly this, and the gap between blasts was tuned so it stays countable. The player waits on the horn to learn what kind of night this is. |
+| Archers fight from **wall perches**: centre-first, six a side, combat only | Centre-first concentrates fire over the gate raiders mass at. Mounting only on raid nights makes archers-on-the-wall itself the danger signal. The cap stops one side soaking up the whole corps once a map has several fronts. |
+| **Wall tops are perches, never navmesh** | The 0.5m-deep wall erodes to zero walkable cells at a 0.3 agent radius; `filter_ledge_spans` and the deliberately tiny `agent_max_climb` both exist to fix documented bugs and would need re-tuning; and no villager has Y-axis movement at all. A parked shooter needs no pathfinding, and with fixed posts, walking the parapet buys nothing. Revisit only if *patrolling* walls ever becomes a design need. |
+| Maps are **terrain-gated**, and closed bearings carry no wall offers | Kingdom's linear world rebuilt in 3D: the map limits how many fronts exist, so every wall you can buy is one that can matter. A gate is one invisible box collider dressed in scenery — free to the navmesh, which bakes from static collision — and the slab stays flat: there is no elevation anywhere. |
+| Raids come from **visible camps**, never a random bearing | A random bearing makes every wall mandatory and every unwalled side a nightly coin-flip — the redundancy problem inverted. A camp you can see makes a wall an informed bet, new camps re-price that bet mid-run, and destroyable camps eventually give the military something to do offensively. |
+| Early bandits are impatient; **Flankers arrive with escalation** | One wall on the camp's bearing genuinely works early, and patient flankers later make every open side a liability. Walls gain value in the same order the player can afford them, so enclosure is a goal rather than an up-front tax. |
+| Rejected: tear-down refunds · random-bearing raids · walls with economic bonuses | The three tempting answers to wall redundancy. Refunds invite min-maxing against the spirit of committed building; random bearings make all walls mandatory; giving walls a second, economic job is forced justification for a defensive structure. |
+| **Bandits ignore the monarch** for now | The crown threat belongs to the Stealer archetype, which waits on the purse cap — consistent with getting hit costing no gold for the same reason. |
+| **Blood moon every 15th night**, as a fixed constant | Andrei's requested cadence. It is tunable, and how it interacts with cycle length is an open question (§12), not a principle. |
 
 ## §12. Open questions
 
@@ -358,23 +602,79 @@ Genuine forks. **Do not silently pick one** — raise it.
 11. **How long should a season be?** Three day/night cycles (~12 min) was picked so a
     test session sees more than one, not from any feel for pacing. It has never been
     played against the map run in §10.
+12. **Which character pack for bandits and knights?** Nothing can be generated any more
+    (§ASSETS), so this is a download decision: Andrei's approval, a licence recorded. And
+    does a pack sit *beside* the procedural cast, or eventually replace it wholesale?
+    A rigged, detailed pack next to tween-animated villagers may not sit right.
+13. **Should a recovered bundle re-kit its victim?** Killing a fleeing thief drops nothing
+    today. Letting the bundle come back — restoring the robbed citizen's job without
+    another bowl of soup — would reward defending hard, at the cost of softening the
+    robbery's whole point.
+14. **Do gates hold shut when a bandit is near?** Bolting them (say, within 6m) protects
+    the interior and creates a real "get everyone home before dark" ritual, which is
+    exactly what the lead-wanderers-home verb in §3 wants — but it locks latecomers out
+    to be robbed. Lean: yes, bolt them.
+15. **Blood-moon cadence versus cycle length.** Fifteen nights is about an hour of play at
+    the current placeholder durations. If that is too long a wait, which number moves —
+    the cadence, or the day length §12.6 has never checked?
+16. **Does wave size scale on anything but the night count?** Village wealth or hall tier
+    would make a rich camp a bigger target, which is either good pressure or a punishment
+    for playing well.
+17. **How much combat audio gets sourced up front?** The reuse set (axe, arrow, tree-fall,
+    gate slam) can carry a first pass, but stone impacts, a breach crash and bandit
+    vocalisations are genuinely missing. Related and unavoidable: the mix has no ducking
+    and no limiter, and a night wave is the first thing that will really fight the beds.
+18. **How long is the grace period, and does night 2 teach?** Two quiet nights is a guess.
+    A single-bandit "lesson raid" on night 2 might teach the horn and the walls better
+    than silence does.
+19. **Are perched archers always visible?** Lean: yes — seeing your own defence is worth a
+    lot. But a garrison model (archer enters, arrows come out of a window) is cheaper and
+    fine for any structure whose top the camera cannot see.
+20. **What fixes the wood-tier perch float?** `fence.glb` is 0.52m tall, so an archer
+    standing on the wood palisade floats. Raise the wood wall's visual (a fortified fence,
+    stacked sections), or accept it as placeholder until the stone upgrade?
+21. **How do camps multiply on a multi-opening map?** Does every blood moon roll for a new
+    one or follow a schedule — and should camps stay off the bearing wanderers walk in
+    from, so recruitment and raids never share a side? (Map 1 has one opening, so this
+    only bites later.)
+22. **Which bearing is the first map's mouth, and where is the exit?** South is proposed,
+    which keeps the rooster's fixed north-east spot clear of the corridor. And when §10
+    exists, is the way out a mountain pass or a bridge?
+23. **Do camps migrate, and do Prowlers exist early?** Both are optional layers on the
+    redundancy answer: a camp that packs up and reappears on another open bearing makes
+    already-built walls value-in-waiting, and early prowlers would make off-front walls
+    petty-theft insurance rather than dead weight.
 
 ## §13. Build order
 
 Rough priority. Item 1 is what turns this from a toy into a game.
 
-1. **Combat & night waves** — bandits down corridors, archers defend, buildings and
-   citizens take losses, and the **two-hearts lose condition** (§9). Everything built so
-   far is setup for this.
-2. **Damage & repair** — cheap once combat exists; reuses `build_crew.gd` wholesale.
-3. **Housing cap** tied to the main building tier (§6), so population has a real ceiling.
-4. **The supper ritual + soup upkeep** — morale, desertion, and the pressure valve (§7).
-5. **Ingredients** replacing coin as the cauldron's input (§7).
-6. **L4 Castle** (§6), and map objectives (§10).
-7. **Mercenaries** (§8).
-8. **Indirect control polish** — rally banners, bell, horn (§3).
-9. **Audio.** There is none at all — no `AudioStreamPlayer` anywhere in the project. The
-   cheapest available win for a game whose pitch is atmosphere.
+1. **Combat & night waves** — now designed in full (§9), and broken into eight
+   playtest-sized tasks in **`COMBAT_PROMPTS.md`**, which is the working plan:
+
+   | | |
+   |---|---|
+   | **P1** | The mountain map — terrain gates, one corridor, one wall side |
+   | **P2** | The bandit body — marches, piles at the shut gate |
+   | **P3** | The raid director — night counter, wave table, camp, the horn that counts |
+   | **P4** | Archers mount the walls — perches, the climb, the combat shot |
+   | **P5** | Robbery — knockdown, tools taken, the victim re-recruited |
+   | **P6a** | Walls break and mend — HP, breach, repair-as-construction |
+   | **P6b** | The hall can fall — the lose condition |
+   | **P7** | The blood moon — every 15th night, red sky, Brutes |
+   | **P8** | The sound of a bad night — reuse wired, gaps listed |
+
+   *(Damage & repair used to be item 2 here; it is P6a/P6b now, since it is the same
+   feature as combat rather than a follow-up to it.)*
+2. **Housing cap** tied to the main building tier (§6), so population has a real ceiling.
+3. **The supper ritual + soup upkeep** — morale, desertion, and the pressure valve (§7).
+4. **Ingredients** replacing coin as the cauldron's input (§7).
+5. **L4 Castle** (§6), and map objectives (§10) — where destroyable camps (§9) are the
+   leading candidate for what an objective actually is.
+6. **Mercenaries** (§8), which combat finally gives a reason to exist.
+7. **Indirect control polish** — rally banners, bell, horn (§3).
+8. **Music.** Still not one note — see `ASSETS.md`. Effects are well past "none" now, but
+   a game pitched on atmosphere has no score, and a night wave has nothing to lift it.
 
 ---
 
