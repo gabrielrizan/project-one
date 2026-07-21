@@ -32,8 +32,15 @@ func shake(duration: float, strength: float) -> void:
 
 func _shake_camera(delta: float) -> void:
 	if _shake_t <= 0.0:
-		if _camera.position != _cam_base:
-			_camera.position = _cam_base
+		# At rest the camera's own position *is* the rest pose -- adopt it, don't force it
+		# back to whatever `_ready()` cached. Forcing it re-wrote the camera every frame and
+		# so silently ate anything else that moved it: the editor's live scene sync (change
+		# Position with the game running and it snapped straight back, looking like live
+		# edit was broken) and any future dynamic zoom. Nothing is lost by adopting, because
+		# the shake below fades `a` to exactly 0 on its last frame and therefore always
+		# lands back on `_cam_base` on its own; and `_shake_t <= 0.0` keeps a mid-shake
+		# offset from being baked in as the new base.
+		_cam_base = _camera.position
 		return
 	_shake_t -= delta
 	var fade: float = clampf(_shake_t / _shake_len, 0.0, 1.0)

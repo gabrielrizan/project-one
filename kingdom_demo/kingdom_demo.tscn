@@ -88,7 +88,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 1)
 script = ExtResource("4_ndqrx")
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=936210487]
-transform = Transform3D(1, 0, 0, 0, 0.76604444, 0.6427876, 0, -0.6427876, 0.76604444, 0, 6.644999, 5.5029993)
+transform = Transform3D(1, 0, 0, 0, 0.7660444, 0.6427875, 0, -0.6427875, 0.7660444, 0, 6.644999, 5.5029993)
 current = true
 fov = 60.0
 
