@@ -108,6 +108,30 @@ const ARROW_HIT_CLIPS := [
 const ARROW_HIT_PITCH := 1.12
 const ARROW_HIT_VOL_JITTER := 2.5
 
+## The purse coming off and going into the king's hands. This is how income
+## actually reaches the player, so it wants to be audible feedback rather than
+## scenery -- but it fires every time any worker or archer gets home, so it is
+## kept quiet and short. Distinct from the tally's `coin_*` clips on purpose:
+## those are single coins counted out, this is a handful changing hands.
+const GOLD_HAND_CLIPS := [
+	preload("res://kingdom_demo/assets/audio/gold_hand_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/gold_hand_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/gold_hand_3.ogg"),
+]
+const GOLD_HAND_PITCH := 1.1
+const GOLD_HAND_VOL_JITTER := 2.5
+const GOLD_HAND_DB := -10.0
+
+## PARKED. Two problems, and only one of them is the clip. The handover animation
+## is a quick torso bow, and a sharp coin sound landing on it reads as the
+## villager being *slapped* rather than handing anything over. On top of that the
+## clip is a leather purse while what you actually watch is loose coins flying
+## across one at a time -- there is no pouch anywhere on screen.
+##
+## Revisit when the handover has a real animation to sit on; the clips, the pool
+## and the wiring all stay. Flip this to hear it again.
+const GOLD_HAND_ENABLED := false
+
 ## A wanderer taking a post picks up the tools that come with it -- the model swaps
 ## to one carrying an axe or a bow on the same frame, and this is that moment.
 ## Workers get it a touch lower than archers, which is the cheapest way to make the
@@ -130,6 +154,7 @@ static var _hammer_pool: AudioStreamRandomizer = null
 static var _bow_pool: AudioStreamRandomizer = null
 static var _arrow_hit_pool: AudioStreamRandomizer = null
 static var _job_pool: AudioStreamRandomizer = null
+static var _gold_hand_pool: AudioStreamRandomizer = null
 
 @onready var model_root: Node3D = $Model
 @onready var _agent: NavigationAgent3D = $NavAgent
@@ -188,6 +213,8 @@ func _ready() -> void:
 		_arrow_hit_pool = _build_pool(ARROW_HIT_CLIPS, ARROW_HIT_PITCH, ARROW_HIT_VOL_JITTER)
 	if _job_pool == null:
 		_job_pool = _build_pool(JOB_CLIPS, JOB_PITCH_JITTER, 2.0)
+	if _gold_hand_pool == null:
+		_gold_hand_pool = _build_pool(GOLD_HAND_CLIPS, GOLD_HAND_PITCH, GOLD_HAND_VOL_JITTER)
 
 ## One randomiser per kind of sound, built once and shared. Picks a clip at random
 ## and jitters pitch and volume, so repeated blows never land identically.
@@ -748,6 +775,8 @@ func _deliver(delta: float) -> void:
 			var t := create_tween()
 			t.tween_property(_model, "rotation:x", deg_to_rad(20.0), 0.1)
 			t.tween_property(_model, "rotation:x", 0.0, 0.16)
+		if GOLD_HAND_ENABLED:
+			_play(_gold_hand_pool, GOLD_HAND_DB)
 		_dump_purse(king.global_position)
 		_end_errand()
 
@@ -772,6 +801,8 @@ func _present(delta: float) -> void:
 		t.tween_interval(0.34)
 		t.tween_property(_model, "position:y", _base_y, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		t.parallel().tween_property(_model, "rotation:x", 0.0, 0.22)
+	if GOLD_HAND_ENABLED:
+		_play(_gold_hand_pool, GOLD_HAND_DB)
 	for i in range(_purse.size()):
 		_offer_coin(_purse[i], king, 0.12 + i * 0.1)
 	_purse.clear()

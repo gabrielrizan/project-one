@@ -12,6 +12,23 @@ const CHIP_TEX := preload("res://kingdom_demo/assets/pixel/wood_chip.png")
 
 const BLAZE_LIFT := 0.16
 
+## The daub of paint going on. It lives here rather than in `tree_resource.gd`
+## and `berry_bush.gd` separately because **the monarch is doing the same thing
+## to both** -- marking is one verb, so it gets one sound, exactly like the
+## blaze and the banner it goes with.
+const MARK_SFX := [
+	preload("res://kingdom_demo/assets/audio/mark_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/mark_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/mark_3.ogg"),
+]
+const MARK_DB := -7.0
+const MARK_PITCH := 1.12
+const MARK_VOL_JITTER := 3.0
+
+## Built once and shared by every marked thing on the map -- there is only ever
+## one monarch, so one pool is enough.
+static var _mark_pool: AudioStreamRandomizer = null
+
 ## Instantiate a model at a uniform scale.
 static func model(scene: PackedScene, scale: float) -> Node3D:
 	var n: Node3D = scene.instantiate()
@@ -59,6 +76,30 @@ static func particle(tex: Texture2D, px: float) -> Sprite3D:
 	return s
 
 ## Daubs the felling/foraging mark on, in one wet slap.
+## A brush stroke where the blaze just landed. On a throwaway emitter parented
+## to the scene rather than to `owner`, because a felled tree frees itself
+## immediately and would cut its own sound off.
+static func mark_sound(owner: Node3D) -> void:
+	if owner == null or not owner.is_inside_tree():
+		return
+	if _mark_pool == null:
+		_mark_pool = AudioStreamRandomizer.new()
+		for i in range(MARK_SFX.size()):
+			_mark_pool.add_stream(i, MARK_SFX[i])
+		_mark_pool.random_pitch = MARK_PITCH
+		_mark_pool.random_volume_offset_db = MARK_VOL_JITTER
+		_mark_pool.playback_mode = AudioStreamRandomizer.PLAYBACK_RANDOM_NO_REPEATS
+	var p := AudioStreamPlayer3D.new()
+	p.stream = _mark_pool
+	p.bus = &"SFX"
+	p.volume_db = MARK_DB
+	p.unit_size = 5.0
+	p.max_distance = 26.0
+	owner.get_tree().current_scene.add_child(p)
+	p.global_position = owner.global_position + Vector3(0, 1.0, 0)
+	p.finished.connect(p.queue_free)
+	p.play()
+
 static func blaze(owner: Node3D, local_y: float, px: float) -> Sprite3D:
 	var b := sprite(MARK_TEX, px)
 	owner.add_child(b)

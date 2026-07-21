@@ -308,18 +308,24 @@ Note:     Workers play at pitch 0.92, archers at 1.06 -- the cheapest way to mak
           building.gd::RAISE_SFX.
 
 
-rain_light.ogg                                       [CC0 — no credit needed] (EDITED)
+rain_light.ogg                                       [CC0 - no credit needed] (EDITED)
 --------------------------------------------------------------------------
-Title:    R30-25a-Steady Heavy Rain.wav
-Author:   craigsmith
-Source:   https://freesound.org/s/486272/
-Licence:  CC0 1.0 — https://creativecommons.org/publicdomain/zero/1.0/
-Length:   40 s (from a 46 s source)
-Edited:   Trimmed to a seamless loop -- the last 4 s are crossfaded back over the
-          first 4 s, so the join is continuous and the file loops without a click.
-          Normalised to -3 dBFS.
+Title:    Rain on grass and leaves
+Author:   SamsterBirdies
+Source:   https://freesound.org/s/584268/
+Licence:  CC0 1.0 - https://creativecommons.org/publicdomain/zero/1.0/
+Length:   140 s, stereo (from a 170 s source)
+Edited:   Most even 145 s window found by measurement (0.15 dB variation across
+          its length), looped seamlessly with a 5 s crossfade, normalised to
+          -3 dBFS.
 Used for: the light rain bed (ambience.gd), fading up across weather intensity
-          0.02-0.30. Thin and hissy, which is what a drizzle is.
+          0.02-0.30.
+Replaced: craigsmith 486272 "R30-25a-Steady Heavy Rain" (also CC0), rejected on
+          listening as metallic -- it read as rain hitting a gutter, wrong for a
+          cast standing in open field. That is measurable: rain on a hard surface
+          rings rather than hissing, and the rejected file scored 0.025 on
+          spectral flatness against this one's 0.505. The flatness measure is
+          what picked the replacement.
 
 
 rain_heavy.ogg                                       [CC0 — no credit needed] (EDITED)
@@ -357,3 +363,307 @@ Used for: distant thunder (ambience.gd::_on_lightning), thrown to a random
 
 Note: everything in this weather batch is CC0, so none of it is added to
       ATTRIBUTION-REQUIRED.md.
+
+
+thunder_near.ogg                                     [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    Distant Thunder (same recording as thunder_1..4)
+Author:   richwise
+Source:   https://freesound.org/s/361401/
+Licence:  CC0 1.0
+Length:   5.85 s
+Edited:   Cut at 397.55-403.40 s, the brightest loud event in the recording --
+          chosen by measuring high-frequency content rather than by loudness,
+          because distance low-passes thunder. It carries roughly 2.5x the
+          1-6 kHz energy of the rolling cuts. 30 ms fade in (short, so the crack
+          stays sharp), 1.1 s fade out, normalised to -2 dBFS.
+Used for: the near strike (ambience.gd::_on_lightning). Deliberately NOT in the
+          random pool -- it plays only when the sound arrives within 4 s of the
+          flash, so the one clip with a crack on it can never land on a storm
+          sitting out on the horizon.
+
+
+mark_1.ogg / mark_2.ogg / mark_3.ogg                 [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    normal paint strokes_1-2.aif
+Author:   acrober
+Source:   https://freesound.org/s/86113/
+Licence:  CC0 1.0 - https://creativecommons.org/publicdomain/zero/1.0/
+Lengths:  0.51 s each
+Edited:   The source holds several strokes in one file. Onsets were located by
+          measurement and the three most isolated single strokes cut out, each
+          with an 8 ms fade in and a 0.22 s fade out, normalised to -6 dBFS.
+          A fourth was attempted from the same author's "slowpaintstrokes"
+          (86114) but that recording is a sustained swell with no transient to
+          cut on, so the pool is three.
+Used for: marking a tree OR a bush (mark_fx.gd::mark_sound). One sound for one
+          verb -- it lives in MarkFx alongside the blaze and the banner rather
+          than in tree_resource.gd and berry_bush.gd separately.
+Open:     whether a paint brush is right for this at all. It is literal (the
+          visual is a paint blaze) but a woodier knock would read more like a
+          decree. Andrei to judge.
+
+
+bush_pick_1.ogg / bush_pick_2.ogg                    [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Titles:   "Rustling foilage 1.wav"  https://freesound.org/s/190638/
+          "Rustling foilage 3.wav"  https://freesound.org/s/190639/
+Author:   GUS_MAN
+Licence:  CC0 1.0 (both)
+Lengths:  0.69 s / 1.15 s
+Edited:   Trimmed tight top and tail, faded, normalised to -6 dBFS. Not cut on
+          onsets -- a rustle is a sustained swell whose noise floor sits close
+          to its peak, so onset detection finds nothing in it.
+Note:     190640 and 190641 are byte-identical uploads of the same audio; only
+          one is usable. Both were rejected here as too long anyway.
+Used for: an archer stripping a berry bush (berry_bush.gd::strip).
+
+
+bush_pick_3.ogg                                      [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    The Rustle of a Bush
+Author:   Montacue
+Source:   https://freesound.org/s/178615/
+Licence:  CC0 1.0
+Length:   1.11 s
+Edited:   As above.
+Open:     this one is from a different recordist to bush_pick_1 and _2 and
+          measures brighter (7.2 kHz spectral centroid against ~4.4 kHz). Kept
+          because rustles vary a lot naturally, but if it reads as a different
+          bush it should be replaced with a third cut from GUS_MAN.
+
+
+animal_drop_1.ogg                                    [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    Body fall_01.wav
+Author:   deleted_user_2104797
+Source:   https://freesound.org/s/346695/
+Licence:  CC0 1.0
+Length:   0.96 s
+Edited:   Cut around its single onset with a 1.2 s tail, normalised to -5 dBFS.
+          Chosen by measurement over two alternatives: at a 1.7 kHz centroid and
+          a 6.1 low/high ratio it is the only candidate with real weight to it --
+          the others measured ~5.5 kHz and read as light and papery.
+Used for: a hunted animal hitting the ground (wild_animal.gd::_die).
+Pitched:  one clip covers every species -- rabbit 1.38, stag 0.84, anything else
+          1.0, plus a small random jitter. Same approach as villager.gd's
+          JOB_PITCH; adding a boar costs one dictionary entry.
+
+
+gold_hand_1..3.ogg                                   [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    purse_coin
+Author:   cupido-1
+Source:   https://freesound.org/s/519645/
+Licence:  CC0 1.0
+Lengths:  0.78 s each
+Edited:   Three most isolated events cut out of a 70 s take, faded, normalised
+          to -7 dBFS.
+Used for: a worker or archer handing their purse to the monarch (villager.gd,
+          both _deliver and _present). Mixed low at -10 dB because it fires
+          every time anyone gets home.
+Note:     deliberately a different sound from the tally's coin_* clips. Those
+          are single coins counted out during a purchase; this is a handful
+          changing hands.
+Open:     KEPT FOR NOW, but flagged by Andrei on audition: the clip is a leather
+          *purse*, while workers and archers actually hand over loose coins that
+          fly across one at a time (villager.gd::_offer_coin). The code calls the
+          carried gold a "_purse" but nothing on screen is one, so the sound
+          tells a different story from the picture. Two ways out: a
+          loose-coins-in-a-hand clip, or give carriers a visible pouch.
+
+
+hoof_1..6.ogg                                        [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    Horse.wav
+Author:   mmacneil
+Source:   https://freesound.org/s/184949/
+Licence:  CC0 1.0 - https://creativecommons.org/publicdomain/zero/1.0/
+Lengths:  ~0.175 s each
+Edited:   Six individual strikes cut out of a 13.6 s walking recording. Chosen
+          from six candidate recordings by measurement: this one has the
+          cleanest isolation (noise floor at 0.000 of peak) and a 2.5 kHz
+          spectral centroid -- dull enough to read as soft ground rather than
+          the bright clop of cobbles, which is what the world is.
+          Cut windows were tightened twice: at 0.34 s each cut held *two*
+          strikes, because a walking horse lands hooves in close pairs. 0.16 s
+          isolates one. Cuts whose peak arrived late (a slow "attack" on a
+          percussive sound means the window opened before the strike) were
+          discarded, as were any still holding two events.
+Used for: the monarch's horse (monarch.gd::_step).
+Why six:  it is the most repeated sound in the game by a wide margin, and the
+          player is rarely not riding. Every other pool in the project carries
+          2-5.
+Rhythm:   fired from a stride clock, NOT evenly. A gallop lands two feet close
+          together, then the other two, then all four leave the ground:
+          0.053 s inside a pair, 0.131 s between the pairs, 0.381 s suspension.
+          Even spacing was the first attempt and was rejected on listening as
+          "T T T T T", and four evenly-bunched falls as still not paired enough.
+Deepened: the raw cuts measured 1.5-2.9 kHz spectral centroid -- all click, no
+          body, rejected on listening as "someone using some cups". Fixed in
+          processing rather than by finding another take, because no small hoof
+          recording has the low end this wants:
+            resample to 0.85    lowers the whole spectrum and lengthens the hit
+            low-pass at 2 kHz   takes the high-mid "tock" off, keeps the attack
+            + synthesised body  a damped NOISE burst, not a tone
+          Result: centroid 1915 -> ~900 Hz, and crucially a spectral flatness of
+          0.011-0.050 against the raw cut's 0.0004.
+Ground:   the body burst started life as a decaying **sine**, and that was wrong.
+          A sine is the most tonal signal there is, and it took the clips to a
+          flatness of ~0.0004 -- more resonant than the rain bed that was
+          rejected for sounding metallic (0.025). A ringing low tone reads as a
+          hard hollow surface: wood, stone, a drum. Andrei heard exactly that.
+          Soft ground damps instead: no ring, fast decay, energy spread as noise
+          rather than concentrated at a pitch. So the body is now low-passed
+          noise on a 0.034 s decay, with a quieter band-passed burst over it for
+          the scuff of turf. Widening or piling on the body made things *worse* --
+          a narrow low-frequency "noise" is just a rumble at one pitch.
+          A first pass at 0.72 / 900 Hz / 0.55 went too far -- centroid 180 Hz
+          and a ratio of 500, which is a drum, not a horse. The sub must stay
+          under the hoof, not replace it.
+Level:    HOOF_DB is -25, and the accents across a stride span only 3.5 dB.
+          Andrei's brief was that it should be there without drawing the
+          player's focus, and at ~4 strikes a second for an hour anything you
+          can pick out of the mix becomes nagging. Softening the attack was
+          tried as well and dropped: measured, it shifted the leading-edge
+          energy only 52% -> 49%, because after deepening most of the energy
+          sits in the low body rather than the front. Level and accent depth
+          are the levers that actually work here.
+Overlap:  falls are ~75 ms apart and the clips run 175 ms, so they genuinely
+          overlap. They are spread over HOOF_VOICES players; a single player
+          would cut each strike off to start the next.
+
+
+
+horse_snort_1..4.ogg / horse_nicker.ogg              [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Titles:   "G38-16-Four Horse Snorts.wav" by craigsmith  (snorts 1-3)
+                                          https://freesound.org/s/437111/
+          "Horse(snort)_3.wav" by o_ciz   (snort 4)
+                                          https://freesound.org/s/475483/
+          "Horses - Soft Nicker" by TheKingOfGeeks360  (nicker)
+                                          https://freesound.org/s/861234/
+Licence:  CC0 1.0 (all three)
+Lengths:  1.40 s x3, 0.49 s, 0.38 s
+Edited:   Snorts 1-3 cut out of one four-snort take by onset; snort 4 and the
+          nicker trimmed and normalised whole. All to -7 dBFS.
+Used for: the horse while the monarch stands still (monarch.gd), on a 6-18 s
+          random gap. A standing horse is not a silent object, and the pauses
+          are when the player is reading the camp and deciding what to buy.
+Note:     the gap is wide deliberately. Too regular and it becomes a metronome
+          telling you how long you have been idle.
+
+
+horn_night.ogg / horn_dawn.ogg                       [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    Deep Horn
+Author:   Vendarro
+Source:   https://freesound.org/s/328541/
+Licence:  CC0 1.0 - https://creativecommons.org/publicdomain/zero/1.0/
+Lengths:  3.25 s (night) / 2.30 s (dawn)
+Edited:   One blast cut out, then **de-tremoloed**, then normalised. `horn_dawn`
+          is the same blast resampled to 1.40 and de-tremoloed again afterwards
+          -- one instrument, two registers.
+Replaced: klavo1985 402753 "medieval horn" (also CC0), rejected on listening as
+          "low quality, it feels like it vibrates". That is measurable: it
+          carried an amplitude wobble of 0.097 at ~12 Hz, i.e. audible tremolo,
+          the worst but one of the six horns auditioned. A real player's vibrato
+          reads as character once and as a fault on a sound the game blows every
+          cycle.
+De-tremolo: the signal is divided by its own *fast* envelope while its slow one
+          is kept, so the shape of the blast survives and only the flutter goes.
+          Gain clamped and then smoothed, because an abrupt correction is itself
+          an artefact. Result: wobble 0.097 -> 0.014 (night), 0.020 (dawn).
+Chosen:   this source is equally deep (516 Hz centroid against 626) with roughly
+          half the raw wobble, and carries far more low end (low/high 22.9
+          against 6.7). It was passed over the first time on a noisy extraction
+          window rather than on the sound itself.
+Shortened: to 2.00 s (from 3.25) so ALARM_GAP's 2.5 s leaves real silence
+          between blasts. The count IS the message -- one blast is nightfall,
+          two an attack, three a blood moon -- and blasts that run together
+          cannot be counted. Daybreak is no longer a horn: it is a rooster, so
+          the horn only ever means danger.
+          **Spliced, not trimmed.** A hard cut to length landed the fade on a
+          still-loud sustain and was rejected on listening as "ends too
+          abruptly, feels sped up then cut". The blast now keeps the recording's
+          own swell (0..1.15 s) crossfaded onto its own decay (2.45 s..end), so
+          the middle is shortened but both ends are genuine. Trim a sustained
+          note this way, never with a straight fade.
+          Settled at 2.0 s after 1.75 s was judged to lack gravitas -- a signal
+          this important wants room to breathe. ALARM_GAP moved with it; the two
+          must always be retuned together or the blasts stop being countable.
+Gating:   only once the campfire is lit -- before that there is no village and
+          nobody to blow it. A watchtower building may own it later.
+Timing:   fired off `darkness()` crossing a threshold, NOT off the clock. The
+          day/night durations are placeholder and will be retuned; a threshold
+          on how dark it actually is keeps the horn landing at the right moment
+          whatever they become. Lands ~2.4 s into dusk, leaving ~17 s of warning.
+
+
+rooster.ogg                                          [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    Rooster - Crow 3 - 96kHz.wav
+Author:   JarredGibb
+Source:   https://freesound.org/s/233167/
+Licence:  CC0 1.0 - https://creativecommons.org/publicdomain/zero/1.0/
+Length:   2.28 s
+Edited:   The COMPLETE crow (0.50-2.28 s of the source) resampled to 0.78 for
+          depth, gently low-passed, normalised to -6 dBFS. From a 96 kHz master.
+Used for: daybreak (ambience.gd::crow_daybreak). The relief answer to the
+          night's horn -- Warcraft III's dawn rooster was the reference.
+Whole call: **a rooster's crow is "er-er-er-ERRRR"** -- a build, a snatched
+          breath, then the finish. An earlier attempt cut 0.74 s out of a
+          farmyard recording (mike_stranks 407393) and landed mid-build; it was
+          rejected on listening as "feels sped up". Exactly the same mistake as
+          hard-trimming the horn. Never cut inside a call that has a shape.
+Pitch:    the first bird tried (JarredGibb 233161, unpitched) was rejected as
+          "too pitchy" -- fundamental ~932 Hz, highest of six candidates. This
+          is ~662 Hz. **Measure the fundamental, not the spectral centroid, when
+          the note is about pitch**: centroid barely separated the candidates
+          (2284 vs 2096 Hz) while autocorrelation separated them completely.
+Alts:     rooster_alt_b.ogg (233161 pitched down, ~676 Hz) and rooster_alt_c.ogg
+          (jsbarrett 200339, ~774 Hz). On disk, not wired, kept for A/B.
+Placing:  **the same spot every morning** (ROOSTER_AT, north-east of the fire).
+          A bird lives somewhere; randomising its bearing each dawn made it a
+          noise from nowhere. Level -14 dB on its own voice with a short reach --
+          it had been borrowing the HORN's settings (unit_size 34, reach 200),
+          which are chosen so a signal carries the whole map, and duly arrived
+          enormous. The brief was "not astonishingly loud", not "distant".
+
+
+deer_1..3.ogg                                        [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    Deer Meewing 01.wav
+Author:   msantoro11
+Source:   https://freesound.org/s/351113/
+Licence:  CC0 1.0
+Lengths:  1.20 s each
+Edited:   Three calls cut out of one recording by onset, then LOW-PASSED at
+          3.2 kHz. The low-pass is the point: air absorbs high frequencies, so
+          rolling the top off reads as *distance* rather than merely quiet, and
+          "subtle but there" was the brief. Normalised to -9 dBFS.
+Used for: deer out in the woods (ambience.gd), day or night, on a wide 28-85 s
+          gap. Like the tree creak it plays OUT OF a real animal within earshot,
+          never from a bearing -- so it can't call from a wood already hunted
+          empty, and the map going quiet as it is stripped is audible.
+
+
+cauldron_feed.ogg                                    [CC0 - no credit needed] (EDITED)
+--------------------------------------------------------------------------
+Title:    Pouring Water Into Metal Pot or Kettle
+Author:   ahriik
+Source:   https://freesound.org/s/585516/
+Licence:  CC0 1.0
+Length:   1.90 s
+Edited:   Trimmed and LOW-PASSED at 2.2 kHz. The raw pour was splashy (7.4 kHz
+          centroid) and a bright splash draws the ear; the brief was subtle, so
+          the top was rolled off (down to 2.1 kHz) and the level set to -15 dB.
+Used for: broth going into the cauldron (campfire.gd::_pour, alongside the
+          soup-level tween). Confirmation the gold landed, not an event -- it
+          fires three times per cauldron, several cauldrons a night.
+Shape:    0.62 s, and **the animation was re-timed to match it exactly**
+          (POUR_SWELL + POUR_SETTLE). The first cut was 1.9 s and did not peak
+          until 1.34 s, against a 0.40 s animation -- so the cauldron finished
+          filling a second before the pour was loudest, which reads as the
+          sound arriving after the picture. A sound accompanying an animation
+          has to share its *length and peak*, not merely start with it.

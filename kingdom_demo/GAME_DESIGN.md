@@ -313,7 +313,11 @@ reading the reason.**
 | **Winter has no weather at all** | It is a placeholder for snow, which isn't built. A dry season is the honest stand-in; faking winter with rain would be worse. |
 | Wetness is a **separate clock** from rain intensity | Pools that appear and vanish with the rain read as a light switch. Lagging saturation is what gives a shower an aftermath. |
 | Rain leans along the **existing** wind bearing | `wind.gd` already owns one shared bearing for the trees and leaves. A storm with its own direction would read as two weathers at once. |
-| All four thunder clips come from **one** recording | Thunder from four sources sits in four different distances and airs, and the pool stops sounding like a single storm. |
+| All thunder clips come from **one** recording | Thunder from several sources sits in several different distances and airs, and the pool stops sounding like a single storm. |
+| A storm **swells and eases** rather than holding at its peak | Otherwise every storm has the same shape — up, flat, down — and only its height and length differ, which is what makes weather feel canned. |
+| Most storms **never reach full intensity** | Peak is drawn per storm from the season's band, and only summer's reaches 1.0. A true downpour should be an event, not the default. |
+| The near thunder is picked by **distance, not at random** | The one clip with a crack on it would otherwise land on a storm sitting on the horizon. A sharp report arriving nine seconds after the flash contradicts what you just saw. |
+| Lighting the campfire has **no sound of its own** | Andrei's call. The crackle loop starting is enough of an event; a whoosh on top read as a sound effect rather than a fire. |
 
 ## §12. Open questions
 

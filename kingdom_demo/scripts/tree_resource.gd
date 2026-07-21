@@ -97,6 +97,7 @@ func _mark() -> void:
 	remove_from_group("interactable")
 	add_to_group("marked_tree")
 	hide_prompt()
+	MarkFx.mark_sound(self)
 	MarkFx.shake(self, model, _base_x, 0.09)
 	_blaze = MarkFx.blaze(self, TRUNK_Y, 0.013)
 	MarkFx.face_camera(_blaze, chop_anchor())

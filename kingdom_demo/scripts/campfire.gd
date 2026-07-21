@@ -53,11 +53,18 @@ const CRACKLE_NIGHT_DB := -9.0
 const CRACKLE_DAY_DB := -18.0
 const CRACKLE_FADE := 3.0    # dB per second, eased across dusk with everything else
 
-## Trimmed so the whoosh peaks 0.18s in, which is about when the flame appears --
-## lighting the fire is the first thing the player ever does, and it should land.
-const LIGHT_CLIP := preload("res://kingdom_demo/assets/audio/fire_light.ogg")
-const LIGHT_DB := -4.0
-const LIGHT_REACH := 40.0
+## Broth going into the pot. **Deliberately unobtrusive**: it is confirmation
+## that the gold landed, not an event. Rolled off at 2.2 kHz before it got here
+## so the splash doesn't sizzle -- a bright pour draws the ear, and this fires
+## three times per cauldron, several cauldrons a night.
+const FEED_CLIP := preload("res://kingdom_demo/assets/audio/cauldron_feed.ogg")
+const FEED_DB := -15.0
+const FEED_PITCH := Vector2(0.94, 1.06)
+
+## REMOVED -- the catch/whoosh on lighting the fire. Andrei's call: the crackle
+## loop starting is enough of an event on its own, and the whoosh on top read as
+## a sound effect rather than a fire. `fire_light.ogg` and its licence entry are
+## kept so this can be reinstated without re-sourcing anything.
 
 var lit := false
 var fill := 0
@@ -149,23 +156,8 @@ func light() -> void:
 	if lit:
 		return
 	lit = true
-	_light_sound()
 	_apply_state()
 	_spawn_village()
-
-## Its own emitter rather than the crackle player, so the catch rings over the top
-## of the loop starting instead of cutting it off.
-func _light_sound() -> void:
-	var p := AudioStreamPlayer3D.new()
-	p.stream = LIGHT_CLIP
-	p.bus = &"SFX"
-	p.volume_db = LIGHT_DB
-	p.unit_size = 10.0
-	p.max_distance = LIGHT_REACH
-	add_child(p)
-	p.global_position = global_position + Vector3(0, 0.5, 0)
-	p.finished.connect(p.queue_free)
-	p.play()
 
 # ---------------------------------------------------------------- cauldron
 
@@ -180,12 +172,23 @@ func _level() -> float:
 	return clampf(float(fill) / float(CAULDRON_MAX), 0.0, 1.0)
 
 ## A ladle goes in: the level swells past its mark and settles.
+##
+## **The two halves are timed to the pour clip, not picked by feel.** They used
+## to run 0.22 + 0.18 = 0.40s against a 1.9s sound that did not peak until 1.34s,
+## so the cauldron finished filling a full second before the pour was at its
+## loudest -- which reads as the sound arriving after the animation. The clip is
+## now 0.62s and these add up to it, so they start, peak and end together.
+## If the clip is ever replaced, re-match these to its length.
+const POUR_SWELL := 0.34
+const POUR_SETTLE := 0.28
+
 func _pour() -> void:
+	_pour_sound()
 	var t := _level()
 	_soup.visible = true
 	var tw := create_tween()
-	tw.tween_method(_set_soup_level, _soup.scale.y, t * 1.12, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tw.tween_method(_set_soup_level, t * 1.12, t, 0.18).set_trans(Tween.TRANS_SINE)
+	tw.tween_method(_set_soup_level, _soup.scale.y, t * 1.12, POUR_SWELL).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_method(_set_soup_level, t * 1.12, t, POUR_SETTLE).set_trans(Tween.TRANS_SINE)
 
 ## One villager takes their supper. Emptying the pot re-opens it for refilling,
 ## which is what lets the camp grow past its first five wanderers.
@@ -296,3 +299,18 @@ func _apply_state() -> void:
 		_crackle.play()
 	elif not lit and _crackle.playing:
 		_crackle.stop()
+
+## Broth going in. Its own throwaway emitter rather than the crackle player, so
+## it lays over the fire instead of interrupting it.
+func _pour_sound() -> void:
+	var p := AudioStreamPlayer3D.new()
+	p.stream = FEED_CLIP
+	p.bus = &"SFX"
+	p.volume_db = FEED_DB
+	p.pitch_scale = randf_range(FEED_PITCH.x, FEED_PITCH.y)
+	p.unit_size = 4.0
+	p.max_distance = 18.0
+	get_tree().current_scene.add_child(p)
+	p.global_position = global_position + Vector3(0, 1.0, 0)
+	p.finished.connect(p.queue_free)
+	p.play()

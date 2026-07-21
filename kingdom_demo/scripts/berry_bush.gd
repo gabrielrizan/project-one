@@ -17,6 +17,19 @@ const PICKED_MODEL := preload("res://kingdom_demo/assets/3d/props/berry_bush_pic
 const BLAZE_Y := 0.45
 const BANNER_Y := 1.35
 
+## Foliage being pushed aside and stripped. Three takes so repeated foraging
+## doesn't repeat one rustle -- an archer works a bush every few seconds.
+const PICK_SFX := [
+	preload("res://kingdom_demo/assets/audio/bush_pick_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/bush_pick_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/bush_pick_3.ogg"),
+]
+const PICK_DB := -9.0
+const PICK_PITCH := 1.14
+const PICK_VOL_JITTER := 3.0
+
+static var _pick_pool: AudioStreamRandomizer = null
+
 @onready var model: Node3D = $Model
 @onready var prompt: Label3D = $Prompt
 
@@ -93,6 +106,7 @@ func _mark() -> void:
 	add_to_group("marked_bush")
 	hide_prompt()
 	MarkFx.shake(self, model, _base_x, 0.07)
+	MarkFx.mark_sound(self)
 	_blaze = MarkFx.blaze(self, BLAZE_Y, 0.011)
 	MarkFx.face_camera(_blaze, global_position + Vector3(0, BLAZE_Y, 0))
 	_banner = MarkFx.banner(self, BASKET_MODEL, BANNER_Y, 0.8)
@@ -132,6 +146,7 @@ func rustle(from: Vector3) -> void:
 func strip() -> void:
 	if picked:
 		return
+	_pick_sound()
 	picked = true
 	marked = false
 	remove_from_group("marked_bush")
@@ -179,3 +194,25 @@ func _fruit() -> void:
 	model.scale = _ripe_scale * 0.7
 	var t := create_tween()
 	t.tween_property(model, "scale", _ripe_scale, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+## The rustle of the bush being worked. On its own emitter rather than a child
+## of this bush: the bush swaps its model and keeps living, but the sound should
+## survive regardless of what happens to it.
+func _pick_sound() -> void:
+	if _pick_pool == null:
+		_pick_pool = AudioStreamRandomizer.new()
+		for i in range(PICK_SFX.size()):
+			_pick_pool.add_stream(i, PICK_SFX[i])
+		_pick_pool.random_pitch = PICK_PITCH
+		_pick_pool.random_volume_offset_db = PICK_VOL_JITTER
+		_pick_pool.playback_mode = AudioStreamRandomizer.PLAYBACK_RANDOM_NO_REPEATS
+	var p := AudioStreamPlayer3D.new()
+	p.stream = _pick_pool
+	p.bus = &"SFX"
+	p.volume_db = PICK_DB
+	p.unit_size = 4.5
+	p.max_distance = 22.0
+	get_tree().current_scene.add_child(p)
+	p.global_position = global_position + Vector3(0, BLAZE_Y, 0)
+	p.finished.connect(p.queue_free)
+	p.play()

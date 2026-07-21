@@ -60,7 +60,12 @@ lose condition. The walls, gates, archers and day/night cycle are all *setup* fo
 that does not exist. That is the single biggest gap — see `GAME_DESIGN.md` §9.
 
 **Also not built:** L4 Castle · soup upkeep / morale / desertion · mercenaries
-· map objectives and moving to the next map · any audio at all.
+· map objectives and moving to the next map · **music of any kind** · any mixing beyond
+static bus levels (no limiter, no ducking except rain over the beds).
+
+**Audio is well past "none"** — beds, weather, work, the monarch's horse and a watch horn.
+`ASSETS.md` holds the inventory and the per-role criteria; `audio_review.html` is the
+listening desk. Several clips are placeholders chosen to get a feel, not finals.
 
 **Placeholder numbers:** hall tier costs are a flat 5 so testing is fast, not a tuned curve.
 
@@ -210,6 +215,19 @@ in one frame would fight and flicker.
 **Rain leans along `wind.gd`'s bearing**, which is why `wind` is now a group — a storm
 blowing across the wind reads as two weathers at once.
 
+**A storm breathes while it falls.** Its intensity wanders between `1-SWELL` and its full
+peak on two sine rates that don't divide into each other — the same trick `wind.gd::gust()`
+uses, so there is no period to notice. Without it a storm ramped up, held *dead flat* until
+its timer expired, then ramped down, and every storm in the game had an identical shape.
+The swell only pulls **down** from the peak, so the peak stays the storm's ceiling, and it
+is applied only in `RAINING` — gathering and clearing must be left to run to their ends.
+
+**Peak intensity is drawn per storm from the season's band, so most rain is partial.** Only
+summer's band reaches 1.0; spring caps at 0.72 and autumn at 0.85. A true downpour is
+meant to be rare. When measuring the swell, sample **only while `state_name() == "raining"`**
+— a long window runs off the end of the storm and measures it clearing, which looks
+exactly like a swell to nothing.
+
 ### Dev overlay (`dev_menu.gd`) — F1
 
 Weather is random and nightfall is minutes away, so tuning either by waiting is hopeless.
@@ -223,7 +241,12 @@ Every key reaches into a system directly:
 | **F5** | lightning now |
 | **F6** | next season |
 | **F7** | dry the ground (F4-off leaves pools to dry on their own) |
+| **J / H / K** | horn — 1 blast (nightfall) / 2 (attack) / 3 (blood moon). Needs the fire lit |
+| **L** | rooster — daybreak. Needs the fire lit |
 | F3 | navmesh debug — **already taken** by `nav_world.gd` |
+
+**Every tool is a clickable button too**, built from the same `ACTIONS` list that binds
+the keys, so the two can't drift. Add a tool by adding one entry and one method.
 
 ⚠️ It is a **dev tool with no release gate**. Wrap it in `OS.is_debug_build()` before
 shipping.
@@ -249,6 +272,29 @@ for the duration, so the king stays **locked on target** and a second tally can 
 - **Groups are the wiring**: `monarch`, `game_manager`, `interactable`, `workplace`,
   `villager`, `tree`, `marked_tree`, `bush`, `marked_bush`, `wild_game`, `wall_side`,
   `build_site`, `day_night_cycle`, `camera_rig`, `wind`, `weather`, `wind_sway`.
+- **The watch horn counts.** Meaning lives in the *number of blasts*: **one** at nightfall,
+  **two** for an attack, **three** for a blood moon (concept only). The blasts must stay
+  countable, so `horn_night` (1.7s) is deliberately shorter than `ALARM_GAP` (2.0s) —
+  overlapping them was the bug that made two indistinguishable from one. **Daybreak is a
+  *rooster*, not a horn**, so the horn only ever means danger and its count never competes
+  with a good-news call. Fired off `darkness()` crossing a threshold, **never off the
+  clock** (the durations are placeholder); silent until the campfire is lit.
+- **Ambient calls come out of a real emitter, never a bare bearing**, when there is a thing
+  on screen they could come from. The tree creak plays out of a trunk within earshot and
+  the deer out of a live animal in `wild_game`; both go silent when nothing qualifies, so
+  the audio can't contradict the picture, and a wood you have hunted or logged empty
+  audibly quietens. Reserve thrown-to-a-bearing calls (owl, thunder) for things genuinely
+  offscreen.
+- **A gait is a bunch of beats and then a gap, never an even tick.** `monarch.gd` runs a
+  **stride clock** (`_advance_stride`) scaled by real speed; `GALLOP_AT` says where each
+  hoof falls as a fraction of a stride and `GALLOP_GAIN` accents the lead hoof, and
+  everything after the last entry is the suspension. Evenly spaced strikes read as
+  "T T T T T" — the silence is what makes it a gallop. Changing gait is those two arrays
+  and nothing else. Two constraints: falls inside a stride are ~75ms apart against a
+  175ms clip, so strikes **must** be spread over several players (`HOOF_VOICES`) or each
+  one cuts off the last; and the clock is deliberately **independent of the placeholder
+  bob animation** — when the real gallop animation lands, drive it from `stride_phase()`
+  so picture and sound share one clock.
 - **Models face +Z with feet/base at y = 0**, and live under a `Model` holder node the
   script populates. Scripts turn them with `atan2(vel.x, vel.z)` and animate them by
   moving/rotating that holder. `villager.gd::_set_model()` swaps which model is worn — a
@@ -258,8 +304,10 @@ for the duration, so the king stays **locked on target** and a second tally can 
 - **`menu.gd` is one scene used twice**: the title screen, and (with `pause_mode = true`,
   instanced under the game's `UI` layer) the Escape pause menu. Its layout is built in code,
   so there is no big hand-authored UI `.tscn` to keep in sync.
-- **`MarkFx`** (`mark_fx.gd`, `class_name`, static helpers) owns the shared visual language
-  for anything the monarch marks: paint blaze, floating banner, shake, leaves, debris.
+- **`MarkFx`** (`mark_fx.gd`, `class_name`, static helpers) owns the shared language for
+  anything the monarch marks: paint blaze, floating banner, shake, leaves, debris — **and
+  the mark sound**. Marking is *one verb*, so a tree and a bush get the same sound the same
+  way they get the same blaze. Anything markable added later inherits it for free.
 - **`villager.gd` is one big state machine** for the whole civilian life cycle — eating,
   taking a job, chopping, hunting, foraging, building, hauling gold home. Resist splitting
   it across files; keep the sections commented instead.
@@ -347,6 +395,17 @@ for the duration, so the king stays **locked on target** and a second tally can 
   `light_energy` only brightens faces pointing at the sun, does nothing at night when the
   sun is under the map, and turns the grass fully saturated so it reads as the clouds
   parting. A blue-white ambient lift is both truer and far more readable.
+- **A new `.ogg` imports with `loop=false`, and a bed that doesn't loop dies silently.**
+  The rain beds played once and then never again — which looks like intermittent,
+  unreproducible "sometimes there's no rain sound", because it only bites after the clip's
+  length has elapsed. The existing beds had `loop=true` set by hand in the editor; anything
+  imported from the command line does not. **After adding any looping audio, check
+  `loop=` in its `.ogg.import` and flip it**, then re-run `--import`. One-shots must stay
+  `false`.
+- **Godot's editor eats `F8` (Stop Project) even when the game window has focus**, so a
+  dev hotkey bound there just closes the game. `F5`/`F6` are Run shortcuts — leave them be.
+  `dev_menu.gd` now drives its tools from one `ACTIONS` list that builds both the hotkeys
+  and clickable buttons, so prefer adding a button over inventing another keybind.
 - **`sf.write()` segfaults on long OGG encodes** (libsndfile, ~8s+ at 48 kHz). Write
   block-wise through `sf.SoundFile` instead. Relevant whenever audio is being cut up.
 - **Holding "interact" for a fixed 1–2s is not enough for a big tally.** Each coin takes

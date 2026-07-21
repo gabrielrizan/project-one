@@ -49,19 +49,27 @@
     <td><a href="https://freesound.org/s/616354/">klankbeeld</a></td>
   </tr>
   <tr>
-    <td class="name">tree_creak_a.ogg</td>
-    <td><audio controls preload="none" src="assets/audio/tree_creak_a.ogg"></audio></td>
-    <td class="when" rowspan="3">Every 11–34s, but only when a trunk is within 17m.
-        Plays <i>out of</i> a real tree. Silent in open ground.</td>
-    <td rowspan="3"><a href="https://freesound.org/s/95259/">Department64</a></td>
-  </tr>
-  <tr>
-    <td class="name">tree_creak_b.ogg</td>
+    <td class="name">tree_creak_b.ogg <span class="tag">reworked</span></td>
     <td><audio controls preload="none" src="assets/audio/tree_creak_b.ogg"></audio></td>
+    <td class="when" rowspan="2">Every <b>14–40s</b>, but only when a trunk is within 17m.
+        Plays <i>out of</i> a real tree, so riding into open ground silences it.
+        <br><b>Reworked on your note.</b> It used to announce itself and then vanish, so:
+        the 0.4s clip is <b>dropped from the pool</b> (it was a tick, not a groan), what's
+        left sits <b>9 dB lower</b>, and it now <b>fades in over 0.9s</b> instead of
+        starting. An onset is what makes the ear file something as an event and then lose
+        interest — easing it up out of the bed means it emerges rather than arrives.</td>
+    <td rowspan="2"><a href="https://freesound.org/s/95259/">Department64</a> · CC0</td>
   </tr>
   <tr>
-    <td class="name">tree_creak_c.ogg</td>
+    <td class="name">tree_creak_c.ogg <span class="tag">the long one</span></td>
     <td><audio controls preload="none" src="assets/audio/tree_creak_c.ogg"></audio></td>
+  </tr>
+  <tr class="off">
+    <td class="name">tree_creak_a.ogg <span class="tag parked">DROPPED</span></td>
+    <td><audio controls preload="none" src="assets/audio/tree_creak_a.ogg"></audio></td>
+    <td class="when">Out of the pool — 0.4s is a tick, and it's what made the creak
+        something you noticed and then lost. File kept.</td>
+    <td><a href="https://freesound.org/s/95259/">Department64</a> · CC0</td>
   </tr>
   <tr class="off">
     <td class="name">crow_a.ogg <span class="tag parked">PARKED</span></td>
@@ -78,10 +86,12 @@
     <td class="name">crow_c.ogg <span class="tag parked">PARKED</span></td>
     <td><audio controls preload="none" src="assets/audio/crow_c.ogg"></audio></td>
   </tr>
-  <tr>
-    <td class="name">fire_light.ogg</td>
+  <tr class="off">
+    <td class="name">fire_light.ogg <span class="tag parked">REMOVED</span></td>
     <td><audio controls preload="none" src="assets/audio/fire_light.ogg"></audio></td>
-    <td class="when">Lighting the campfire — the first thing you ever do.</td>
+    <td class="when"><b>No longer plays.</b> Your call — the crackle loop starting is
+        enough of an event on its own. The file and its licence entry are kept so it
+        can be put back without re-sourcing anything.</td>
     <td><a href="https://freesound.org/s/381855/">cribbler</a></td>
   </tr>
   <tr>
@@ -107,19 +117,29 @@
   recording of genuinely distant thunder, so they should sit in the same weather as each
   other. <b>They are meant to sound far away</b>, not overhead.
   <br><br>
-  Measured before they got here, so you don't have to check: rain beds vary by
-  <b>0.3 dB and 1.0 dB</b> across their length (dead even), with no energy spikes.
+  Measured before they got here, so you don't have to check: both rain beds vary by
+  under <b>0.3 dB</b> across their whole length (dead even), with no energy spikes.
   <code>thunder_1</code> measures as a single event with its noise floor at 1% of peak.
+  <br><br>
+  <b>On the metallic one you rejected:</b> you were hearing something real and
+  measurable. Rain on a hard surface rings — its spectrum is peaky rather than
+  broadband. The old file scored <b>0.025</b> on spectral flatness; the replacement
+  scores <b>0.505</b>, about twenty times more noise-like. I used that measurement to
+  pick the new one, so if it still sounds wrong to you, the metric is missing
+  something and I'd want to know.
 </div>
 
 <table>
   <tr><th>Sound</th><th>Listen</th><th>When it fires</th><th>Source</th></tr>
   <tr>
-    <td class="name">rain_light.ogg</td>
+    <td class="name">rain_light.ogg <span class="tag">REPLACED — v2</span></td>
     <td><audio controls preload="none" src="assets/audio/rain_light.ogg"></audio></td>
     <td class="when">Bed. Fades up across intensity <b>0.02–0.30</b>, then stays.
-        This is the whole sound of a drizzle. 40s loop.</td>
-    <td><a href="https://freesound.org/s/486272/">craigsmith</a> · CC0</td>
+        This is the whole sound of a drizzle. 140s loop, stereo.
+        <br><b>Rain falling on grass and leaves</b> — the previous one was rain on a
+        hard surface, which is where the metallic gutter quality came from.</td>
+    <td><a href="https://freesound.org/s/584268/">SamsterBirdies</a> · CC0
+        <br><span class="tag">was craigsmith 486272</span></td>
   </tr>
   <tr>
     <td class="name">rain_heavy.ogg</td>
@@ -149,6 +169,350 @@
   <tr>
     <td class="name">thunder_4.ogg <span class="tag">the long roll</span></td>
     <td><audio controls preload="none" src="assets/audio/thunder_4.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">thunder_near.ogg <span class="tag">NEW — the close one</span></td>
+    <td><audio controls preload="none" src="assets/audio/thunder_near.ogg"></audio></td>
+    <td class="when">The closer strike you asked for. <b>Not in the random pool</b> — it
+        only plays when the sound arrives within <b>4s</b> of the flash, i.e. when the
+        strike really was nearby. It comes in from half the distance and a few dB up.
+        <br>What makes it read as close is <b>treble, not volume</b>: it carries several
+        times the 1–6 kHz content of the rolling cuts, because distance filters the
+        high end out of thunder.</td>
+    <td><a href="https://freesound.org/s/361401/">richwise</a> · CC0
+        <br><span class="tag">same recording as the other four</span></td>
+  </tr>
+  </table>
+
+<h2>The watch horn <span class="tag">NEW — needs your ears</span></h2>
+
+<div class="note">
+  <b>The number of blasts carries the meaning.</b> Night's Watch style: <b>one</b> at
+  nightfall, <b>two</b> for an attack, <b>three</b> for a blood moon (a K2C concept — not
+  implemented, but the count is here so combat inherits the whole vocabulary for free).
+  <br><br>
+  <b>Shortened and quietened, on your notes.</b> You couldn't tell where one blast ended
+  and the next began — at 3.25s under a 1.5s gap they overlapped. The blast is now
+  <b>1.75s under a 2.0s gap</b>, so there's real silence between them. It's also down
+  <b>5 dB</b>. At nightfall you wait on the horn to hear whether it's one blast (safe) or
+  more (trouble), so counting has to be effortless.
+  <br><br>
+  <b>And re-cut, because you said it ended abruptly.</b> You were right — I'd hard-trimmed
+  it to length, which put the fade on top of a still-loud sustain. It now keeps the
+  recording's <i>own</i> swell crossfaded onto the recording's <i>own</i> decay, with only
+  the middle shortened. Both ends are genuine, so it stops rather than gets cut.
+  <b>Now 2.0s</b> for the gravitas you asked for, with the gap widened to 2.5s to keep the
+  blasts countable — those two always move together.
+  <br><br>
+  <b>Test in the dev overlay (F1):</b> <b>J</b> = 1 blast, <b>H</b> = 2, <b>K</b> = 3, or
+  click the buttons. All need the campfire lit — the horn comes from the camp.
+  <br><br>
+  <b>Daybreak is now a rooster, not a horn</b> (your Warcraft III reference). That split is
+  deliberate: the horn only ever means danger, so its count never competes with a good-news
+  call. Fire it with <b>L</b>. The old pitched-up horn-dawn is kept but unwired.
+  <br><br>
+  <b>The rooster was too loud, too close and too pitchy — all three now fixed, but the
+  bird itself is your pick.</b> It turned out to be borrowing the <i>horn's</i> 3D settings
+  (built so a signal carries the whole map), which is why it arrived enormous and on top of
+  you; it now has its own voice at <b>-19 dB</b> with a short reach, placed 9–16m out from
+  the fire on a fresh bearing each morning.
+  <br>On "pitchy": measurable, and badly so. The old bird's fundamental was <b>932 Hz</b> —
+  the highest of six candidates. <b>Three options are below — the two alternates are still below
+  if you want to compare, but the one in game is now a rebuilt third version.</b>
+  Worth knowing: spectral centroid barely separated these (2284 vs 2096 Hz) while the
+  fundamental separated them completely, so that's the number I used.
+  <br><br>
+  <b>It fires off how dark it actually is, not off the clock</b> — so when you lengthen the
+  day/night cycle later, the horn keeps landing in the right place with no retuning. It
+  lands about 2.4s into dusk, leaving you ~17s of warning at the current durations.
+  It stays silent until the campfire is lit: no village, nobody to blow it.
+  <br><br>
+  <b>What to listen for:</b> this fires every cycle, so play it <b>five or six times in a
+  row</b> — that's the real test. Is it <b>strong enough</b> to read as a warning without
+  becoming a nuisance? And is the <b>one-blast vs two-blast</b> distinction obvious enough
+  to carry a combat alarm later?
+</div>
+
+<table>
+  <tr><th>Sound</th><th>Listen</th><th>When it fires</th><th>Source</th></tr>
+  <tr>
+    <td class="name">horn_night.ogg <span class="tag">shortened + quieter</span></td>
+    <td><audio controls preload="none" src="assets/audio/horn_night.ogg"></audio></td>
+    <td class="when"><b>1 blast = nightfall · 2 = attack · 3 = blood moon</b> (J / H / K in
+        the overlay). Blown from the camp, so it pans — it points home. 1.7s under a 2.0s
+        gap, so blasts are countable. Deeper, steadier recording than the first horn, with
+        the tremolo taken out (wobble 0.097 → 0.014).</td>
+    <td><a href="https://freesound.org/s/328541/">Vendarro</a> · CC0</td>
+  </tr>
+  <tr>
+    <td class="name">rooster.ogg <span class="tag">REBUILT — v3</span></td>
+    <td><audio controls preload="none" src="assets/audio/rooster.ogg"></audio></td>
+    <td class="when"><b>Daybreak</b> (L in the overlay), from the <b>same spot every
+        morning</b> now — a bird lives somewhere, and randomising its bearing made it a
+        noise from nowhere.
+        <br><b>"Sped up" was my bug.</b> A crow is "er-er-er-ERRRR" — build, breath,
+        finish — and I'd cut a <b>0.74s</b> slice that landed mid-build. Same error as
+        hard-trimming the horn: shortening something whose length is part of what it is.
+        This is the <b>complete 1.6s call</b>, pitched down (which lengthens it to 2.3s;
+        a deep crow really is slower). Fundamental <b>662 Hz</b> vs the original 932.
+        <br>Level is <b>-14 dB</b> — audible village sound, not a blast.</td>
+    <td><a href="https://freesound.org/s/233167/">JarredGibb</a> · CC0</td>
+  </tr>
+  <tr>
+    <td class="name">rooster_alt_b.ogg <span class="tag">OPTION B</span></td>
+    <td><audio controls preload="none" src="assets/audio/rooster_alt_b.ogg"></audio></td>
+    <td class="when"><b>~676 Hz.</b> The bird you already heard, pitched down a fourth.
+        Middle ground — deeper than before but still recognisably the same rooster.
+        Longest of the three at 2.3s.</td>
+    <td><a href="https://freesound.org/s/233161/">JarredGibb</a> · CC0
+        <br><span class="tag">pitched down</span></td>
+  </tr>
+  <tr>
+    <td class="name">rooster_alt_c.ogg <span class="tag">OPTION C</span></td>
+    <td><audio controls preload="none" src="assets/audio/rooster_alt_c.ogg"></audio></td>
+    <td class="when"><b>~774 Hz.</b> A different natural bird — brighter than A, but
+        unprocessed and a cleaner single crow than the farmyard recording.</td>
+    <td><a href="https://freesound.org/s/200339/">jsbarrett</a> · CC0</td>
+  </tr>
+  <tr class="off">
+    <td class="name">horn_dawn.ogg <span class="tag parked">UNWIRED</span></td>
+    <td><audio controls preload="none" src="assets/audio/horn_dawn.ogg"></audio></td>
+    <td class="when">The old horn-daybreak, superseded by the rooster. Kept on disk in case
+        you prefer a horn both ways.</td>
+    <td><a href="https://freesound.org/s/328541/">Vendarro</a> · CC0</td>
+  </tr>
+</table>
+
+<h2>The woods &amp; the pot <span class="tag">NEW — needs your ears</span></h2>
+
+<div class="note">
+  <b>Both of these are meant to be nearly unnoticed</b>, so judge them at the low volume
+  they play at, not at the raw level below.
+  <br><br>
+  <b>The deer</b> call out of a <i>real animal within earshot</i> — like the tree creak
+  comes out of a real trunk — never from a bearing. So they can't call from a wood you've
+  already hunted empty, and the map going quiet as you strip its game is something you can
+  hear. Low-passed to 3.2 kHz, which reads as distance rather than just quiet, and very
+  sparse (28–85s). <b>Your bar was "subtle or not at all"</b> — if you can pick these out
+  of the bed, say so and they go.
+  <br><br>
+  <b>The cauldron pour</b> fires when you feed the pot. It was a splashy recording; I rolled
+  the top off and dropped it to −15 dB so it's confirmation the gold landed, not an event —
+  it fires three times per cauldron, several a night.
+</div>
+
+<table>
+  <tr><th>Sound</th><th>Listen</th><th>When it fires</th><th>Source</th></tr>
+  <tr>
+    <td class="name">deer_1.ogg <span class="tag">1 of 3</span></td>
+    <td><audio controls preload="none" src="assets/audio/deer_1.ogg"></audio></td>
+    <td class="when" rowspan="3">Out of a deer within ~34m (<code>ambience.gd</code>), day
+        or night, every 28–85s. Silent when nothing's near.</td>
+    <td rowspan="3"><a href="https://freesound.org/s/351113/">msantoro11</a> · CC0</td>
+  </tr>
+  <tr>
+    <td class="name">deer_2.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/deer_2.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">deer_3.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/deer_3.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">cauldron_feed.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/cauldron_feed.ogg"></audio></td>
+    <td class="when">Each time you feed the cauldron (<code>campfire.gd::_pour</code>), over
+        the existing soup-level animation. −15 dB, top rolled off.</td>
+    <td><a href="https://freesound.org/s/585516/">ahriik</a> · CC0</td>
+  </tr>
+</table>
+
+<h2>The monarch's horse <span class="tag">NEW — needs your ears</span></h2>
+
+<div class="note">
+  <b>You ride for the entire game and it was completely silent</b> — <code>monarch.gd</code>
+  had no audio in it at all. This is the most repeated sound in the project by a wide
+  margin: about <b>3.8 a second</b>, and you're rarely not moving. So it carries
+  <b>six</b> variants where every other pool has 2–5, and it's mixed right down to
+  <b>-17 dB</b> to sit under everything else.
+  <br><br>
+  <b>Deepened, on your note.</b> The first cuts were all click and no body — you said
+  "someone using some cups", which was exactly right: they measured a <b>1915 Hz</b>
+  spectral centroid, the sound of tapping something hard. No small hoof recording has the
+  low end this wants, so I built it instead of hunting: pitched down, rolled the high-mid
+  off, and layered a synthesised sub under each strike. Now <b>358 Hz</b>, with more than
+  thirty times the bass-to-treble ratio.
+  <br>A first attempt went too far (180 Hz) and turned into a drum. The sub has to sit
+  <i>under</i> the hoof, not replace it.
+  <br><br>
+  <b>The rhythm is pairs now</b>, as you described — two feet close together, then the
+  other two, then all four off the ground. Measured: <b>0.053s inside a pair, 0.131s
+  between pairs, 0.381s suspension.</b>
+  <pre style="color:#cfe0a8;font-size:.8rem;overflow-x:auto">|....|............|....|..............................|....|............|....|
+^ each | is a hoof, 10ms per character — "ta-TAM ta-TAM ... ta-TAM ta-TAM"</pre>
+  <b>The faster gallop is already handled</b> — stride length scales with real speed, so
+  when you add it the same clips just come quicker. Walk, trot and canter patterns are
+  sitting in <code>GAITS</code> in <code>monarch.gd</code>, untuned and unused, so adding
+  one later is a <code>set_gait()</code> call rather than a rewrite.
+  <br><br>
+  <b>Pushed right down, on your note</b> — <b>-17 → -25 dB</b>, and the accents between
+  hoof-falls flattened from a 5 dB spread to 3.5 dB. A strong accent gives the ear a beat
+  to lock onto, and a rhythm you can lock onto is one you attend to; the <i>pairing</i>
+  carries the gait, so the accents only need to shade it.
+  <br>The players below are the raw files. <b>In game they now sit about three times
+  quieter than this</b> — judge it riding around, not here.
+  <br><br>
+  <i>I also tried blunting the attack, on the theory that a sharp onset draws the ear
+  even when quiet. Measured, it barely moved (52% → 49% of energy in the leading edge),
+  because after the deepening most of the energy is in the low body rather than the
+  front. Not worth the extra processing, so it isn't applied.</i>
+</div>
+
+<table>
+  <tr><th>Sound</th><th>Listen</th><th>Trigger</th><th>Source</th></tr>
+  <tr>
+    <td class="name">hoof_1.ogg <span class="tag">1 of 6</span></td>
+    <td><audio controls preload="none" src="assets/audio/hoof_1.ogg"></audio></td>
+    <td class="when" rowspan="6">Every time the horse's bounce bottoms out while you're
+        moving (<code>monarch.gd::_step</code>) — about <b>3.8 a second</b>. Silent the
+        instant you stop. Positional, so spinning the camera with Z / X pans it.</td>
+    <td rowspan="6"><a href="https://freesound.org/s/184949/">mmacneil</a> · CC0
+        <br><span class="tag">6 strikes cut from one walk</span></td>
+  </tr>
+  <tr>
+    <td class="name">hoof_2.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/hoof_2.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">hoof_3.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/hoof_3.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">hoof_4.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/hoof_4.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">hoof_5.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/hoof_5.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">hoof_6.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/hoof_6.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">horse_snort_1.ogg <span class="tag">NEW — idle, 1 of 5</span></td>
+    <td><audio controls preload="none" src="assets/audio/horse_snort_1.ogg"></audio></td>
+    <td class="when" rowspan="5">The horse <b>while you stand still</b>
+        (<code>monarch.gd</code>), every <b>6–18s</b>. A standing horse isn't a silent
+        object, and the pauses are when you're reading the camp deciding what to buy —
+        this is what stops those moments going dead.
+        <br>The gap is deliberately wide and random: too regular and it becomes a
+        metronome telling you how long you've been idle. Re-armed while you ride, so the
+        clock only starts once you've actually stopped.</td>
+    <td rowspan="5"><a href="https://freesound.org/s/437111/">craigsmith</a> (1–3) ·
+        <a href="https://freesound.org/s/475483/">o_ciz</a> (4) ·
+        <a href="https://freesound.org/s/861234/">TheKingOfGeeks360</a> (nicker) · CC0</td>
+  </tr>
+  <tr>
+    <td class="name">horse_snort_2.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/horse_snort_2.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">horse_snort_3.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/horse_snort_3.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">horse_snort_4.ogg <span class="tag">shorter, different take</span></td>
+    <td><audio controls preload="none" src="assets/audio/horse_snort_4.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">horse_nicker.ogg <span class="tag">the soft one</span></td>
+    <td><audio controls preload="none" src="assets/audio/horse_nicker.ogg"></audio></td>
+  </tr>
+</table>
+
+<h2>The monarch's verb &amp; its payoffs <span class="tag">NEW — needs your ears</span></h2>
+
+<div class="note">
+  <b>What to listen for in this batch.</b> These are all <i>one-shots</i>, so the criteria
+  are the anti-bed ones: <b>one event, not a sequence</b> · <b>clean isolation</b> (nothing
+  else audible behind it) · <b>tight top and tail</b> · <b>dry and narrow</b>, since they
+  all get positioned in 3D. And because most of them repeat, <b>play each pool five or six
+  times in a row</b> — anything irritating only shows up on repetition.
+  <br><br>
+  <b>Marking is one sound for both trees and bushes</b>, deliberately — the monarch is doing
+  the same thing to both, so it gets one sound the way it already gets one blaze and one
+  banner. If it works on a tree but not on a bush, that's worth knowing.
+  <br><br>
+  <b>Two things I'm unsure about and want your call on:</b>
+  <br>1. <b>Is a paint brush right for marking at all?</b> It's literal — the visual is a
+  paint blaze — but a woodier "thunk" would read more like a decree and less like an
+  art class. I went literal; I'm not confident.
+  <br>2. <b>bush_pick_3 is from a different recordist</b> than 1 and 2, and measures
+  noticeably brighter (7200 Hz against ~4400 Hz). Rustles vary a lot in nature so it may
+  pass, but if it reads as a different bush, say so and I'll cut a third from the same
+  source as the others.
+</div>
+
+<table>
+  <tr><th>Sound</th><th>Listen</th><th>Trigger</th><th>Source</th></tr>
+  <tr>
+    <td class="name">mark_1.ogg <span class="tag">1 of 3</span></td>
+    <td><audio controls preload="none" src="assets/audio/mark_1.ogg"></audio></td>
+    <td class="when" rowspan="3">Every time you mark <b>a tree or a bush</b> — one shared
+        sound for the one verb (<code>mark_fx.gd</code>). Fires on the frame the blaze
+        lands. The most frequent thing in this batch.</td>
+    <td rowspan="3"><a href="https://freesound.org/s/86113/">acrober</a> · CC0
+        <br><span class="tag">3 strokes cut from one take</span></td>
+  </tr>
+  <tr>
+    <td class="name">mark_2.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/mark_2.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">mark_3.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/mark_3.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">bush_pick_1.ogg <span class="tag">1 of 3</span></td>
+    <td><audio controls preload="none" src="assets/audio/bush_pick_1.ogg"></audio></td>
+    <td class="when" rowspan="3">An archer stripping a berry bush bare
+        (<code>berry_bush.gd::strip</code>). Fires once per bush, and a bush regrows, so
+        you'll hear it repeatedly over a run.</td>
+    <td rowspan="3"><a href="https://freesound.org/s/190638/">GUS_MAN</a> (1, 2) ·
+        <a href="https://freesound.org/s/178615/">Montacue</a> (3) · CC0</td>
+  </tr>
+  <tr>
+    <td class="name">bush_pick_2.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/bush_pick_2.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">bush_pick_3.ogg <span class="tag">different recordist</span></td>
+    <td><audio controls preload="none" src="assets/audio/bush_pick_3.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">animal_drop_1.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/animal_drop_1.ogg"></audio></td>
+    <td class="when">A hunted animal hitting the ground (<code>wild_animal.gd::_die</code>).
+        <b>One clip pitched by size</b> rather than a set per species — a rabbit plays it
+        at <b>1.38</b> (light and high), a stag at <b>0.84</b> (heavy and low). The player
+        above is the raw clip at 1.0, so it'll sit between the two you'll actually hear.</td>
+    <td><a href="https://freesound.org/s/346695/">deleted_user_2104797</a> · CC0</td>
+  </tr>
+  <tr>
+    <td class="name">gold_hand_1.ogg <span class="tag parked">PARKED</span></td>
+    <td><audio controls preload="none" src="assets/audio/gold_hand_1.ogg"></audio></td>
+    <td class="when" rowspan="3"><b>No longer plays</b> — your call. The problem isn't really the clip: the handover animation is a quick torso bow, and a sharp coin sound landing on it reads as the villager getting <i>slapped</i>. On top of that it's a leather purse while what you watch is loose coins flying across one at a time.<br>Parked behind <code>GOLD_HAND_ENABLED</code> in <code>villager.gd</code>; clips and wiring all kept. Worth revisiting once the handover has a real animation to sit on — this same clip may work then.</td>
+    <td rowspan="3"><a href="https://freesound.org/s/519645/">cupido-1</a> · CC0
+        <br><span class="tag">3 cut from one take</span></td>
+  </tr>
+  <tr>
+    <td class="name">gold_hand_2.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/gold_hand_2.ogg"></audio></td>
+  </tr>
+  <tr>
+    <td class="name">gold_hand_3.ogg</td>
+    <td><audio controls preload="none" src="assets/audio/gold_hand_3.ogg"></audio></td>
   </tr>
 </table>
 
