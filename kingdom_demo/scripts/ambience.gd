@@ -16,10 +16,11 @@ extends Node
 const DAY_BED := preload("res://kingdom_demo/assets/audio/ambience_day.ogg")
 const NIGHT_BED := preload("res://kingdom_demo/assets/audio/ambience_night.ogg")
 const OWL := preload("res://kingdom_demo/assets/audio/owl_hoot.ogg")
-## Three lengths on purpose -- a tick, a creak and a long groan -- so the pool
-## has real variety rather than one recognisable noise at random intervals.
+## `tree_creak_a` (0.4s) is **deliberately not in this pool**. It was a tick: you
+## noticed it and it was gone, which is the opposite of what a creak should do.
+## What is left are the two long ones -- a groan should arrive slowly, hold long
+## enough to be worth turning your head for, and leave without a clear end.
 const CREAKS := [
-	preload("res://kingdom_demo/assets/audio/tree_creak_a.ogg"),
 	preload("res://kingdom_demo/assets/audio/tree_creak_b.ogg"),
 	preload("res://kingdom_demo/assets/audio/tree_creak_c.ogg"),
 ]
@@ -47,11 +48,83 @@ const THUNDER := [
 	preload("res://kingdom_demo/assets/audio/thunder_3.ogg"),
 	preload("res://kingdom_demo/assets/audio/thunder_4.ogg"),
 ]
-## The near one, cut from the same recording as the other four but from an event
-## with a 5 ms crack on the front and noticeably more high frequency in it --
-## distance low-passes thunder, so "close" is a measurable thing, not a louder
-## version of the same sound.
+## The near strike, cut from the same recording. It is not in the pool above --
+## it is chosen by *distance*, so the one clip with a real crack in it only ever
+## plays when the flash was close. Picking it at random would put a nearby
+## thunderclap on a storm sitting on the horizon.
+##
+## Distance low-passes thunder, so "close" is a measurable thing rather than a
+## louder version of the same sound: this cut carries several times the 1-6 kHz
+## content of the rolling ones. Every clip is normalised, so level is set at
+## playback, not baked in.
 const THUNDER_NEAR := preload("res://kingdom_demo/assets/audio/thunder_near.ogg")
+
+## The watch horn. **Meaning is carried by the number of blasts, not by
+## different sounds**: one for nightfall, two for an attack, three for a blood
+## moon. Combat therefore needs no new clip and no new vocabulary to teach.
+##
+## At nightfall the player is listening to find out *which kind of night this
+## is*, so the blasts must be countable -- see `ALARM_GAP`.
+const HORN_NIGHT := preload("res://kingdom_demo/assets/audio/horn_night.ogg")
+
+## **Daybreak is a cockerel, not a horn.** That split is the point: the horn only
+## ever means danger, so the count never has to compete with a "good news" call.
+## `horn_dawn.ogg` is the superseded higher-register horn -- kept, not wired.
+##
+## Deep on purpose -- its fundamental is ~662 Hz against the ~930 Hz of the first
+## bird tried, which read as shrill.
+##
+## **The whole crow, never a slice of one.** A rooster's call is "er-er-er-ERRRR":
+## a build, a snatched breath, then the finish. An earlier version cut 0.74s out
+## of a farmyard recording and landed mid-build, which was heard as "sped up" --
+## the same mistake made with the horn. This is the complete 1.6s call, pitched
+## down (which lengthens it to 2.3s, and a deep crow is genuinely slower).
+## `rooster_alt_b/c.ogg` are other candidates from the audition, kept, not wired.
+const ROOSTER := preload("res://kingdom_demo/assets/audio/rooster.ogg")
+## On its own voice rather than the horn's. The horn carries deliberately
+## (unit_size 34, reach 200) because it is a signal meant to reach the whole map;
+## a cockerel borrowing those settings arrived enormous and right on top of you.
+## The brief was "not astonishingly loud", not "distant" -- so this is a normal
+## village sound, present and clear, just not a blast.
+const ROOSTER_DB := -14.0
+const ROOSTER_UNIT := 7.0
+const ROOSTER_REACH := 40.0
+## **The same spot every morning.** A bird lives somewhere; it does not move
+## round the camp overnight. Fixed north-east of the fire so it becomes a place
+## you know rather than a noise from nowhere -- and once there is a coop or a
+## hall to hang it on, this should read its position off that instead.
+const ROOSTER_AT := Vector3(11.0, 1.4, -7.0)
+const HORN_DB := -12.0
+## **Longer than the blast, so there is real silence between them.** The count is
+## the message -- one for nightfall, two for an attack -- and at nightfall the
+## player is listening to find out which kind of night this is. If the blasts
+## run together you cannot count them, and the signal says nothing. An earlier
+## version overlapped them deliberately and that was the mistake: 1.5s of gap
+## under a 3.25s blast meant the second landed while the first was still at full
+## voice. The blast is 2.0s now -- lengthened for gravitas, since a short one had
+## no room to breathe -- and its last quarter is decay, so a 2.5s gap leaves half
+## a second of real air plus a fading tail. **Lengthen this whenever the blast is
+## lengthened**, or the count stops being readable.
+const ALARM_GAP := 2.5
+## Two voices, so a blast's tail can still ring under the next attack.
+const HORN_VOICES := 2
+
+## How many blasts each signal is. **The number is the whole vocabulary**, so
+## these must stay distinct and countable.
+const HORN_NIGHTFALL := 1
+const HORN_ATTACK := 2
+## 🔮 Concept only, borrowed from Kingdom Two Crowns -- a worse night than a
+## normal raid. Nothing raises it yet; it exists so the vocabulary has room and
+## so it can be heard from the dev overlay.
+const HORN_BLOODMOON := 3
+
+## **Fired off how dark it actually is, never off the clock.** The day and night
+## durations are placeholder and will be retuned; `darkness()` crossing a
+## threshold means the horn keeps landing at the right moment whatever they
+## become. Dusk is darkness rising off the floor, dawn is it coming back off
+## the ceiling.
+const HORN_AT_DUSK := 0.04
+const HORN_AT_DAWN := 0.96
 
 const BED_DB := -2.0
 ## far enough down to be inaudible without the cost of stopping and restarting
@@ -87,7 +160,30 @@ const THUNDER_DISTANCE := Vector2(26.0, 48.0)
 ## than rolled separately** -- a sharp crack arriving nine seconds after the
 ## flash would put the strike miles away and sound wrong for what you saw.
 const NEAR_DELAY := 4.0
+## Noticeably closer, not deafening -- a few dB up and from half the distance,
+## which is plenty when it also carries far more treble than the rolling cuts.
+const THUNDER_NEAR_DB := -1.5
 const THUNDER_NEAR_DISTANCE := Vector2(12.0, 22.0)
+
+## Deer, out in the woods. Like the tree creak this comes **out of a real animal**
+## rather than a bearing -- if there is nothing alive within earshot the woods
+## stay quiet, so it can never contradict what you can see.
+##
+## **Held to "subtle or not at all".** The calls were rolled off at 3.2 kHz before
+## they got here, which reads as distance rather than merely quiet, and the gap
+## is very wide. If you can tell it apart from the bed it is already too loud.
+const DEER := [
+	preload("res://kingdom_demo/assets/audio/deer_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/deer_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/deer_3.ogg"),
+]
+const DEER_GAP := Vector2(28.0, 85.0)
+const DEER_PITCH := 1.1
+const DEER_VOL_JITTER := 3.0
+const DEER_DB := -19.0
+## Far enough that the animal is usually off-screen -- something out there, not
+## the stag you are looking at.
+const DEER_RANGE := 34.0
 
 ## An owl should be noticed, then forgotten, then surprise you again. That needs a
 ## gap wide enough that you stop expecting it: anywhere from half a minute to over
@@ -103,10 +199,19 @@ const OWL_DISTANCE := Vector2(14.0, 30.0)
 ## Timber groans by day. Unlike the owl this is not thrown to a random bearing --
 ## it comes out of an actual trunk near the monarch, so it only ever happens where
 ## there are trees to make the noise. Ride into open ground and the woods go quiet.
-const CREAK_GAP := Vector2(11.0, 34.0)
+const CREAK_GAP := Vector2(14.0, 40.0)
 const CREAK_PITCH := 1.2
 const CREAK_VOL_JITTER := 4.0
 const CREAK_RANGE := 17.0     # how close a trunk has to be to be worth creaking
+## Sat well back. This should be something you half-hear and glance toward, not
+## an event announcing itself over the bed.
+const CREAK_DB := -9.0
+## **Faded in rather than started.** A creak that begins at full level has an
+## onset, and an onset is what makes the ear file it as an event and then lose
+## interest once it stops. Easing up out of the bed over the best part of a
+## second means it emerges instead -- present, but never quite starting.
+const CREAK_FADE_IN := 0.9
+const CREAK_FADE_FROM := 16.0    # dB below its level to open at
 
 ## PARKED. The day bed already has crows in it, distant and behind the wind, and
 ## those sound right. Anything we add on top arrives closer and sharper than the
@@ -136,12 +241,18 @@ var _rain_light: AudioStreamPlayer = null
 var _rain_heavy: AudioStreamPlayer = null
 var _thunder: AudioStreamPlayer3D = null
 var _thunder_near: AudioStreamPlayer3D = null
+var _horns: Array[AudioStreamPlayer3D] = []
+var _horn_voice := 0
+var _rooster: AudioStreamPlayer3D = null
+var _last_dark := 0.0
 var _owl: AudioStreamPlayer3D = null
 var _creak: AudioStreamPlayer3D = null
 var _crow: AudioStreamPlayer3D = null
+var _deer: AudioStreamPlayer3D = null
 var _owl_t := 0.0
 var _creak_t := 0.0
 var _crow_t := 0.0
+var _deer_t := 0.0
 
 func _ready() -> void:
 	_day = _make_bed(DAY_BED, BED_DB)
@@ -152,14 +263,20 @@ func _ready() -> void:
 	# A one-clip pool, so it still gets the randomiser's pitch and volume jitter
 	# and never lands twice the same way.
 	_thunder_near = _make_voice([THUNDER_NEAR], THUNDER_PITCH, THUNDER_VOL_JITTER, 30.0, 120.0)
+	for i in range(HORN_VOICES):
+		_horns.append(_make_voice([HORN_NIGHT], 1.0, 0.0, 34.0, 200.0))
+	_rooster = _make_voice([ROOSTER], 1.03, 1.5, ROOSTER_UNIT, ROOSTER_REACH)
+	_rooster.volume_db = ROOSTER_DB
 	# Weather may not have run `_ready` yet, so the hookup waits a frame.
 	call_deferred("_hook_weather")
 	_owl = _make_voice([OWL], OWL_PITCH, OWL_VOL_JITTER, 18.0, 60.0)
 	_creak = _make_voice(CREAKS, CREAK_PITCH, CREAK_VOL_JITTER, 6.0, 28.0)
 	_crow = _make_voice(CROWS, CROW_PITCH, CROW_VOL_JITTER, 16.0, 60.0)
+	_deer = _make_voice(DEER, DEER_PITCH, DEER_VOL_JITTER, 9.0, 46.0)
 	_owl_t = randf_range(OWL_GAP.x, OWL_GAP.y)
 	_creak_t = randf_range(CREAK_GAP.x, CREAK_GAP.y)
 	_crow_t = randf_range(CROW_GAP.x, CROW_GAP.y)
+	_deer_t = randf_range(DEER_GAP.x, DEER_GAP.y)
 
 func _process(delta: float) -> void:
 	var night := _is_night()
@@ -172,6 +289,7 @@ func _process(delta: float) -> void:
 	_fade(_night, BED_DB - duck if night else BED_OFF_DB, delta)
 	_fade(_rain_light, _rain_db(rain, RAIN_LIGHT_IN), delta, RAIN_FADE_RATE)
 	_fade(_rain_heavy, _rain_db(rain, RAIN_HEAVY_IN), delta, RAIN_FADE_RATE)
+	_watch_the_light()
 
 	if night:
 		_owl_t -= delta
@@ -188,6 +306,13 @@ func _process(delta: float) -> void:
 			if _crow_t <= 0.0:
 				_crow_t = randf_range(CROW_GAP.x, CROW_GAP.y)
 				_crow_burst()
+
+	# Deer call day or night -- the woods are inhabited around the clock, and at
+	# this level it never competes with the owl.
+	_deer_t -= delta
+	if _deer_t <= 0.0:
+		_deer_t = randf_range(DEER_GAP.x, DEER_GAP.y)
+		_call_from_an_animal()
 
 # ---- beds ----
 
@@ -238,7 +363,8 @@ func _on_lightning(delay: float, loudness: float) -> void:
 	var voice: AudioStreamPlayer3D = _thunder_near if near else _thunder
 	if not is_instance_valid(voice):
 		return
-	voice.volume_db = THUNDER_DB + linear_to_db(clampf(loudness, 0.05, 1.0))
+	var base := THUNDER_NEAR_DB if near else THUNDER_DB
+	voice.volume_db = base + linear_to_db(clampf(loudness, 0.05, 1.0))
 	_call_from_a_bearing(voice, THUNDER_NEAR_DISTANCE if near else THUNDER_DISTANCE)
 
 # ---- one-shots ----
@@ -310,8 +436,93 @@ func _creak_from_a_tree() -> void:
 	if near.is_empty():
 		return
 	_creak.global_position = near[randi() % near.size()].global_position + Vector3(0, 1.6, 0)
+	_creak.volume_db = CREAK_DB - CREAK_FADE_FROM
 	_creak.play()
+	var t := create_tween()
+	t.tween_property(_creak, "volume_db", CREAK_DB, CREAK_FADE_IN).set_trans(Tween.TRANS_SINE)
+
+## Out of an actual animal within earshot, the same way a creak comes out of an
+## actual trunk. **Nothing plays when there is nothing alive nearby** -- so a
+## call can never come from a wood you have already hunted empty, and the map
+## going quiet as you strip it is a real thing you can hear.
+func _call_from_an_animal() -> void:
+	var king := get_tree().get_first_node_in_group("monarch")
+	if king == null or not is_instance_valid(_deer):
+		return
+	var near: Array[Node3D] = []
+	for a in get_tree().get_nodes_in_group("wild_game"):
+		if king.global_position.distance_to(a.global_position) <= DEER_RANGE:
+			near.append(a)
+	if near.is_empty():
+		return
+	_deer.volume_db = DEER_DB
+	_deer.global_position = near[randi() % near.size()].global_position + Vector3(0, 0.6, 0)
+	_deer.play()
 
 func _is_night() -> bool:
 	var cycle := get_tree().get_first_node_in_group("day_night_cycle")
 	return cycle != null and cycle.is_night()
+
+# ---- the watch horn ----
+
+## Watches the light rather than the clock and blows the horn as it turns.
+func _watch_the_light() -> void:
+	var cycle := get_tree().get_first_node_in_group("day_night_cycle")
+	if cycle == null:
+		return
+	var dark: float = cycle.darkness()
+	# Before the fire is lit there is no village and nobody to blow it, so the
+	# threshold is still tracked -- just never acted on. Otherwise lighting the
+	# fire at dusk would fire a horn for a crossing that already happened.
+	if _village_exists():
+		if _last_dark < HORN_AT_DUSK and dark >= HORN_AT_DUSK:
+			blow_horn(HORN_NIGHTFALL)
+		elif _last_dark > HORN_AT_DAWN and dark <= HORN_AT_DAWN:
+			crow_daybreak()
+	_last_dark = dark
+
+func _village_exists() -> bool:
+	var fire := get_tree().get_first_node_in_group("campfire")
+	return fire != null and fire.lit
+
+## Two blasts: the attack signal. **Public because combat will raise it** -- for
+## now only the dev overlay does, since there is nothing to be attacked by.
+func sound_alarm() -> void:
+	blow_horn(2)
+
+## `blasts` of the deep horn. One is nightfall, two an attack, three a blood moon;
+## the dev overlay fires each so they can be counted against each other.
+func blow_horn(blasts: int) -> void:
+	_blow(HORN_NIGHT, blasts)
+
+## Daybreak. One crow -- the relief answer to the night's horn.
+## Public so the dev overlay can fire it without waiting out a night.
+##
+## Named `crow_daybreak` rather than `_crow` because `_crow` is already the
+## carrion-crow player: the two birds would collide.
+func crow_daybreak() -> void:
+	if not is_instance_valid(_rooster):
+		return
+	var fire := get_tree().get_first_node_in_group("campfire")
+	var at: Vector3 = fire.global_position if fire else Vector3.ZERO
+	_rooster.global_position = at + ROOSTER_AT
+	_rooster.play()
+
+## `times` blasts from the camp, spread across the voices so they overlap rather
+## than cut each other off.
+func _blow(stream: AudioStream, times: int) -> void:
+	var fire := get_tree().get_first_node_in_group("campfire")
+	var at: Vector3 = fire.global_position + Vector3(0, 2.0, 0) if fire else Vector3.ZERO
+	for i in range(times):
+		if i > 0:
+			await get_tree().create_timer(ALARM_GAP).timeout
+		if _horns.is_empty():
+			return
+		var p := _horns[_horn_voice]
+		_horn_voice = (_horn_voice + 1) % _horns.size()
+		if not is_instance_valid(p):
+			return
+		p.stream = stream
+		p.volume_db = HORN_DB
+		p.global_position = at
+		p.play()

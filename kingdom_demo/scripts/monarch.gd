@@ -3,6 +3,111 @@ extends CharacterBody3D
 const SPEED := 5.0
 const ACCEL := 60.0
 
+## How fast the horse's visual bounce runs.
+const BOB_RATE := 12.0
+
+## **A gallop is not an even tick.** Hoof-falls come bunched, and then all four
+## feet leave the ground -- the suspension -- and there is silence until the next
+## stride. That gap is the whole rhythm: evenly spaced strikes read as
+## "T T T T T", the bunch-then-gap reads as "da-da-da-DUM ... da-da-da-DUM".
+##
+## A gallop lands **two feet close together, then the other two close together**,
+## then all four leave the ground and there is silence until the next stride --
+## "ta-TAM ta-TAM ... ta-TAM ta-TAM". Spacing the four falls evenly was the first
+## attempt and read as a tick; the pairing is the whole thing.
+##
+## Each gait is:
+##   at      where each hoof falls, as a fraction of one stride
+##   gain    that fall's level relative to HOOF_DB. A gallop builds toward the
+##           lead hoof, so the second of each pair is the louder
+##   stride  seconds for one full stride at top speed, scaled by real speed --
+##           which is why a faster gallop later needs no second set of numbers
+## Anything after the last `at` entry is suspension.
+##
+## **Only "gallop" is used today**; the horse has one speed. The rest are here so
+## that adding a walk later is a `set_gait()` call and a tuning pass rather than
+## a rewrite. Their numbers are textbook footfalls, **never heard in this game** --
+## a starting point, not a setting.
+const GAITS := {
+	"gallop": {                                  # <- in use
+		"at": [0.00, 0.09, 0.30, 0.39],
+		# Shallow on purpose. A strong accent gives the ear a beat to lock onto,
+		# and a rhythm you can lock onto is a rhythm you attend to. The pairing
+		# in `at` is what carries the gait; the accents only shade it.
+		"gain": [-3.5, -2.0, -1.5, 0.0],
+		"stride": 0.62,
+	},
+	"canter": {                                  # UNTUNED, unused
+		"at": [0.00, 0.18, 0.30],
+		"gain": [-4.0, -2.0, 0.0],
+		"stride": 0.70,
+	},
+	"trot": {                                    # UNTUNED, unused
+		"at": [0.00, 0.50],
+		"gain": [-1.0, -1.0],
+		"stride": 0.78,
+	},
+	"walk": {                                    # UNTUNED, unused
+		"at": [0.00, 0.25, 0.50, 0.75],
+		"gain": [-2.0, -2.0, -2.0, -2.0],
+		"stride": 1.10,
+	},
+}
+const DEFAULT_GAIT := "gallop"
+
+## The stride clock is deliberately **independent of the bob animation**. The
+## bounce in `_animate` is placeholder and is being replaced, so marrying the
+## sound to it would be work thrown away. When the real gallop animation lands,
+## drive it from `stride_phase()` rather than the other way round -- then picture
+## and sound share one clock again, which is where this wants to end up.
+const HOOF_CLIPS := [
+	preload("res://kingdom_demo/assets/audio/hoof_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/hoof_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/hoof_3.ogg"),
+	preload("res://kingdom_demo/assets/audio/hoof_4.ogg"),
+	preload("res://kingdom_demo/assets/audio/hoof_5.ogg"),
+	preload("res://kingdom_demo/assets/audio/hoof_6.ogg"),
+]
+## Six clips, more than any other pool in the game, because this is far and away
+## the most repeated sound in it: about four a second, and the player is rarely
+## not riding. Quiet for the same reason -- it should sit under everything.
+const HOOF_PITCH := 1.1
+## Small. Level that jumps about between strikes is itself a thing to notice, and
+## the point of this sound is not to be noticed.
+const HOOF_VOL_JITTER := 2.0
+## **Deliberately almost too quiet.** This should tell you that you are moving
+## without ever becoming something you listen to -- you hear it for an hour, and
+## anything you can pick out of the mix at that rate turns into nagging. If it
+## feels like it has vanished, this is the one number to raise; every accent in
+## GAITS is relative to it, so they all move together.
+const HOOF_DB := -25.0
+## The two falls of a pair are ~56 ms apart and the clips run 206 ms, so several
+## are always sounding at once -- which is how a gallop sounds. One player would
+## cut each strike off to start the next and the whole thing would come out
+## clipped, so strikes are spread round a ring of voices and left to ring out.
+## Raise this if the clips are ever lengthened again.
+const HOOF_VOICES := 6
+
+## The horse while you stand still: snorts, a blow, the occasional soft nicker.
+## **A standing horse is not a silent object**, and the pauses are when the
+## player is reading the camp and deciding what to buy -- this is what stops
+## those moments going dead.
+##
+## The gap is wide on purpose. Too regular and it becomes a metronome telling
+## you how long you have been idle; it should feel like the animal happening to
+## do something, not a timer expiring.
+const IDLE_CLIPS := [
+	preload("res://kingdom_demo/assets/audio/horse_snort_1.ogg"),
+	preload("res://kingdom_demo/assets/audio/horse_snort_2.ogg"),
+	preload("res://kingdom_demo/assets/audio/horse_snort_3.ogg"),
+	preload("res://kingdom_demo/assets/audio/horse_snort_4.ogg"),
+	preload("res://kingdom_demo/assets/audio/horse_nicker.ogg"),
+]
+const IDLE_GAP := Vector2(6.0, 18.0)
+const IDLE_PITCH := 1.08
+const IDLE_VOL_JITTER := 3.5
+const IDLE_DB := -13.0
+
 @onready var interact_area: Area3D = $InteractArea
 @onready var model: Node3D = $Model
 
@@ -11,12 +116,24 @@ var _highlighted: Node3D = null
 var _bob := 0.0
 var _base_y := 0.0
 var _yaw := 0.0
+var _hooves: Array[AudioStreamPlayer3D] = []
+var _voice := 0
+## 0..1 through the current stride, and the next hoof-fall due within it.
+var _stride := 0.0
+var _fall := 0
+var _gait := DEFAULT_GAIT
+var _idle_voice: AudioStreamPlayer3D = null
+var _idle_t := 0.0
 
 func _ready() -> void:
 	add_to_group("monarch")
 	interact_area.body_entered.connect(_on_body_entered)
 	interact_area.body_exited.connect(_on_body_exited)
 	_base_y = model.position.y
+	for i in range(HOOF_VOICES):
+		_hooves.append(_make_hoof())
+	_idle_voice = _make_voice(IDLE_CLIPS, IDLE_PITCH, IDLE_VOL_JITTER, IDLE_DB, 6.0, 22.0)
+	_idle_t = randf_range(IDLE_GAP.x, IDLE_GAP.y)
 
 func _physics_process(delta: float) -> void:
 	var input_dir := Vector3.ZERO
@@ -49,13 +166,97 @@ func _physics_process(delta: float) -> void:
 func _animate(delta: float, moving: bool) -> void:
 	if moving:
 		# the horse's gait, plus turning to face the way we ride
-		_bob += delta * 12.0
+		_bob += delta * BOB_RATE
 		model.position.y = _base_y + abs(sin(_bob)) * 0.06
+		_advance_stride(delta)
+		# Re-armed every frame under way, so the clock only ever starts once you
+		# have actually stopped -- never mid-ride.
+		_idle_t = randf_range(IDLE_GAP.x, IDLE_GAP.y)
 		if Vector2(velocity.x, velocity.z).length() > 0.1:
 			_yaw = lerp_angle(_yaw, atan2(velocity.x, velocity.z), 0.2)
 			model.rotation.y = _yaw
 	else:
 		model.position.y = move_toward(model.position.y, _base_y, delta * 0.6)
+		# Park the stride at its start so pulling away again opens on the first
+		# hoof of a stride rather than halfway through one.
+		_stride = 0.0
+		_fall = 0
+		_idle_t -= delta
+		if _idle_t <= 0.0:
+			_idle_t = randf_range(IDLE_GAP.x, IDLE_GAP.y)
+			if is_instance_valid(_idle_voice):
+				_idle_voice.play()
+
+## 0..1 through the current stride. **The new gallop animation should be driven
+## from this**, so picture and sound come off one clock.
+func stride_phase() -> float:
+	return _stride
+
+## Swap gait. Restarts the stride so the change lands on a whole beat rather than
+## halfway through the old pattern.
+func set_gait(name: String) -> void:
+	if not GAITS.has(name) or name == _gait:
+		return
+	_gait = name
+	_stride = 0.0
+	_fall = 0
+
+func gait() -> String:
+	return _gait
+
+## Walks the stride clock forward and fires whichever hoof-falls it passed.
+## Scaled by real speed, so pulling away and a future faster gallop both change
+## the rhythm without a second set of numbers.
+func _advance_stride(delta: float) -> void:
+	var speed := Vector2(velocity.x, velocity.z).length() / SPEED
+	if speed <= 0.01:
+		return
+	var at: Array = GAITS[_gait]["at"]
+	var gain: Array = GAITS[_gait]["gain"]
+	_stride += delta * speed / float(GAITS[_gait]["stride"])
+	while _stride >= 1.0:
+		_stride -= 1.0
+		_fall = 0
+	# `while`, not `if` -- a long frame can step past more than one hoof-fall,
+	# and skipping them would drop beats out of the rhythm.
+	while _fall < at.size() and _stride >= float(at[_fall]):
+		_step(float(gain[_fall]))
+		_fall += 1
+
+func _make_hoof() -> AudioStreamPlayer3D:
+	return _make_voice(HOOF_CLIPS, HOOF_PITCH, HOOF_VOL_JITTER, HOOF_DB, 7.0, 26.0)
+
+## One randomiser wrapping a clip pool, on its own positional player. Same shape
+## as `ambience.gd::_make_voice`; kept local because the monarch's voices hang
+## off him rather than off the ambience node.
+func _make_voice(clips: Array, pitch: float, jitter: float, db: float,
+		unit: float, reach: float) -> AudioStreamPlayer3D:
+	var pool := AudioStreamRandomizer.new()
+	for i in range(clips.size()):
+		pool.add_stream(i, clips[i])
+	pool.random_pitch = pitch
+	pool.random_volume_offset_db = jitter
+	pool.playback_mode = AudioStreamRandomizer.PLAYBACK_RANDOM_NO_REPEATS
+	var p := AudioStreamPlayer3D.new()
+	p.stream = pool
+	p.bus = &"SFX"
+	p.volume_db = db
+	p.unit_size = unit
+	p.max_distance = reach
+	add_child(p)
+	return p
+
+## One hoof, on the next voice round the ring so it can ring out over the last.
+## Positional rather than flat, so spinning the camera with Z / X pans the horse
+## under you instead of leaving it glued to the centre of the mix.
+func _step(gain: float) -> void:
+	if _hooves.is_empty():
+		return
+	var p := _hooves[_voice]
+	_voice = (_voice + 1) % _hooves.size()
+	if is_instance_valid(p):
+		p.volume_db = HOOF_DB + gain
+		p.play()
 
 ## A subject kneeling to present their take -- the king rises in the saddle and a
 ## glint of gold goes up as he accepts it.

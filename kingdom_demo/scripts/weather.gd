@@ -60,6 +60,24 @@ const CLEAR_TIME := Vector2(10.0, 22.0)
 
 ## Intensity eases toward its target at this rate, so no transition ever snaps.
 const RAMP := 0.14
+
+## **Rain breathes while it falls.** Without this a storm ramps to its peak and
+## then holds dead flat until its timer runs out, so every storm has the same
+## shape and only its height and length differ -- which is exactly what makes
+## weather feel canned.
+##
+## Two sine rates that don't divide into each other, the same trick `wind.gd`
+## uses for gusts: the sum never repeats on any period short enough for the ear
+## or eye to catch. `SWELL` is how far it wanders either side of the peak, as a
+## *fraction* of that peak, so a drizzle wavers gently and a downpour surges
+## hard -- one rule covering both, rather than a flat number that would swamp
+## light rain and be invisible in heavy.
+## The peak stays the storm's ceiling -- swelling only ever pulls *down* from it,
+## between here and full. A storm is never allowed to breathe its way to nothing,
+## or it reads as having stopped and then restarted rather than eased off.
+const SWELL := 0.35
+const SWELL_RATE_A := 0.055
+const SWELL_RATE_B := 0.021
 ## Wetness rises to meet the rain but dries far slower -- pools outlive the
 ## shower that made them, which is most of what sells the aftermath.
 const WET_RISE := 0.055
@@ -92,7 +110,11 @@ const WATER_BASE := Color(0.24, 0.30, 0.28, 0.46)
 ## Lightning is scheduled against the *storm*, not the clock: no strikes until
 ## the rain has some weight behind it.
 const STRIKE_MIN_INTENSITY := 0.45
-const STRIKE_GAP := Vector2(9.0, 34.0)
+## Divided by 1.5 from the original 9-34s, which is a 50% lift in strikes (and
+## therefore in thunder, since every flash gets one). Scaling the gap rather
+## than loosening `STRIKE_MIN_INTENSITY` or the seasons' thunder odds keeps
+## *which* storms are thundery exactly as it was -- only their rate changes.
+const STRIKE_GAP := Vector2(6.0, 22.5)
 ## Distant, so the flash arrives well before the sound. Seconds of delay, which
 ## also sets how muffled the thunder is when `ambience.gd` plays it.
 const THUNDER_DELAY := Vector2(2.5, 9.0)
@@ -115,6 +137,7 @@ var _target := 0.0
 var _peak := 0.0
 var _thundery := false
 
+var _t := 0.0
 var _intensity := 0.0
 var _wetness := 0.0
 var _flash := 0.0
@@ -217,8 +240,13 @@ func strike_lightning() -> void:
 # ---------------------------------------------------------------- tick
 
 func _process(delta: float) -> void:
+	_t += delta
 	_advance_seasons()
 	_advance_state(delta)
+	# Only a storm that is actually falling breathes. Gathering and clearing set
+	# `_target` themselves and must be left to run to their ends.
+	if _state == State.RAINING:
+		_target = _peak * _swell()
 	_intensity = move_toward(_intensity, _target, RAMP * delta)
 	_advance_wetness(delta)
 	_advance_lightning(delta)
@@ -267,6 +295,14 @@ func _advance_state(delta: float) -> void:
 		State.CLEARING:
 			_state = State.CLEAR
 			_timer = randf_range(CLEAR_GAP.x, CLEAR_GAP.y)
+
+## How much of its peak the storm is giving right now, 1-SWELL .. 1. Two slow
+## waves whose rates don't divide into each other, so the sum has no period
+## short enough to notice -- lifted straight from `wind.gd::gust()`, which
+## solves the same "make it wander convincingly" problem for the trees.
+func _swell() -> float:
+	var w := (sin(_t * TAU * SWELL_RATE_A) + sin(_t * TAU * SWELL_RATE_B)) * 0.5
+	return 1.0 - SWELL * 0.5 * (1.0 - w)
 
 func _advance_wetness(delta: float) -> void:
 	if _intensity > 0.02:

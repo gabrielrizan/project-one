@@ -9,6 +9,14 @@ const ACCEL := 30.0
 const ARRIVE := 0.45
 const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
 
+## The body hitting the ground. **One clip pitched by size** rather than a set
+## per species -- a rabbit lands light and high, a stag heavy and low, and that
+## is most of the difference between them. Same trick as `villager.gd::JOB_PITCH`.
+## Anything not listed falls back to 1.0, so adding a boar costs one entry.
+const DROP_SFX := preload("res://kingdom_demo/assets/audio/animal_drop_1.ogg")
+const DROP_DB := -9.0
+const DROP_PITCH := {"rabbit": 1.38, "stag": 0.84}
+
 @export var species: String = "rabbit"
 @export var model_scene: PackedScene
 @export var model_scale: float = 0.3
@@ -200,6 +208,7 @@ func _idle(delta: float) -> void:
 
 func _die(from: Vector3) -> void:
 	_play_anim(["Death", "death", "Die"])
+	_drop_sound()
 	var knock := global_position - from
 	knock.y = 0.0
 	if knock.length() < 0.01:
@@ -233,3 +242,19 @@ func _drop_gold() -> void:
 	if is_instance_valid(_hunter) and _hunter.has_method("receive_loot"):
 		_hunter.receive_loot(coins)
 	_hunter = null
+
+## The drop, on a throwaway emitter parented to the scene -- this body frees
+## itself a moment later once its death tween finishes, and a child player
+## would be cut off mid-thud.
+func _drop_sound() -> void:
+	var p := AudioStreamPlayer3D.new()
+	p.stream = DROP_SFX
+	p.bus = &"SFX"
+	p.volume_db = DROP_DB
+	p.pitch_scale = float(DROP_PITCH.get(species, 1.0)) * randf_range(0.94, 1.06)
+	p.unit_size = 5.0
+	p.max_distance = 30.0
+	get_tree().current_scene.add_child(p)
+	p.global_position = global_position
+	p.finished.connect(p.queue_free)
+	p.play()
