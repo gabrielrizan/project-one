@@ -15,9 +15,13 @@ const CHOPS_TO_FELL := 8
 const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
 const AXE_MODEL := preload("res://kingdom_demo/assets/3d/props/axe_marker.glb")
 
-const TRUNK_Y := 0.95         # height the axe bites at / the blaze is painted at
-const TRUNK_BASE_Y := 0.08    # where the trunk meets the grass -- the topple hinge
-const BANNER_Y := 2.95
+## **Deliberately not scaled with the tree.** The tree tripled to ~4.5 m, but a
+## worker's shoulder did not: he still swings at the same height, so the axe bite
+## and the paint blaze stay where a 1.3 m person can reach. Only the banner and
+## the hinge follow the model.
+const TRUNK_Y := 1.10         # height the axe bites at / the blaze is painted at
+const TRUNK_BASE_Y := 0.18    # where the trunk meets the grass -- the topple hinge
+const BANNER_Y := 4.90
 const FALL_TIME := 0.85
 
 ## Both clips were trimmed so their loudest moment sits exactly 1.09s in, which is

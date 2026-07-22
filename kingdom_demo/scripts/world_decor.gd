@@ -189,20 +189,26 @@ func _plant(pos: Vector3) -> void:
 	t.add_to_group("wind_sway")
 
 ## Builds one tree with random shape / size / colour.
+##
+## **Roughly doubled** so the woodland towers over a village whose tallest tier is
+## a 3 m castle: mature trees now land around 3-6.5 m against a 1.2 m villager, so
+## the clearing reads as cut *into* a forest rather than sitting beside a hedge.
+## The ranges are what stop the treeline looking like a comb, so they were widened
+## with the scale rather than replaced by one size.
 func _make_tree() -> Node3D:
 	var roll := _rng.randf()
 	var tree: Node3D
 	if roll < 0.6:
 		tree = (_pines[_rng.randi() % _pines.size()] as PackedScene).instantiate()
-		var s := _rng.randf_range(1.0, 1.7)
+		var s := _rng.randf_range(2.0, 3.4)
 		tree.scale = Vector3(s, s * _rng.randf_range(0.9, 1.2), s)
 		_tint_model(tree, _pine_mats[_rng.randi() % _pine_mats.size()])
 	elif roll < 0.82:
 		tree = (_autumn[_rng.randi() % _autumn.size()] as PackedScene).instantiate()
-		var s := _rng.randf_range(1.0, 1.6)
+		var s := _rng.randf_range(2.0, 3.2)
 		tree.scale = Vector3(s, s, s)
 	else:
 		tree = (_bigtrees[_rng.randi() % _bigtrees.size()] as PackedScene).instantiate()
-		var s := _rng.randf_range(1.1, 1.9)
+		var s := _rng.randf_range(2.2, 3.8)
 		tree.scale = Vector3(s, s, s)
 	return tree

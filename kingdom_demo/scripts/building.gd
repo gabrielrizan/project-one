@@ -30,6 +30,12 @@ extends StaticBody3D
 @export var upgrade2_cost: int = 0
 @export var upgrade2_unlocks_stone: bool = false   # Stone Hall: opens the wall stone upgrade
 
+@export var upgrade3_model_scene: PackedScene   # tier 3 -- the top of the ladder, e.g. Stone Hall -> Castle
+@export var upgrade3_display_name: String = ""
+@export var upgrade3_scale: float = 1.0
+@export var upgrade3_height: float = 0.0
+@export var upgrade3_cost: int = 0
+
 const MAX_JOBS := 4
 const JOB_COST := 3
 const LOG_MODEL := preload("res://kingdom_demo/assets/3d/props/log_marker.glb")
@@ -41,6 +47,7 @@ const BANNER_SCALE := 5.0
 ## Base seconds for one worker to raise each tier; a crew scales it (see [BuildCrew]).
 const TIER1_BUILD_TIME := 25.0
 const TIER2_BUILD_TIME := 40.0
+const TIER3_BUILD_TIME := 60.0   # the Castle -- placeholder, like the costs
 
 # ---- the sound of a tier landing ----
 #
@@ -76,7 +83,8 @@ var jobs := 0          # positions created (paid for)
 var filled := 0        # positions taken by loyal villagers
 var upgraded := false      # tier 1 reached
 var upgraded2 := false     # tier 2 reached
-var _building_tier := 0    # 0 = no site open; 1 or 2 = the tier a crew is raising
+var upgraded3 := false     # tier 3 reached -- the top of the ladder
+var _building_tier := 0    # 0 = no site open; 1..3 = the tier a crew is raising
 var _progress := 0.0
 var _crew: BuildCrew = null
 var _banner: Node3D = null
@@ -155,8 +163,15 @@ func _can_upgrade2() -> bool:
 	return _building_tier == 0 and upgraded and not upgraded2 \
 		and upgrade2_cost > 0 and upgrade2_model_scene != null
 
+## Guarded on the model being set, like the tiers above it, so a building with no
+## tier 3 wired simply never offers one -- the Workers and Archers huts share this
+## script and must not sprout a Castle upgrade.
+func _can_upgrade3() -> bool:
+	return _building_tier == 0 and upgraded2 and not upgraded3 \
+		and upgrade3_cost > 0 and upgrade3_model_scene != null
+
 func _update_interactable() -> void:
-	var should_be := job_type != "" or _can_upgrade() or _can_upgrade2()
+	var should_be := job_type != "" or _can_upgrade() or _can_upgrade2() or _can_upgrade3()
 	if should_be and not is_in_group("interactable"):
 		add_to_group("interactable")
 	elif not should_be and is_in_group("interactable"):
@@ -180,6 +195,8 @@ func _prompt_text() -> String:
 		return _upgrade_offer(upgrade_display_name, upgrade_cost)
 	if _can_upgrade2():
 		return _upgrade_offer(upgrade2_display_name, upgrade2_cost)
+	if _can_upgrade3():
+		return _upgrade_offer(upgrade3_display_name, upgrade3_cost)
 	if job_type == "":
 		return ""
 	if jobs >= MAX_JOBS:
@@ -208,6 +225,9 @@ func interact(who: Node3D) -> void:
 	elif _can_upgrade2():
 		if _workers_exist():
 			await _buy(who, upgrade2_cost, _open_upgrade_site.bind(2))
+	elif _can_upgrade3():
+		if _workers_exist():
+			await _buy(who, upgrade3_cost, _open_upgrade_site.bind(3))
 	elif job_type != "" and jobs < MAX_JOBS:
 		await _buy(who, JOB_COST, _add_job)
 
@@ -348,7 +368,10 @@ func _open_upgrade_site(tier: int) -> void:
 	_update_interactable()
 
 func _build_time() -> float:
-	return TIER1_BUILD_TIME if _building_tier == 1 else TIER2_BUILD_TIME
+	match _building_tier:
+		1: return TIER1_BUILD_TIME
+		2: return TIER2_BUILD_TIME
+		_: return TIER3_BUILD_TIME
 
 func _process(delta: float) -> void:
 	if _building_tier == 0:
@@ -380,7 +403,7 @@ func _finish_upgrade() -> void:
 		upgraded = true
 		_swap_and_heave(upgrade_model_scene, upgrade_display_name, upgrade_scale,
 			upgrade_height, "wood")
-	else:
+	elif tier == 2:
 		upgraded2 = true
 		_swap_and_heave(upgrade2_model_scene, upgrade2_display_name, upgrade2_scale,
 			upgrade2_height, "stone")
@@ -388,6 +411,13 @@ func _finish_upgrade() -> void:
 			var gm := get_tree().get_first_node_in_group("game_manager")
 			if gm and gm.has_method("unlock_stone_walls"):
 				gm.unlock_stone_walls()
+	else:
+		upgraded3 = true
+		# "castle" has no set of its own in RAISE_SFX yet, and `_raise_sfx()` falls
+		# back to wood for any material it doesn't know -- so this lands as timber
+		# until a castle set is added, rather than silently landing as nothing.
+		_swap_and_heave(upgrade3_model_scene, upgrade3_display_name, upgrade3_scale,
+			upgrade3_height, "castle")
 	_update_interactable()
 
 # ---- the crew (asked by villagers, same duck-typed interface as a wall site) ----

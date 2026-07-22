@@ -42,7 +42,18 @@ against a person. That is why the error is invisible on one and glaring on the o
 
 ---
 
-## D1 — The sun casts shadows
+## D1 — The sun casts shadows ✅ *landed*
+
+*Shipped values: `shadow_enabled` on, `directional_shadow_mode = 0`,
+`directional_shadow_max_distance = 48`, `shadow_bias = 0.06`, `shadow_normal_bias = 2.5`;
+elevation gate at 2°→12° in `day_night_cycle.gd::_update_shadows()`; casting turned off
+for every weather particle layer in `weather.gd::_add_layer()`.*
+
+**Correction to the bullet below:** `world_decor.gd:96` and `:150` are **not** decor trees.
+`:96` is `_add_strip()` (the dirt path quads) and `:150` is `_scatter_patches()` (flat
+ground-colour planes). Both are sheets lying at y≈0.02 and must **stay** non-casting — a
+low sun projects a flat sheet's silhouette across the whole map. The actual decor trees
+(`_make_tree`) never had an override, so they cast for free the moment the sun did.
 
 Nothing in the game casts a shadow. That is the single biggest reason objects read as
 stickers on a flat layer rather than things standing on ground.
@@ -110,7 +121,19 @@ hall tier feel like a real step up? Does anyone get stuck pathing round the new 
 
 ---
 
-## D3 — Trees and decor to match
+## D3 — Trees and decor to match ✅ *landed*
+
+*Decor trees roughly doubled to ~3–6.5 m (`world_decor.gd::_make_tree`), resource tree
+1.98 → **4.5 m** (`tree.tscn`, model scale 1.4 → 3.2). Collision cylinder, prompt and
+banner moved with it; the **axe bite and paint blaze deliberately did not** — the tree
+tripled, a worker's shoulder didn't, so `TRUNK_Y` stays at 1.10 m.*
+
+Sized against a village whose tallest tier is a 3 m castle, not against this task's
+original targets — D2 landed much smaller than it proposed. Bush scale untouched, so the
+`cell_height` hazard below was never in play; the tree collision **radius** is also
+unchanged at 0.5, so the navmesh footprint is exactly as before.
+
+## D3 (original task) — Trees and decor to match
 
 With the buildings corrected the forest becomes the thing that is undersized. Mature trees
 at 1.4–3.5 m are roughly half what they should be.
@@ -134,7 +157,24 @@ trees swallow it?
 
 ---
 
-## D4 — Depth fog
+## D4 — Depth fog ✅ *landed*
+
+*Shipped values: `fog_mode = 1` (DEPTH — confirmed working under `gl_compatibility`),
+band 8→40m, `fog_depth_curve = 1.2`, density 0.45 clear / 0.95 in a storm, near edge
+pulled to 2.5m by a storm, `fog_sky_affect = 0`. Colour is driven from the final `bg` in
+`day_night_cycle.gd` — so storm, golden hour and lightning all reach it for free — and
+lifted toward white by `FOG_PALE` in clear daylight, which is what actually makes it
+visible at midday.*
+
+**The bug this task uncovered:** `weather.gd` already owned `fog_enabled` and tied it to
+`_intensity > 0.02`, so fog was **off whenever it wasn't raining**. Clear-day density and
+colour were being written onto a disabled environment, so no value of either could show up
+and only storms looked hazy. That block is gone; fog belongs to the cycle now.
+
+**Lesson for D5:** the first pass used the 18–65m band this task implies and was invisible
+on screen — the camera only sees ~32m out, so most of the band was behind the horizon.
+**`FOG_FAR` is calibrated to the camera, so pulling the camera back in D5 means retuning
+it in the same pass.**
 
 Distant objects are exactly as saturated and contrasty as near ones, so the eye gets no
 depth ordering. Aerial perspective fixes that. `gl_compatibility` has no volumetric fog,
@@ -159,7 +199,23 @@ storm, or is it greying out the village?
 
 ---
 
-## D5 — The camera lens *(last, and a taste call)*
+## D5 — The camera lens ✅ *landed — and it went further than this task proposed*
+
+*Shipped: **`battle 45`** — Camera3D local `(0, 18.38, 18.38)`, `rotation_degrees.x = -45`,
+`fov = 34`. Six alternates sit on **C** in the dev overlay.*
+
+**This deliberately answers D6's question too.** The task below argues for a longer lens at
+the same coverage; what shipped is a longer lens *and* a pull-back to **~28 m** of visible
+ground, which is the third axis D6 says needs deciding on its own terms. Andrei chose it
+after seeing both. Consequences that follow from it, none of them addressed yet:
+
+- The world-space `Label3D` prompts and the billboard sprites are now ~1.6× smaller on
+  screen than the numbers below assume. §D6 predicts **the tally breaks first** — check it.
+- The depth-fog band was re-tuned (22–55 m); the visible ground is a *slant* range of
+  21–39 m at this camera, not 3–32 m.
+- Pulling back this far may show the world edge — decor only reaches ±48 m.
+
+## D5 (original task, kept for the reasoning) — The camera lens *(last, and a taste call)*
 
 Only start this once D1–D4 have landed and been played. Everything before this is fixing
 something that is *wrong*; this one is choosing a look, and it should be judged against a

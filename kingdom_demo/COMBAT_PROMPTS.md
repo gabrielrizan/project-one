@@ -30,6 +30,26 @@ single entry.
 - Leave the remaining bearing open as a corridor, at least 8m clear.
 - The world stays **one flat slab**. No elevation, no ramps: a mountain here is a rock
   wall standing on flat ground.
+
+  > **Real elevation was considered and deliberately deferred** (decided 2026-07-22, with
+  > the depth work). The long-term intent is terrain-gated maps — a village in a hill's
+  > arms, a river closing the back — and the U here is the flat stand-in for that. Revisit
+  > it as its own project, not inside a combat task, because the cost is not the ground
+  > mesh:
+  >
+  > - **The navmesh is tuned flat on purpose.** `nav_world.gd` runs `cell_height = 0.1`
+  >   and `agent_max_climb = 0.2`, both at the floor *because* nothing has height. Slopes
+  >   force them up into exactly the range where a 0.7m bush once came out as a climbable
+  >   step and villagers oscillated against it — and "the navmesh and physics disagree
+  >   about what is solid" is the signature of the worst bug class in this project.
+  > - **~103 sites across 19 scripts assume the ground is y = 0** — wanderer walk-in,
+  >   the wildlife ring, decor scatter, puddles, building placement, spilled coins. Each
+  >   becomes a ray-to-ground.
+  >
+  > For reference, Thronefall does use real authored elevation, but it also uses **fixed
+  > build slots** and **fixed enemy lanes**, so it never places a building on an arbitrary
+  > slope or paths freely over terrain. Copying the look means copying that authoring
+  > model too. If elevation is ever picked up, adopt fixed build slots in the same move.
 - Delete the three `WallSide` nodes on the closed bearings from `kingdom_demo.tscn`; keep
   the one across the corridor. Closed bearings offer no walls (§11).
 - Move any tree or berry bush now inside the rock, and bias the wanderer walk-in

@@ -63,7 +63,7 @@ surface_material_override/0 = SubResource("StandardMaterial3D_soup")
 [node name="Prompt" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 visible = false
-pixel_size = 0.01
+pixel_size = 0.007
 billboard = 1
 no_depth_test = true
 modulate = Color(1, 0.9, 0.4, 1)

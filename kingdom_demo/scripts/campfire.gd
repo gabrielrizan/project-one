@@ -17,22 +17,49 @@ const VILLAGER_COUNT := 5
 ##
 ## Note this counts everyone drawn in, wanderers included, not just citizens who
 ## have eaten and taken a job.
-const TIER_CAPS: Array[int] = [6, 9, 12]
+const TIER_CAPS: Array[int] = [6, 9, 12, 16]
 
 # PLACEHOLDER COSTS -- flat 5 so play-testing isn't gated behind grinding gold. These
 # want a real progression curve later; don't read "all tiers cost the same" as intent.
 const WOODEN_HALL_COST := 5   # L2
 const STONE_HALL_COST := 5    # L3
-const STONE_HALL_SCALE := 2.2
-const STONE_HALL_HEIGHT := 3.4
+const CASTLE_COST := 5        # L4
+
+## The main-building ladder, as **cells-x, cells-z, storeys, target height in
+## metres**. Composed at runtime from kit modules ([HallBuilder]) rather than
+## loaded, because the Fantasy Town Kit has no house model in it -- see
+## `ASSETS.md`.
+##
+## A module is 1 m and a storey is therefore a whole metre, so integer storeys
+## land on 1.63 / 2.63 / 3.63 m and **cannot hit 2.0 / 2.5 / 3.0 directly**. Each
+## tier is built at the proportions that look right and then scaled to its target
+## height (`_hall_scale`), which is why they are all 2 storeys: the tiers stay
+## structurally identical and read as one building growing.
+##
+## **The footprint carries the progression, not the height.** Only 0.5 m separates
+## the tiers, which is not a silhouette you would notice; the width goes
+## 2.3 -> 2.9 -> 4.6 m, which is. Sizes are held where the current spawn positions
+## still clear each other -- growing them further needs the village laid out
+## again, which is D2 in `DEPTH_PROMPTS.md` and not done yet.
+const HALL_L2 := [3, 2, 2, 2.0]    # Wooden Hall -- timber
+const HALL_L3 := [3, 3, 2, 2.5]    # Stone Hall
+const HALL_L4 := [4, 3, 2, 3.0]    # Castle
+const WORKER_HUT := [2, 2, 1, 1.4]  # a shed, deliberately shorter than any hall
+
+## L1. The raw tent model is 0.88 m -- shorter than the villager who sleeps in it.
+const TENT_SCALE := 3.075
+const TENT_HEIGHT := 1.5
+## Kept just under the L3 hall: a watchtower may out-top a tent, but it should not
+## out-top the stone hall it stands next to.
+const ARCHER_SCALE := 1.525
+const ARCHER_HEIGHT := 2.0
 
 const BUILDING_SCENE := preload("res://kingdom_demo/scenes/building.tscn")
 const VILLAGER_SCENE := preload("res://kingdom_demo/scenes/villager.tscn")
-const TENT_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tent.glb")
-const WORKER_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tent-canvas.glb")
+## L1 is the **canvas** tent. `tent.glb` is a bare timber A-frame with no cover on
+## it, which read as an unfinished building rather than somewhere anyone lives.
+const TENT_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tent-canvas.glb")
 const ARCHER_MODEL := preload("res://kingdom_demo/assets/3d/kenney_castle-kit/Models/GLB format/tower-base.glb")
-const WOODEN_HALL_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/structure.glb")
-const STONE_HALL_MODEL := preload("res://kingdom_demo/assets/3d/kenney_castle-kit/Models/GLB format/tower-square.glb")
 
 const SOUP_BASE_Y := 0.07     # inner floor of the pot, in cauldron-local space
 const SOUP_FULL_H := 0.44     # matches the CylinderMesh height in the scene
@@ -215,9 +242,23 @@ func take_serving() -> bool:
 func villager_cap() -> int:
 	if not is_instance_valid(_hall):
 		return TIER_CAPS[0]
+	# Read top-down: each flag implies the ones below it, so the first hit wins.
+	if _hall.upgraded3:
+		return TIER_CAPS[3]
 	if _hall.upgraded2:
 		return TIER_CAPS[2]
 	return TIER_CAPS[1] if _hall.upgraded else TIER_CAPS[0]
+
+## The main building's tier, 1..4, or 0 before the village exists. `wall_side.gd`
+## gates each of its four levels on this, so a wall can never outrun the hall.
+func hall_tier() -> int:
+	if not is_instance_valid(_hall):
+		return 0
+	if _hall.upgraded3:
+		return 4
+	if _hall.upgraded2:
+		return 3
+	return 2 if _hall.upgraded else 1
 
 func population() -> int:
 	return get_tree().get_nodes_in_group("villager").size()
@@ -254,16 +295,30 @@ func _spawn_village() -> void:
 	# -> L3 Stone Hall -> L4 Castle (not built yet). Lighting the fire raises the
 	# Tent for free; every tier after that is paid for AND raised by a crew, and
 	# reaching the Stone Hall is what opens the walls' own stone upgrade.
-	_hall = _spawn_building(TENT_MODEL, "Tent", Vector3(-3.6, 0, -2.6), 1.8, 1.3, "",
-		WOODEN_HALL_MODEL, "Wooden Hall", 1.4, 2.0, WOODEN_HALL_COST,
-		STONE_HALL_MODEL, "Stone Hall", STONE_HALL_SCALE, STONE_HALL_HEIGHT, STONE_HALL_COST, true)
-	_spawn_building(WORKER_MODEL, "Workers", Vector3(3.6, 0, -2.6), 1.8, 1.4, "worker")
-	_spawn_building(ARCHER_MODEL, "Archers", Vector3(0, 0, -4.6), 1.2, 2.4, "archer")
+	_hall = _spawn_building(TENT_MODEL, "Tent", Vector3(-3.6, 0, -2.6), TENT_SCALE, TENT_HEIGHT, "",
+		_hall_tier(HALL_L2, false), "Wooden Hall", _hall_scale(HALL_L2), HALL_L2[3], WOODEN_HALL_COST,
+		_hall_tier(HALL_L3, true), "Stone Hall", _hall_scale(HALL_L3), HALL_L3[3], STONE_HALL_COST, true,
+		_hall_tier(HALL_L4, true), "Castle", _hall_scale(HALL_L4), HALL_L4[3], CASTLE_COST)
+	_spawn_building(_hall_tier(WORKER_HUT, false), "Workers", Vector3(3.6, 0, -2.6),
+		_hall_scale(WORKER_HUT), WORKER_HUT[3], "worker")
+	_spawn_building(ARCHER_MODEL, "Archers", Vector3(0, 0, -4.6), ARCHER_SCALE, ARCHER_HEIGHT, "archer")
+
+## Builds one tier from a `[cells_x, cells_z, storeys, height]` spec and packs it,
+## since `building.gd` takes a PackedScene per tier.
+func _hall_tier(spec: Array, stone: bool) -> PackedScene:
+	return HallBuilder.packed(HallBuilder.build(spec[0], spec[1], spec[2], stone))
+
+## What the composed metres have to be multiplied by to reach the tier's target
+## height. Derived rather than written down, so changing a target height moves the
+## footprint with it and the two can't fall out of step.
+func _hall_scale(spec: Array) -> float:
+	return float(spec[3]) / HallBuilder.height(spec[2])
 
 func _spawn_building(scene: PackedScene, bname: String, pos: Vector3, sc: float, height: float, job: String,
 		up_scene: PackedScene = null, up_name := "", up_scale := 1.0, up_height := 0.0, up_cost := 0,
 		up2_scene: PackedScene = null, up2_name := "", up2_scale := 1.0, up2_height := 0.0, up2_cost := 0,
-		up2_unlocks_stone := false) -> Node3D:
+		up2_unlocks_stone := false,
+		up3_scene: PackedScene = null, up3_name := "", up3_scale := 1.0, up3_height := 0.0, up3_cost := 0) -> Node3D:
 	var b := BUILDING_SCENE.instantiate()
 	b.model_scene = scene
 	b.display_name = bname
@@ -281,6 +336,11 @@ func _spawn_building(scene: PackedScene, bname: String, pos: Vector3, sc: float,
 	b.upgrade2_height = up2_height
 	b.upgrade2_cost = up2_cost
 	b.upgrade2_unlocks_stone = up2_unlocks_stone
+	b.upgrade3_model_scene = up3_scene
+	b.upgrade3_display_name = up3_name
+	b.upgrade3_scale = up3_scale
+	b.upgrade3_height = up3_height
+	b.upgrade3_cost = up3_cost
 	get_tree().current_scene.add_child(b)
 	b.global_position = pos
 	return b

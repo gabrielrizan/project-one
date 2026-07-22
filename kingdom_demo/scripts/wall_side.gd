@@ -2,22 +2,57 @@ extends StaticBody3D
 ## One side of the village palisade. It starts as a lone marker post with a
 ## "build" prompt at the gate spot.
 ##
-## Paying BUILD_COST does not raise the wall -- the monarch does not build, he
-## commissions. It opens a BUILDING SITE: timber is dropped along the line, a
-## hammer banner goes up, and workers down tools and walk over. Sections rise
-## one at a time under their hammers, corners first, closing in on the gap; the
-## gate drops into it last. See [BuildCrew] for the pace: up to three workers,
-## each beyond the first adding 30% more speed.
+## Paying does not raise the wall -- the monarch does not build, he commissions.
+## It opens a BUILDING SITE: material is dropped along the line, a hammer banner
+## goes up, and workers down tools and walk over. Sections rise one at a time
+## under their hammers, corners first, closing in on the gap; the gate drops into
+## it last. See [BuildCrew] for the pace: up to three workers, each beyond the
+## first adding 30% more speed.
 ##
-## Once built, a second and separate upgrade is on offer: paying STONE_COST
-## opens the same kind of site again, this time converting the standing wood
-## sections to Kenney castle stone in place and re-skinning the gate leaves as
-## castle doors. It is only on the table once the L3 Stone Hall has
-## gone up ([GameManager].stone_unlocked) -- a wall built before or after that
-## point is wood until someone pays to upgrade it; nothing converts for free.
+## **Four levels — twig, wood, stone, fortified stone — and each one needs the
+## matching main-building tier.** You cannot ring a tent with a castle wall: the
+## kingdom's defences can never outrun the hall they defend, which is what stops
+## the walls being a way to skip the ladder. Every rung is a separate purchase
+## opening its own site, and nothing ever converts for free; a wall left at twig
+## stays twig however grand the hall gets.
 
-const BUILD_COST := 5
-const STONE_COST := 8
+## The four levels, and the main-building tier each one needs. **A wall can never
+## outrun the hall it defends**: twig comes with the Tent, wood with the Wooden
+## Hall, stone with the Stone Hall, fortified with the Castle. So the level index
+## *is* the required hall tier, which is why there is no separate "requires"
+## field -- the two can't drift apart if only one number exists.
+##
+## Heights climb 0.75 -> 1.05 -> 1.35 -> 1.64 m against a 1.2 m villager, so each
+## upgrade is a silhouette you can read from across the camp: something you step
+## over, something you hide behind, something you man.
+##
+## `yaw` is per level because the kits disagree about which way a panel runs --
+## Fantasy Town pieces are 1 m along **Z** with the face on +X, so they turn 90
+## degrees to lie along the wall; the castle kit's wall is already 1 m along X.
+const NONE := 0
+const TWIG := 1
+const WOOD := 2
+const STONE := 3
+const FORT := 4
+const TOP_LEVEL := FORT
+
+const TWIG_SCENE := preload("res://kingdom_demo/assets/3d/kenney_fantasy-town-kit/Models/GLB format/poles-horizontal.glb")
+const WOODWALL_SCENE := preload("res://kingdom_demo/assets/3d/kenney_fantasy-town-kit/Models/GLB format/wall-wood.glb")
+const STONEWALL_SCENE := preload("res://kingdom_demo/assets/3d/kenney_fantasy-town-kit/Models/GLB format/wall.glb")
+## The castle kit's wall, and the only one in either kit with battlements on it --
+## which is what makes the top tier read as *fortified* rather than just bigger.
+const FORT_SCENE := preload("res://kingdom_demo/assets/3d/kenney_castle-kit/Models/GLB format/wall.glb")
+
+## PLACEHOLDER COSTS, climbing rather than flat -- unlike the hall tiers, a wall
+## you can rebuild on four sides wants to feel like it costs more each time.
+const LEVELS := [
+	{},   # 0 -- a bare marker post, nothing to describe
+	{"name": "Twig Fence", "scene": TWIG_SCENE, "yaw": 90.0, "scale": 0.75, "cost": 3, "stone": false},
+	{"name": "Wooden Wall", "scene": WOODWALL_SCENE, "yaw": 90.0, "scale": 1.05, "cost": 5, "stone": false},
+	{"name": "Stone Wall", "scene": STONEWALL_SCENE, "yaw": 90.0, "scale": 1.35, "cost": 8, "stone": true},
+	{"name": "Fortified Wall", "scene": FORT_SCENE, "yaw": 0.0, "scale": 1.25, "cost": 12, "stone": true},
+]
+
 const HALF := 8.0             # wall runs local x  -HALF .. +HALF
 const GATE_HALF := 1.0        # sections stop this far from centre -> gate opening
 const STAKE_SPACING := 1.0    # one section wide
@@ -25,8 +60,8 @@ const OPEN_ANGLE := 85.0
 const DOOR_SCALE := 2.8       # castle door.glb is small -> scale up to gate size
 const BASE_BUILD_TIME := 30.0 # for either phase, at a single pair of hands
 
+## Gate leaves only -- the wall runs themselves come from LEVELS above.
 const FENCE_SCENE := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/fence.glb")
-const WALL_SCENE := preload("res://kingdom_demo/assets/3d/kenney_castle-kit/Models/GLB format/wall.glb")
 const DOOR_SCENE := preload("res://kingdom_demo/assets/3d/kenney_castle-kit/Models/GLB format/door.glb")
 const HAMMER_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tool-hammer.glb")
 const TIMBER_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tree-log.glb")
@@ -50,14 +85,13 @@ const STATIONS: Array[float] = [0.0, -3.6, 3.6]
 @onready var _marker_col: CollisionShape3D = $MarkerCollision
 @onready var _prompt: Label3D = $Prompt
 
-var built := false
+var level := NONE             # 0 = marker post only; 1..4 = the ladder above
 var building := false         # a site is open, waiting on or worked by hands
-var _stone_upgrading := false # which phase `building` is: wood raise or stone upgrade
+var _target := NONE           # the level the open site is working toward
 var _busy := false
 var _near := 0
 var _saluting := false        # the gate is mid-flourish; leave it alone
 var _flagged := false         # pennants only ever go up once
-var _style_castle := false
 var _sections: Array[Node3D] = []
 var _left_leaf: Node3D = null
 var _right_leaf: Node3D = null
@@ -80,18 +114,37 @@ func _ready() -> void:
 
 # ---- build interaction ----
 
+## The next rung, or NONE if there isn't one -- either the wall is already
+## fortified, or the hall hasn't earned the next material yet.
+func _next_level() -> int:
+	if level >= TOP_LEVEL:
+		return NONE
+	var want := level + 1
+	return want if _hall_tier() >= want else NONE
+
+## The main building's tier, 1..4. Walls read this rather than a "stone unlocked"
+## flag, because there are now four gates rather than one.
+func _hall_tier() -> int:
+	var fire := get_tree().get_first_node_in_group("campfire")
+	if fire != null and fire.has_method("hall_tier"):
+		return fire.hall_tier()
+	return NONE
+
 func show_prompt() -> void:
 	if building or _busy:
 		return
-	if not built:
-		_prompt.text = ("Hold E  Build Wall (%d)" % BUILD_COST) if _workers_exist() else "Build Wall  needs a worker"
-		_prompt.visible = true
+	var want := _next_level()
+	if want == NONE:
+		hide_prompt()
 		return
-	if not _style_castle and _stone_unlocked():
-		_prompt.text = ("Hold E  Upgrade to Stone (%d)" % STONE_COST) if _workers_exist() else "Upgrade to Stone  needs a worker"
-		_prompt.visible = true
-		return
-	hide_prompt()
+	var d: Dictionary = LEVELS[want]
+	# No "Build" / "Upgrade to" verb: the level's own name changes every rung, so
+	# the verb added nothing but length. World-space prompts are physically large
+	# (see `CLAUDE.md`) and "Hold E  Upgrade to Fortified Wall (12)" was 38
+	# characters of 3D text lying across the village.
+	_prompt.text = ("Hold E  %s (%d)" % [d["name"], d["cost"]]) if _workers_exist() \
+		else "%s  needs a worker" % d["name"]
+	_prompt.visible = true
 
 func hide_prompt() -> void:
 	_prompt.visible = false
@@ -99,29 +152,20 @@ func hide_prompt() -> void:
 func interact(who: Node3D) -> void:
 	if building or _busy:
 		return
-	if not built:
-		if not _workers_exist() or not GoldFx.can_afford(BUILD_COST):
-			return
-		_busy = true
-		hide_prompt()
-		var ok: bool = await GoldFx.pay(who, self, BUILD_COST, 2.2)
-		_busy = false
-		if ok:
-			_open_site()
-		elif _near_enough(who):
-			show_prompt()
+	var want := _next_level()
+	if want == NONE:
 		return
-	if not _style_castle and _stone_unlocked():
-		if not _workers_exist() or not GoldFx.can_afford(STONE_COST):
-			return
-		_busy = true
-		hide_prompt()
-		var ok: bool = await GoldFx.pay(who, self, STONE_COST, 2.2)
-		_busy = false
-		if ok:
-			_open_stone_upgrade()
-		elif _near_enough(who):
-			show_prompt()
+	var cost: int = LEVELS[want]["cost"]
+	if not _workers_exist() or not GoldFx.can_afford(cost):
+		return
+	_busy = true
+	hide_prompt()
+	var ok: bool = await GoldFx.pay(who, self, cost, 2.2)
+	_busy = false
+	if ok:
+		_open_site(want)
+	elif _near_enough(who):
+		show_prompt()
 
 func _near_enough(who: Node3D) -> bool:
 	return is_instance_valid(who) and global_position.distance_to(who.global_position) < 3.0
@@ -132,39 +176,32 @@ func _workers_exist() -> bool:
 			return true
 	return false
 
-func _stone_unlocked() -> bool:
-	var gm := get_tree().get_first_node_in_group("game_manager")
-	return gm != null and gm.stone_unlocked
-
 # ---- the building site ----
 
-func _open_site() -> void:
+## One site for every rung. Raising the first wall and upgrading an existing one
+## differ only in whether a section rises out of the ground or is swapped in
+## place, so `_upgrading()` is the single branch rather than two near-identical
+## functions -- which is what let the old pair drift into wood-only and
+## stone-only assumptions.
+func _open_site(want: int) -> void:
 	building = true
-	_stone_upgrading = false
+	_target = want
 	remove_from_group("interactable")
 	add_to_group("build_site")
 	_crew = BuildCrew.new()
 	_raised = 0
 	_progress = 0.0
+	# The same offsets either way: raising walks them empty, upgrading steps
+	# through the sections already standing on them.
 	_plan = _section_plan()
 	_banner = MarkFx.banner(self, HAMMER_MODEL, BANNER_Y, BANNER_SCALE)
 	_banner_t = 0.0
-	_lay_out_site_props(TIMBER_MODEL)
+	_lay_out_site_props(STONE_PILE_MODEL if LEVELS[want]["stone"] else TIMBER_MODEL)
 	set_process(true)
 
-func _open_stone_upgrade() -> void:
-	building = true
-	_stone_upgrading = true
-	remove_from_group("interactable")
-	add_to_group("build_site")
-	_crew = BuildCrew.new()
-	_raised = 0
-	_progress = 0.0
-	_plan = _section_plan()   # same offsets -- stepping through the sections already standing
-	_banner = MarkFx.banner(self, HAMMER_MODEL, BANNER_Y, BANNER_SCALE)
-	_banner_t = 0.0
-	_lay_out_site_props(STONE_PILE_MODEL)
-	set_process(true)
+## True when there is already a wall standing that this site is replacing.
+func _upgrading() -> bool:
+	return level != NONE
 
 ## Corners first, working inward a pair at a time, so the run closes on the gap
 ## and the gate is the last thing to drop in (or, upgrading, the last to convert).
@@ -204,10 +241,10 @@ func _process(delta: float) -> void:
 	_progress += delta * _crew.speed() / BASE_BUILD_TIME
 	_advance_construction()
 	if _progress >= 1.0:
-		_finish_stone() if _stone_upgrading else _finish()
+		_finish_upgrade() if _upgrading() else _finish()
 
 func _show_site_status(hands: int) -> void:
-	var verb := "Upgrading" if _stone_upgrading else "Building"
+	var verb := "Upgrading" if _upgrading() else "Building"
 	_prompt.text = "Needs workers" if hands == 0 else "%s  %d%%   x%d" % [verb, int(_progress * 100.0), hands]
 	_prompt.visible = true
 
@@ -217,7 +254,7 @@ func _advance_construction() -> void:
 	var steps := _plan.size() + 1
 	var want: int = clampi(int(_progress * float(steps)), 0, _plan.size())
 	while _raised < want:
-		if _stone_upgrading:
+		if _upgrading():
 			_convert_section(_raised)
 		else:
 			_raise_section(_plan[_raised])
@@ -291,10 +328,13 @@ const GATE_PITCH := 1.08
 
 static var _gate_pools := {}
 
-## The material this wall currently is. `_style_castle` already tracks the wood ->
-## stone upgrade for the models, so the sound follows the same flag.
+## The material this wall currently is, for the raise and gate sounds. Read off
+## the level table so a new rung can never sound like the wrong material -- the
+## one flag it used to read only knew wood from stone.
 func _material() -> String:
-	return "stone" if _style_castle else "wood"
+	if level == NONE:
+		return "wood"
+	return "stone" if LEVELS[level]["stone"] else "wood"
 
 func _gate_sfx(kind: String) -> AudioStreamRandomizer:
 	var mat := _material()
@@ -341,7 +381,7 @@ func gate_collision() -> CollisionShape3D:
 
 ## A section heaves up out of the ground and thumps into place, throwing dirt.
 func _raise_section(x: float) -> void:
-	var s := _add_section(x, false)
+	var s := _add_section(x, _target)
 	var at := s.global_position
 	at.y = 0.06
 	s.position.y = -1.3
@@ -350,14 +390,14 @@ func _raise_section(x: float) -> void:
 	t.tween_property(s, "position:y", 0.0, 0.12).set_trans(Tween.TRANS_SINE)
 	MarkFx.debris(self, at, Vector3.UP, 3, DUST, 0.013, 0.35)
 
-## A standing wood section is swapped for stone in place -- a slab dropping the
-## last little way down and settling, rather than heaving from underground.
+## A standing section is swapped for the next material in place -- a slab dropping
+## the last little way down and settling, rather than heaving from underground.
 func _convert_section(i: int) -> void:
 	var old: Node3D = _sections[i]
 	var x: float = old.position.x if is_instance_valid(old) else _plan[i]
 	if is_instance_valid(old):
 		old.queue_free()
-	var s := _add_section(x, true, i)
+	var s := _add_section(x, _target, i)
 	var at := s.global_position
 	at.y = 0.06
 	s.position.y = -0.4
@@ -368,11 +408,11 @@ func _convert_section(i: int) -> void:
 func _finish() -> void:
 	_progress = 1.0
 	building = false
-	built = true
+	level = _target
 	set_process(false)
 	remove_from_group("build_site")
-	# stone may unlock later, so a finished wood wall stays interactable -- the
-	# stone-upgrade prompt just checks _stone_unlocked() live each time
+	# Higher tiers unlock later, so a finished wall stays interactable -- the
+	# prompt asks _next_level() live each time and simply goes quiet at the top.
 	add_to_group("interactable")
 	_prompt.visible = false
 	_marker.visible = false
@@ -386,17 +426,21 @@ func _finish() -> void:
 	NavWorld.rebake(self)
 	_celebrate()
 
-func _finish_stone() -> void:
+func _finish_upgrade() -> void:
 	_progress = 1.0
 	building = false
-	_style_castle = true
+	level = _target
 	set_process(false)
 	remove_from_group("build_site")
-	remove_from_group("interactable")   # fully upgraded -- nothing left to offer
+	# Only the top of the ladder has nothing left to sell.
+	if level >= TOP_LEVEL:
+		remove_from_group("interactable")
+	else:
+		add_to_group("interactable")
 	_prompt.visible = false
 	_crew = BuildCrew.new()
 	_clear_site_props()
-	# every section is already stone by now -- only the gate leaves are left
+	# every section is already converted by now -- only the gate leaves are left
 	if is_instance_valid(_left_model):
 		_left_model.queue_free()
 	if is_instance_valid(_right_model):
@@ -509,16 +553,21 @@ func _raise_pennants() -> void:
 
 # ---- construction ----
 
-func _add_section(x: float, stone: bool, at_index := -1) -> Node3D:
-	var s: Node3D = WALL_SCENE.instantiate() if stone else FENCE_SCENE.instantiate()
+func _add_section(x: float, lvl: int, at_index := -1) -> Node3D:
+	var d: Dictionary = LEVELS[lvl]
+	var s: Node3D = (d["scene"] as PackedScene).instantiate()
 	add_child(s)
-	if stone:
+	var sc: float = d["scale"]
+	s.scale = Vector3(sc, sc, sc)
+	var yaw: float = d["yaw"]
+	if d["stone"]:
 		# stone tiles butt together cleanly -- no rough jitter
 		s.position = Vector3(x, 0.0, 0.0)
+		s.rotation_degrees = Vector3(0, yaw, 0)
 	else:
-		# a little jitter keeps the fence looking hand-built rather than prefab
+		# a little jitter keeps timber looking hand-built rather than prefab
 		s.position = Vector3(x + randf_range(-0.05, 0.05), 0.0, randf_range(-0.06, 0.06))
-		s.rotation_degrees = Vector3(0, randf_range(-4, 4), 0)
+		s.rotation_degrees = Vector3(0, yaw + randf_range(-4, 4), 0)
 	if at_index >= 0:
 		_sections[at_index] = s
 	else:
@@ -569,10 +618,12 @@ func _make_pivot(hinge_x: float) -> Node3D:
 	add_child(pivot)
 	return pivot
 
-## Adds the swinging leaf model (fence or castle door) to a hinge pivot.
+## Adds the swinging leaf model (fence or castle door) to a hinge pivot. The gate
+## follows the wall's material, so the timber rungs get a fence leaf and the two
+## stone rungs get a castle door.
 func _populate_leaf(pivot: Node3D, dir: float) -> Node3D:
 	var s: Node3D
-	if _style_castle:
+	if level != NONE and LEVELS[level]["stone"]:
 		s = DOOR_SCENE.instantiate()
 		s.rotation_degrees = Vector3(0, 90, 0)   # face the door across the opening
 		s.scale = Vector3(DOOR_SCALE, DOOR_SCALE, DOOR_SCALE)

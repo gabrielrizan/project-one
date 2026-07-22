@@ -14,12 +14,21 @@ extends Node
 const COIN_MODEL := preload("res://kingdom_demo/assets/3d/props/coin.glb")
 const COIN_SCENE := preload("res://kingdom_demo/scenes/coin.tscn")
 const HOLD_ACTION := "interact"
-const PIP_SPACING := 0.55
-const PIP_ROW_SPACING := 0.53
+## **Scaled up ~1.6x for the pulled-back camera.** These were sized against the
+## old 8.6m / fov60 view; the shipped camera is 26m out at fov34, which works out
+## to 0.63x the apparent size, and a pip went from ~22 screen pixels to ~14 --
+## small enough that you could not tell a paid pip from an unpaid one, which is
+## the entire readout. Spacing moves with the scale or the coins overlap.
+##
+## Everything here is in **metres**, so it is tied to the camera and not to the
+## screen: any future camera change has to revisit these. The pips are the first
+## thing to break on a pull-back -- characters survive much further out.
+const PIP_SPACING := 0.88
+const PIP_ROW_SPACING := 0.85
 const PIPS_PER_ROW := 8      # bigger asks stack into rows instead of one long line
 const PIP_UNPAID := Color(0.24, 0.23, 0.26)   # a coin not yet handed over
-const PIP_SCALE := 0.69
-const FLYING_SCALE := 0.94
+const PIP_SCALE := 1.10
+const FLYING_SCALE := 1.50
 const COIN_FLIGHT := 0.34
 const COIN_GAP := 0.1
 const MAX_RANGE := 4.0       # step further than this from the anchor and the deal is off

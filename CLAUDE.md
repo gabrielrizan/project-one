@@ -48,8 +48,10 @@ each session. `GAME_DESIGN.md` §13 lists rough priorities, but treat it as idea
 
 **Working:** monarch rides and buys via hold-to-pay · campfire → village → cauldron draws
 wanderers → they eat, become citizens, take jobs · workers fell marked trees · archers hunt
-and forage by daylight · crew construction for walls, wall→stone, and both hall tiers ·
-main building L1 Tent → L2 Wooden Hall → L3 Stone Hall · day/night with real camp lighting ·
+and forage by daylight · crew construction for every wall rung and every hall tier ·
+main building L1 Tent → L2 Wooden Hall → L3 Stone Hall → L4 Castle · day/night with real
+camp lighting ·
+**sun shadows gated on the sun's elevation, and depth fog that thickens with the storm** ·
 **weather: rain, overcast skies, water pools, distant thunderstorms, on a season clock** ·
 navmesh pathfinding round everything solid, re-baked as the village changes ·
 title + pause menus, settings persist · **a dev overlay on F1** for reaching any of it
@@ -59,7 +61,7 @@ instantly.
 lose condition. The walls, gates, archers and day/night cycle are all *setup* for a threat
 that does not exist. That is the single biggest gap — see `GAME_DESIGN.md` §9.
 
-**Also not built:** L4 Castle · soup upkeep / morale / desertion · mercenaries
+**Also not built:** soup upkeep / morale / desertion · mercenaries
 · map objectives and moving to the next map · **music of any kind** · any mixing beyond
 static bus levels (no limiter, no ducking except rain over the beds).
 
@@ -69,7 +71,7 @@ listening desk. Several clips are placeholders chosen to get a feel, not finals.
 
 **Placeholder numbers:** hall tier costs are a flat 5 so testing is fast, not a tuned curve.
 
-**Population is capped by the hall's tier** — 6 at L1 Tent, 9 at L2, 12 at L3
+**Population is capped by the hall's tier** — 6 at L1 Tent, 9 at L2, 12 at L3, 16 at L4
 (`campfire.gd::TIER_CAPS`). Room to grow is what the upgrade buys. The cap gates *drawing
 new wanderers*, not filling the pot: a batch of five outnumbers the cauldron's three
 servings, so refusing the sale at cap would strand the last arrivals hungry for good.
@@ -161,7 +163,7 @@ hunt and forage, daylight only. Both haul their take to the monarch.
 
 **Costs and timings live in the code, not here** — they drift as we tune. Look at:
 `campfire.gd` (light, feed, hall tiers) · `building.gd` (`JOB_COST`, tier build times) ·
-`wall_side.gd` (`BUILD_COST`, `STONE_COST`) · `tree_resource.gd` / `berry_bush.gd`
+`wall_side.gd` (`LEVELS`) · `tree_resource.gd` / `berry_bush.gd`
 (`MARK_COST`) · `build_crew.gd` (crew cap and speedup) · `game_manager.gd` (starting gold).
 
 Facts that *don't* drift:
@@ -172,6 +174,54 @@ Facts that *don't* drift:
   run clock pacing the move to the next map. Don't add regrowth (`GAME_DESIGN.md` §11).
 - **Vocabulary:** a **citizen** is a loyal villager who has eaten and taken a job; a
   **wanderer** has been drawn in but hasn't eaten and isn't yours yet.
+
+### The main-building ladder (`hall_builder.gd`)
+
+**The hall tiers are composed from kit modules at runtime, not loaded.** The Kenney Fantasy
+Town Kit has no house in it — all 167 pieces are modular wall/roof/doorway panels, and the
+only assembled buildings are a windmill and two watermills — so `HallBuilder.build(cx, cz,
+storeys, stone)` stamps a perimeter of walls and caps it with a flat roof and parapet.
+
+**Every module is a 1 m cell with its panel on the cell's +X face**, and walls are exactly
+1 m tall — measured, not assumed. So the specs in `campfire.gd` (`HALL_L2` etc.) read
+directly as metres, which is the entire point: footprints and heights are comparable to a
+1.2 m villager instead of being guessed through a `model_scale` multiplier. Composed tiers
+therefore carry `model_scale = 1.0`.
+
+Two deliberate choices. The roof is **flat with a parapet** because a pitched roof needs its
+slope panels oriented per edge and gets corners wrong on any non-square footprint, whereas a
+flat cap cannot be oriented wrongly. And the roof panels are **tinted slate**, because the
+kit bakes them turquoise, which from this camera reads as a swimming pool on every roof —
+not burgundy, since the palette keeps red for the monarch.
+
+`building.gd` takes a `PackedScene` per tier, so `HallBuilder.packed()` packs the composed
+node rather than the interface being changed; it stamps `owner` on the direct children,
+which is what `pack()` needs to keep them. A tier is 20–96 nodes, so the ladder is a few
+hundred draw calls — fine at this map size, worth remembering if it ever isn't.
+
+⚠️ **These are placeholders sized for depth, not final art.** They are capped at 4×4 so the
+current spawn positions still clear each other; growing them further needs the village laid
+out again (D2 in `DEPTH_PROMPTS.md`).
+
+### The wall ladder (`wall_side.gd`)
+
+**Four levels — twig · wood · stone · fortified stone — and the level index *is*
+the main-building tier it requires.** You cannot ring a tent with a castle wall; the
+defences can never outrun the hall they defend, which is what stops walls being a way to
+skip the ladder. There is no separate "requires" field precisely so the two cannot drift.
+
+Heights climb **0.75 → 1.05 → 1.35 → 1.64 m** against a 1.2 m villager: something you step
+over, then hide behind, then man. Each rung is its own purchase opening its own site, and
+nothing converts for free — a wall left at twig stays twig however grand the hall gets.
+
+Gating reads `campfire.gd::hall_tier()` (1–4), **not** `game_manager.stone_unlocked` — that
+flag only ever knew "reached L3" and there are four gates now. It is still set and is now
+redundant; removing it means also dropping `building.gd::upgrade2_unlocks_stone`.
+
+⚠️ Sections are spaced `STAKE_SPACING` = 1 m but the scaled models are 1.05–1.35 m wide, so
+the upper rungs **overlap slightly**. That is deliberate — butted opaque panels read as a
+continuous wall — but it means per-level spacing can't be introduced without also remapping
+`_section_plan()`, which upgrades rely on to convert sections in place.
 
 ### Crew construction (`build_crew.gd`)
 
@@ -201,6 +251,15 @@ Two clocks, deliberately separate: **`intensity()`** is what is falling right no
 filling after a shower peaks and are still there well after the last drop. Tying pools
 straight to intensity made rain look like a light switch.
 
+**Overcast is not proportional to rainfall.** `cycle.storm` is driven off
+`pow(intensity, OVERCAST_CURVE)`, not off intensity directly — drizzle falls from a sky
+that is already covered, and what separates it from a downpour is how much water comes
+down, not how much cloud is up there. Linear was wrong at the bottom of the range: light
+rain dimmed the sun only 16%, so it read as bright midday sun with a few pale streaks
+painted over it and the rain was invisible against lit grass. The curve lifts the low end
+(0.35 → 0.56) and leaves a downpour exactly where it was. A *floor* says the same thing but
+pops, because intensity ramps up from zero through the gathering phase.
+
 **The season clock gates rain and nothing else.** Four seasons, `CYCLES_PER_SEASON` day/night
 cycles each, with their own rain odds, strength and thunder odds. **Winter is dry** — that
 is a placeholder for snow, not a design statement. Seasons have *no visual identity yet*:
@@ -210,7 +269,59 @@ for now.
 `day_night_cycle.gd` owns the environment; weather never writes it directly. It sets
 `cycle.storm` and `cycle.flash` and the cycle blends them in **after** the time-of-day
 colours, so a storm at noon still reads as noon. Two scripts writing `background_color`
-in one frame would fight and flicker.
+in one frame would fight and flicker. **Depth fog follows the same rule and the same
+path** — it lives in `day_night_cycle.gd`, and its colour is always the *final* `bg`, so
+the haze can never disagree with the horizon in front of it at any hour, under any storm,
+or during a lightning flash.
+
+**Fog is weather, not atmosphere** — `fog_enabled` is `storm > 0.002`, so a clear day has
+none at all. Clear-day fog was tried at four strengths and never earned its place: too weak
+to see, or strong enough to read and then bleaching the treeline pale rather than pushing
+it back. Depth fog can only tint toward one flat colour, and against this palette that
+reads as *washed out*, not *far away*. Under rain it works, because obscured distance is
+what rain actually does. Don't re-add it as a clear-weather effect without a new idea.
+
+### The clock (`day_night_cycle.gd`)
+
+**A cycle is 6 minutes, split 2.2 : 1 in daylight's favour** — 247.5s of day, 112.5s of
+night. The proportions come from a reference day chart and the **named instants are the
+source of truth**: `SUNRISE_AT` 30 · `NOON_AT` 135 · `SUNSET_AT` 247.5 · `MIDNIGHT_AT`
+307.5, with dawn at t = 0. `DAY_DURATION` and the sun's arc are *derived* from those, so
+retiming the day means editing five numbers and nothing else.
+
+The sun is piecewise through those four instants rather than one linear sweep, because the
+reference day isn't symmetric (sunrise→noon is shorter than noon→sunset). Verified: the sun
+sits at 0° elevation at sunrise and sunset, 90° at noon, −90° at midnight. It is still one
+continuous 360° across the cycle, so nothing snaps when the clock wraps.
+
+`DUSK` (30s, from sunset) and `DAWN` (42s, up to sunrise) are **not** derived — they are how
+long the sky takes to change, a readability call rather than an astronomical one. Dawn stays
+the longer of the two.
+
+Nothing outside this file knows how long a day is; everything reads `darkness()` or
+`is_night()`. Weather's "three cycles per season" detects the clock wrapping, so it survives
+any retime — a season is simply 18 minutes now.
+
+### Shadows (`day_night_cycle.gd`)
+
+**Gated on the sun's real elevation, never on the clock** — the same rule as the horn,
+because the phase durations are placeholder. Below **8°** shadows are off outright (a sun
+under the map would cast them *upward*, and it saves the pass for half of every cycle);
+they fade to full by **28°**.
+
+**That fade is the only honest control over shadow length.** Length is set by the sun's
+arc, and the arc is the day — you cannot shorten a low-sun shadow without lying about
+where the sun is. What you can do is make the longest ones faint, which is also what
+really happens: a shallower sun travels through more atmosphere and casts softer, weaker
+shadows. At 19° a 4.5m tree throws ~13m of shadow across the whole frame, and the fade
+drops it to 0.57 strength so it reads as a smear rather than a bar. Widened from 5–20°
+after the trees doubled in size and made the problem much more visible.
+
+**Nothing weather draws casts** — gated once in `weather.gd::_add_layer()`, so rain,
+splashes, mist and any layer added later inherit it. Ditto the puddle field
+(`puddles.gd`). The flat ground quads in `world_decor.gd` (`_add_strip`, `_scatter_patches`)
+must also stay non-casting: they are sheets lying at y≈0.02, and a low sun projects a
+sheet's silhouette clear across the map.
 
 **Rain leans along `wind.gd`'s bearing**, which is why `wind` is now a group — a storm
 blowing across the wind reads as two weathers at once.
@@ -236,7 +347,9 @@ Every key reaches into a system directly:
 | Key | |
 |---|---|
 | **F1** | show/hide the overlay (live time, season, weather readout) |
-| **F2** | skip to night / day |
+| **F2** | skip to night / day — lands *after* dusk and *at* sunrise, not on the phase boundary, which is still fully lit |
+| **C** | camera preset — battle 45/60° · diorama 45/60° · tabletop 75° · close 50° · stock 40°. The `diorama`/`close`/`stock` five all frame **~18–20m** of ground: distance and FOV cancel, so a longer lens further back buys the diorama look and no extra coverage. Only `battle` shows more. Index 0 must stay in sync with the scene's camera or the readout lies |
+| **T** | speed ×1 → ×2 → ×4 → ×8 → ×16. `Engine.time_scale`, so the whole game moves, not just the clock. Audio keeps its own clock and stacks up badly past ×4; `max_physics_steps_per_frame` is raised alongside it or anything past ×8 silently runs slower than the label claims |
 | **F4** | step rain: off → light → steady → downpour |
 | **F5** | lightning now |
 | **F6** | next season |
@@ -335,6 +448,15 @@ for the duration, so the king stays **locked on target** and a second tally can 
   spawned nothing because of this; it parents animals to itself instead.
 - **World-space `Label3D` prompts are physically large.** A prompt a few words too long
   spans half the screen. Keep them terse and drop `font_size` if you lengthen the text.
+  This bit again when the wall ladder landed: "Hold E  Upgrade to Fortified Wall (12)" is
+  38 characters of 3D text lying across the village. The verb was dropped and every
+  prompt's `pixel_size` cut ~25% for the pulled-back camera.
+- **Everything world-space is coupled to the camera, and the tally breaks first.** Prompts,
+  labels and the `GoldFx` pips are all sized in *metres*, so a camera change rescales them
+  all. The pull-back to 26m/fov34 is 0.63× apparent size: prompts (already too big) got
+  better, but a tally pip fell to ~14px and you could no longer tell a paid pip from an
+  unpaid one — which is the entire readout. `PIP_SCALE` / `PIP_SPACING` went up ~1.6× to
+  compensate. **Any future camera change has to revisit both, in opposite directions.**
 - **In a `--script` SceneTree file, autoloads are not resolvable by name** — reach them via
   `root.get_node("/root/GoldFx")`.
 - **`Input.action_press()` in a test also drives the monarch's real `_try_interact()`**, so
@@ -369,10 +491,79 @@ for the duration, so the king stays **locked on target** and a second tally can 
   copy and everything you edited by hand is gone. This ate the `Weather` and `DevMenu`
   nodes once — scripts all present on disk, feature simply not in the scene and therefore
   dead. After editing a `.tscn` by hand, **grep it back** to confirm the change survived.
+- **A second writer can disable your feature outright, and the symptom is that *no*
+  value you set changes anything.** `weather.gd` already owned `fog_enabled` and tied it
+  to `_intensity > 0.02`, so fog was switched off whenever it wasn't raining. The new
+  clear-day fog wrote density and colour onto a disabled environment every frame — so
+  raising density from 0.55 to 0.72 to 1.0 all looked identical, and only storms ever
+  showed haze, which looked exactly like "fog works, it just needs tuning". Two hours went
+  into tuning a value that could not have mattered. **When a change has no visible effect
+  at any magnitude, stop tuning and grep for another writer of the same property** —
+  measure the pixels rather than eyeballing gradients (`get_image().get_pixel()` with the
+  feature on vs. off settles it in one run). The rule that `day_night_cycle.gd` is the
+  environment's only writer exists precisely because of this failure mode.
+- **Fog has to differ from the ground in *luminance*, not just hue.** Mixing toward a
+  midday sky blue over sunlit lime grass moves the pixel almost not at all, because the
+  two are nearly the same brightness — which is why density alone could never make
+  clear-day fog read. `FOG_PALE` lifts the haze toward white in clear daylight and is what
+  actually makes it visible. It is free because **a 40° camera never shows the horizon**
+  (the top of the frame is ~10° below it), so fog that doesn't match the sky exactly has no
+  seam to give it away. Revisit if the pitch ever changes.
+- **A clipped channel is invisible in a screenshot and obvious in a measurement.** The
+  ground's green sat pinned at exactly **1.000 across the whole frame** at noon under a
+  1.2-energy sun — 100% of sampled pixels — so midday carried *no shading information at
+  all* and read as flat fluorescent green. It looked like "the art is too saturated"; it
+  was actually an **exposure** bug. Fixed by `DAY_ENERGY` 1.2 → 0.9 alone — noon now lands
+  at 0.949 with 0.3% clipped, and the tree canopies get their shading bands back.
+  **When something looks over-saturated, sample the pixels before touching the palette.**
+  Desaturating the ground albedo was tried first and was the wrong fix: it changed the
+  grass to a washed grey-green that Andrei spotted immediately, because the hue was never
+  the problem. The palette is canon (see the north star) — reach for exposure, not hue.
+  If midday still needs taking down, the next lever is the **ambient** term, which
+  contributes ~43% of the noon green and is what flattens the shading.
+- **Tune fog to what the camera sees, not to the size of the map.** The first depth-fog
+  pass used an 18–65m band for a "~30m world" and did nothing at all on screen — at the
+  camera of the day the far edge of the frame was only ~32m out, so two thirds of the band
+  sat behind the horizon. **The camera has since moved** (now `battle 45`: 18.38m up, 45°,
+  fov 34), and the visible ground is a *slant* range of **21–39m**, not 3–32m — so the old
+  band would now fog the grass under the monarch's feet. Band is 22–55m to match. Any
+  camera change moves these again: work out the slant distance at the top and bottom of the
+  frame first, then set the band inside it.
+- **The `.tscn` writes a basis row-major; the GDScript `Transform3D(...)` constructor takes
+  columns.** Decoding a hand-written scene transform with the constructor's convention
+  transposes it and makes a camera that looks *down* appear to look *up*. The shipped
+  camera is `rotation_degrees.x = -45`; in the file that is `(1,0,0, 0,cos,sin, 0,-sin,cos)`.
+- **A flat ground slab gets shadow acne the moment the sun rakes it.** At ~14° elevation
+  the whole field came out banded with moiré stripes. The fix that worked was **more
+  shadow-map density, not more bias**: `directional_shadow_max_distance` was 70m for a
+  camera that sees 32m, so halving it to 48 sharpened every texel. `shadow_normal_bias`
+  2.5 finished it. Reach for distance first — bias buys the same thing at the cost of
+  peter-panning, and the contact point at the feet is the entire cue.
+- **SSAO was tried and removed — don't re-add it.** It changed **0.3%** of the frame at
+  sensible settings and still only **0.8%** cranked to intensity 6 with a 2.5m radius;
+  side-by-side crops at 3× zoom were indistinguishable. Three reasons, all structural: the
+  world is convex objects on a flat plane, and AO needs *concavity* to bite; flat-shaded
+  low-poly has no small-scale detail to shade; and the camera is 26m out, so what little
+  effect exists lands on a handful of pixels. The deeper mistake was that **the sun's
+  shadows had already solved the problem SSAO was being added to solve** — contact
+  darkening is redundant next to a real cast shadow at the feet. It is a per-frame
+  screen-space pass; it was costing that for nothing.
+- **Post-process is not where this game's depth comes from.** Fog and SSAO both failed for
+  the same underlying reason: a flat-shaded palette on a flat slab gives screen-space
+  effects nothing to work with. What has actually moved the needle is **geometry and
+  light** — cast shadows, the scale hierarchy, and the camera. Reach for those first, and
+  be suspicious of any effect that has to be argued for rather than being obvious on sight.
+- **Depth of field does nothing under `gl_compatibility`** — measured 0.000 pixel change at
+  full strength, against SSAO 0.18, glow 0.47, saturation 0.15 and depth fog 0.68 in the
+  same test. So **blur is not an option** for depth here. Two traps on the way: in Godot 4
+  DOF is *not* on `Environment`, it moved to `CameraAttributesPractical` on the camera — and
+  setting the old `Environment.dof_blur_*` names silently kills the coroutine and hangs the
+  run, which looks exactly like a slow test.
 - **`gl_compatibility` has no volumetric fog, no decals and no SSR** (`project.godot`
   sets the renderer; confirmed against the 4.7 docs). Anything "atmospheric" has to be
   faked: depth+height fog and a mist particle layer instead of volumetrics, flat quads on
-  the slab instead of decals. Depth texture, screen texture, glow and SSAO *are* available.
+  the slab instead of decals. Depth texture, screen texture and glow *are* available; SSAO
+  is too, but see above — it does nothing useful in this game.
   Compatibility is also the **only renderer that exports to web**, so switching to Forward+
   costs a browser demo as well as a full re-tune of `day_night_cycle.gd`.
 - **A failed `assert()` in a `--script` SceneTree hangs the run forever.** It kills the

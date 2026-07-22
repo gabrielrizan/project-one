@@ -10,6 +10,12 @@ Licences for everything live in `assets/licenses/` — keep that true.
 **Third-party**
 - **Kenney kits** — castle, survival, game-icons. The bulk of the world: walls, gates,
   doors, fences, tents, towers, tools, trees, rocks, barrels.
+- **Kenney Fantasy Town Kit 2.0** (CC0, added 2026-07-22, `kenney_fantasy-town-kit/`) —
+  167 GLBs for the main-building ladder. ⚠️ **Entirely modular** — stone and wood wall
+  panels, roof panels, doorways, stairs, fences, roads. The only assembled buildings in it
+  are `windmill`, `watermill` and `watermill-wide`, so **halls have to be composed from
+  pieces**; there is no house model to drop in. Red and green roof panels; the red sits
+  with the palette's burgundy.
 - **Ultimate Animated Animals** (ScratchIO, CC0) — the stag, which is rigged and keeps
   its walk cycle. The only animated third-party model in the project.
 

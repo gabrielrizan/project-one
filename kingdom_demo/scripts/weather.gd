@@ -97,7 +97,19 @@ const MIST_MAX := 90
 ## Overcast never reaches 1.0 from rain alone -- a downpour is dark, but pinning
 ## the sky to full storm made midday unreadable.
 const STORM_CEIL := 0.88
-const FOG_DENSITY := 0.022
+## **Cloud cover is not proportional to rainfall.** Drizzle falls out of a sky
+## that is already fully overcast; what separates it from a downpour is how much
+## water comes down, not how much cloud is up there. Driving overcast linearly off
+## intensity got that wrong at the bottom of the range: light rain (0.35) dimmed
+## the sun by only 16%, so it read as bright midday sun with a few pale streaks
+## drawn over it, and the streaks were invisible against lit grass.
+##
+## An exponent below 1 lifts the low end hard and leaves the top almost untouched:
+## 0.35 -> 0.56 and 0.7 -> 0.82, while 1.0 stays exactly 1.0, so a downpour looks
+## exactly as it did. A *floor* would have been the other way to say this, but it
+## pops -- intensity ramps up from 0 through the gathering phase, so a floor makes
+## the sky lurch the instant rain starts. This stays continuous through zero.
+const OVERCAST_CURVE := 0.55
 
 ## The *wet ground* under the water, not the water itself -- the shader mixes
 ## this heavily toward the sky colour, because standing water seen from height
@@ -332,17 +344,19 @@ func _advance_lightning(delta: float) -> void:
 func _drive_look(_delta: float) -> void:
 	var env: Environment = null
 	if _cycle:
-		_cycle.storm = clampf(_intensity * STORM_CEIL, 0.0, 1.0)
+		_cycle.storm = clampf(pow(_intensity, OVERCAST_CURVE) * STORM_CEIL, 0.0, 1.0)
 		_cycle.flash = _flash
 		if _cycle.world_env:
 			env = _cycle.world_env.environment
 
-	# Depth fog standing in for the volumetric haze Compatibility can't do.
-	if env:
-		env.fog_enabled = _intensity > 0.02
-		if env.fog_enabled:
-			env.fog_density = FOG_DENSITY * _intensity
-			env.fog_light_color = env.background_color.lerp(Color(0.62, 0.66, 0.70), 0.45)
+	# Depth fog used to be written from right here, rain-only: `fog_enabled` was
+	# tied to `_intensity > 0.02`, so the moment it stopped raining fog was turned
+	# **off entirely**. That silently defeated the clear-day aerial perspective in
+	# `day_night_cycle.gd` -- density and colour were being written every frame
+	# onto a disabled fog, so no value of either could ever show on screen and only
+	# a storm ever looked hazy. Fog now belongs to the cycle along with the rest of
+	# the environment (see `CLAUDE.md`), and it still thickens with rain, because
+	# `storm` is set a few lines above and the cycle reads it. Nothing was lost.
 
 	_follow_camera()
 
@@ -554,8 +568,15 @@ func _soft_dot() -> GradientTexture2D:
 ## off for it -- the project runs with `physics_interpolation` on globally
 ## (`project.godot`), and an interpolated emitter lags the camera it is supposed
 ## to be centred on.
+##
+## **Nothing weather draws ever casts a shadow.** Now that the sun does
+## (`day_night_cycle.gd`), the default would have every raindrop, splash and mist
+## quad rendered into the shadow map -- thousands of them, for a stipple of dark
+## specks over the whole village that reads as dirt, not rain. Gated here rather
+## than on each emitter so any layer added later inherits it.
 func _add_layer(p: GPUParticles3D) -> void:
 	p.emitting = false
 	p.local_coords = false
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	p.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	add_child(p)

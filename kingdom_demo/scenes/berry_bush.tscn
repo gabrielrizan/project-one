@@ -16,7 +16,7 @@ shape = SubResource("CylinderShape3D_bb")
 [node name="Prompt" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 visible = false
-pixel_size = 0.008
+pixel_size = 0.006
 billboard = 1
 no_depth_test = true
 modulate = Color(1, 0.95, 0.5, 1)

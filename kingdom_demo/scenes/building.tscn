@@ -16,7 +16,7 @@ shape = SubResource("BoxShape3D_b")
 
 [node name="Label" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
-pixel_size = 0.008
+pixel_size = 0.006
 billboard = 1
 no_depth_test = true
 modulate = Color(0.95, 0.95, 0.8, 1)
@@ -30,7 +30,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.4, 0)
 [node name="Prompt" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 visible = false
-pixel_size = 0.009
+pixel_size = 0.007
 billboard = 1
 no_depth_test = true
 modulate = Color(1, 0.9, 0.4, 1)

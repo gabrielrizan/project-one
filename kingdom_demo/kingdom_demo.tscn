@@ -41,6 +41,13 @@ background_mode = 1
 background_color = Color(0.5294118, 0.80784315, 0.92156863, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.56078434, 0.6509804, 0.7019608, 1)
+fog_mode = 1
+fog_light_color = Color(0.5294118, 0.80784315, 0.92156863, 1)
+fog_density = 0.3
+fog_sky_affect = 0.0
+fog_depth_curve = 1.2
+fog_depth_begin = 22.0
+fog_depth_end = 55.0
 
 [node name="KingdomDemo" type="Node3D" unique_id=55025416]
 script = ExtResource("1_0vp01")
@@ -75,6 +82,11 @@ script = ExtResource("2_nbtlu")
 [node name="Sun" type="DirectionalLight3D" parent="DayNightCycle" unique_id=1516669441]
 transform = Transform3D(0.8660254, 0.40957603, -0.28678823, 0, 0.57357645, 0.81915206, 0.5, -0.7094065, 0.49673176, 0, 0, 0)
 light_energy = 1.2
+shadow_enabled = true
+shadow_bias = 0.06
+shadow_normal_bias = 2.5
+directional_shadow_mode = 0
+directional_shadow_max_distance = 48.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="DayNightCycle" unique_id=1859794773]
 environment = SubResource("Environment_hfmf3")
@@ -88,9 +100,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 1)
 script = ExtResource("4_ndqrx")
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=936210487]
-transform = Transform3D(1, 0, 0, 0, 0.7660444, 0.6427875, 0, -0.6427875, 0.7660444, 0, 6.644999, 5.5029993)
+transform = Transform3D(1, 0, 0, 0, 0.7071068, 0.7071068, 0, -0.7071068, 0.7071068, 0, 18.38, 18.38)
 current = true
-fov = 60.0
+fov = 34.0
 
 [node name="WallSideN" parent="." unique_id=52080125 instance=ExtResource("12_ws")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -8)

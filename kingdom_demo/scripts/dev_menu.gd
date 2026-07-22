@@ -26,6 +26,47 @@ const DIM := Color(0.62, 0.66, 0.60)
 const RAIN_STEPS := [0.0, 0.35, 0.70, 1.0]
 const RAIN_NAMES := ["off", "light", "steady", "downpour"]
 
+## Fast-forward, for when you want to watch a whole 6-minute day without living
+## through it. `Engine.time_scale` is the whole mechanism -- it scales the day
+## clock, the walk to the trees and the build timers together, so what you watch
+## is the real game, just quicker.
+##
+## Two things it does *not* scale, both of which are why this is a dev tool and
+## not a game feature: audio keeps its own clock, so at 8x the beds and hoofbeats
+## stack up into a mess; and physics steps are capped per frame, so without the
+## `max_physics_steps_per_frame` line below anything past 8x quietly runs slower
+## than it claims to.
+const SPEED_STEPS := [1.0, 2.0, 4.0, 8.0, 16.0]
+
+## Camera presets, for play-testing the lens (D5 in `DEPTH_PROMPTS.md`). Cycled
+## with C; `pos` is the Camera3D's local offset from the rig, which follows the
+## monarch, so these are pure lens-and-angle changes.
+##
+## **Every preset but `stock` aims at the rig origin** -- pitch equals the
+## position's elevation, so the monarch sits at frame centre. `stock` deliberately
+## does not: the shipped camera sits at 50.4 degrees of elevation but is pitched
+## only 40, so it looks *past* the monarch and puts him low in frame with the
+## ground ahead opened up. That is worth keeping as the baseline to A/B against
+## rather than quietly correcting.
+##
+## The trailing metres are the ground visible across frame centre at 16:9, and
+## they are the point of the list: **the first four are all ~18-20 m.** Distance
+## and field of view cancel, so a longer lens further back buys the diorama look
+## and *no extra coverage at all*. Only the two `battle` presets genuinely show
+## you more -- which is a separate decision from the lens, and the one that
+## matters once there is something to fight (see D6).
+## Index 0 must match what `kingdom_demo.tscn` ships, or the readout lies until
+## the first press. `battle 45` is now the shipped camera.
+const CAM_PRESETS := [
+	{"name": "battle 45°  fov34  ~28m", "pos": Vector3(0, 18.38, 18.38), "pitch": 45.0, "fov": 34.0},
+	{"name": "battle 60°  fov32  ~29m", "pos": Vector3(0, 24.25, 14.00), "pitch": 60.0, "fov": 32.0},
+	{"name": "diorama 45°  fov34  ~18m", "pos": Vector3(0, 12.02, 12.02), "pitch": 45.0, "fov": 34.0},
+	{"name": "diorama 60°  fov32  ~19m", "pos": Vector3(0, 16.45, 9.50), "pitch": 60.0, "fov": 32.0},
+	{"name": "tabletop 75° fov30  ~20m", "pos": Vector3(0, 20.28, 5.44), "pitch": 75.0, "fov": 30.0},
+	{"name": "close  50°  fov45  ~18m", "pos": Vector3(0, 9.19, 7.71), "pitch": 50.0, "fov": 45.0},
+	{"name": "stock  40°  fov60  ~18m", "pos": Vector3(0, 6.645, 5.503), "pitch": 40.0, "fov": 60.0},
+]
+
 ## One list drives both the buttons and the hotkeys, so the two can never drift
 ## apart -- adding a tool is one entry here and one method.
 ##
@@ -36,6 +77,8 @@ const RAIN_NAMES := ["off", "light", "steady", "downpour"]
 ## which the game itself uses.
 const ACTIONS := [
 	{"key": KEY_F2, "name": "F2", "text": "skip to night / day", "fn": "_skip_phase"},
+	{"key": KEY_T, "name": "T", "text": "speed ×1 → ×16", "fn": "_step_speed"},
+	{"key": KEY_C, "name": "C", "text": "camera preset", "fn": "_step_camera"},
 	{"key": KEY_F4, "name": "F4", "text": "rain step", "fn": "_step_rain"},
 	{"key": KEY_F5, "name": "F5", "text": "lightning now", "fn": "_strike"},
 	{"key": KEY_F6, "name": "F6", "text": "next season", "fn": "_next_season"},
@@ -49,6 +92,8 @@ const ACTIONS := [
 var _readout: Label = null
 var _box: VBoxContainer = null
 var _rain_step := 0
+var _speed_step := 0
+var _cam_preset := 0
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -159,12 +204,46 @@ func _rooster() -> void:
 	amb.crow_daybreak()
 	print("[dev] rooster")
 
-## Jump to the start of the next phase -- night if it's day, dawn if it's night.
+## Jump to the next phase, landing on a moment you can actually *see* rather than
+## on the phase boundary. Sunset and dawn are both still fully lit -- jumping to
+## `SUNSET_AT` used to look like nothing had happened -- so night lands once dusk
+## has finished falling, and day lands at sunrise with the light already up.
 func _skip_phase() -> void:
 	var cycle := _cycle()
 	if cycle == null:
 		return
-	cycle.set_time_of_day(0.0 if cycle.is_night() else cycle.DAY_DURATION)
+	if cycle.is_night():
+		cycle.set_time_of_day(cycle.SUNRISE_AT)
+	else:
+		cycle.set_time_of_day(cycle.SUNSET_AT + cycle.DUSK)
+
+## Cycle the fast-forward. `max_physics_steps_per_frame` has to move with it or
+## the engine runs out of physics budget and the world silently drops below the
+## speed on the label -- it defaults to 8, which is exactly ×8, so ×16 would look
+## like the setting simply stopped working.
+func _step_speed() -> void:
+	_speed_step = (_speed_step + 1) % SPEED_STEPS.size()
+	var s: float = SPEED_STEPS[_speed_step]
+	Engine.time_scale = s
+	Engine.max_physics_steps_per_frame = maxi(8, int(ceil(s)))
+	print("[dev] speed x%.0f" % s)
+
+## Cycle the camera preset. Writes `Camera3D.position` directly, which the rig
+## supports: it adopts the camera's position as its rest pose whenever it isn't
+## mid-shake, so a preset survives the next thump instead of being snapped back.
+func _step_camera() -> void:
+	var rig := get_tree().get_first_node_in_group("camera_rig")
+	if rig == null:
+		return
+	var cam: Camera3D = rig.get_node_or_null("Camera3D")
+	if cam == null:
+		return
+	_cam_preset = (_cam_preset + 1) % CAM_PRESETS.size()
+	var p: Dictionary = CAM_PRESETS[_cam_preset]
+	cam.position = p["pos"]
+	cam.rotation_degrees.x = -float(p["pitch"])
+	cam.fov = p["fov"]
+	print("[dev] camera: %s" % p["name"])
 
 func _step_rain() -> void:
 	var w := _weather()
@@ -211,7 +290,10 @@ func _next_season() -> void:
 func _process(_delta: float) -> void:
 	if not visible or _readout == null:
 		return
-	_readout.text = "%s\n%s" % [_time_line(), _weather_line()]
+	_readout.text = "%s\n%s\n%s" % [_time_line(), _weather_line(), _camera_line()]
+
+func _camera_line() -> String:
+	return "camera  %s" % CAM_PRESETS[_cam_preset]["name"]
 
 func _time_line() -> String:
 	var cycle := _cycle()
@@ -221,8 +303,11 @@ func _time_line() -> String:
 	var night: bool = cycle.is_night()
 	var phase_t: float = t - cycle.DAY_DURATION if night else t
 	var phase_len: float = cycle.NIGHT_DURATION if night else cycle.DAY_DURATION
-	return "time    %s  %.0f/%.0fs  (dark %.2f)" % [
-		"night" if night else "day", phase_t, phase_len, cycle.darkness()]
+	# Only shown when it isn't 1x, so a fast-forward you forgot about can't be
+	# mistaken for the day suddenly running short.
+	var speed := "" if Engine.time_scale == 1.0 else "  ×%.0f" % Engine.time_scale
+	return "time    %s  %.0f/%.0fs  (dark %.2f)%s" % [
+		"night" if night else "day", phase_t, phase_len, cycle.darkness(), speed]
 
 func _weather_line() -> String:
 	var w := _weather()
