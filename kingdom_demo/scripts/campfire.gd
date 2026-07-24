@@ -9,6 +9,11 @@ const LIGHT_COST := 3
 const CAULDRON_MAX := 3
 const FEED_COST := 1
 const VILLAGER_COUNT := 5
+## How far out wanderers walk in from, as a ring around the fire. One number to
+## retune per map: on a terrain-gated map some bearings will be inside rock, and a
+## wanderer spawned there is stranded for good (`COMBAT_PROMPTS.md` P1). Biasing
+## the *angle* onto open ground is the map's job; this is just the distance.
+const WANDER_IN := Vector2(15.0, 19.0)   # min .. max metres
 
 ## How many souls the main building can house, by tier: L1 Tent, L2 Wooden Hall,
 ## L3 Stone Hall. Room to grow is what an upgrade buys -- the hall is the reason
@@ -279,7 +284,7 @@ func _attract_villagers() -> void:
 	for i in range(mini(VILLAGER_COUNT, room)):
 		var v := VILLAGER_SCENE.instantiate()
 		var a := randf() * TAU
-		var spawn := global_position + Vector3(cos(a), 0, sin(a)) * randf_range(15.0, 19.0)
+		var spawn := global_position + Vector3(cos(a), 0, sin(a)) * randf_range(WANDER_IN.x, WANDER_IN.y)
 		spawn.y = 0.0
 		v.target = global_position
 		scene.add_child(v)
@@ -295,6 +300,10 @@ func _spawn_village() -> void:
 	# -> L3 Stone Hall -> L4 Castle (not built yet). Lighting the fire raises the
 	# Tent for free; every tier after that is paid for AND raised by a crew, and
 	# reaching the Stone Hall is what opens the walls' own stone upgrade.
+	# Positions are **offsets from the campfire** (see `_spawn_building`), not world
+	# coordinates -- so the whole village follows wherever the fire is placed on a
+	# new map, instead of always spawning around the world origin. The fire sits at
+	# origin today, so these read the same as the old absolute numbers.
 	_hall = _spawn_building(TENT_MODEL, "Tent", Vector3(-3.6, 0, -2.6), TENT_SCALE, TENT_HEIGHT, "",
 		_hall_tier(HALL_L2, false), "Wooden Hall", _hall_scale(HALL_L2), HALL_L2[3], WOODEN_HALL_COST,
 		_hall_tier(HALL_L3, true), "Stone Hall", _hall_scale(HALL_L3), HALL_L3[3], STONE_HALL_COST, true,
@@ -342,7 +351,10 @@ func _spawn_building(scene: PackedScene, bname: String, pos: Vector3, sc: float,
 	b.upgrade3_height = up3_height
 	b.upgrade3_cost = up3_cost
 	get_tree().current_scene.add_child(b)
-	b.global_position = pos
+	# `pos` is an offset from the fire, so the village travels with it. Translation
+	# only, not rotation -- a rotated campfire isn't a real case and turning the
+	# offsets by its basis would be speculative complexity.
+	b.global_position = global_position + pos
 	return b
 
 # ---------------------------------------------------------------- state

@@ -43,8 +43,10 @@ Don't "finish the conversion" — they are billboards on purpose so they read fr
 
 ## Where the build is now
 
-*Backward-looking on purpose. There is no roadmap — what to build next is decided fresh
-each session. `GAME_DESIGN.md` §13 lists rough priorities, but treat it as ideas, not a plan.*
+*Backward-looking on purpose — this section records what exists. Direction lives in
+**`kingdom_demo/ROADMAP.md`** (map progression, the five-tier hall ladder, unlocks and
+playtime targets — decided with Andrei 2026-07-23/24) and the task lists in
+`COMBAT_PROMPTS.md` and `DEPTH_PROMPTS.md`. `GAME_DESIGN.md` §13 still lists priorities.*
 
 **Working:** monarch rides and buys via hold-to-pay · campfire → village → cauldron draws
 wanderers → they eat, become citizens, take jobs · workers fell marked trees · archers hunt
@@ -76,12 +78,16 @@ listening desk. Several clips are placeholders chosen to get a feel, not finals.
 new wanderers*, not filling the pot: a batch of five outnumbers the cauldron's three
 servings, so refusing the sale at cap would strand the last arrivals hungry for good.
 
-## The two docs
+## The docs
 
 - **`CLAUDE.md`** (this file) — what the code *is*, and how to work here. Loaded every
   session. Claude keeps the factual parts current without asking.
 - **`kingdom_demo/GAME_DESIGN.md`** — what the game is *for*. Pillars in full, future
   systems, decisions-with-rationale, open questions. Read before design-shaped work.
+- **`kingdom_demo/ROADMAP.md`** — where the game is *going*: five maps, the five-tier
+  hall ladder, per-map unlocks, the camp-assault objective loop, playtime targets.
+  Decided with Andrei; where it and `GAME_DESIGN.md` §9 disagree, the roadmap is newer
+  and wins. `COMBAT_PROMPTS.md`'s tasks assume it.
 - **`kingdom_demo/ASSETS.md`** — asset inventory, provenance, model quirks. Read when
   working on art.
 
