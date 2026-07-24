@@ -1,0 +1,23 @@
+[gd_scene format=3 uid="uid://bnd7k2qax4mqv"]
+
+[ext_resource type="Script" uid="uid://ddxr4uw5ysgmv" path="res://kingdom_demo/scripts/bandit.gd" id="1_b"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_b"]
+radius = 0.28
+height = 1.2
+
+[node name="Bandit" type="CharacterBody3D"]
+script = ExtResource("1_b")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+shape = SubResource("CapsuleShape3D_b")
+
+[node name="Model" type="Node3D" parent="."]
+
+[node name="NavAgent" type="NavigationAgent3D" parent="."]
+radius = 0.35
+height = 1.5
+path_desired_distance = 0.5
+target_desired_distance = 0.4
+avoidance_enabled = false

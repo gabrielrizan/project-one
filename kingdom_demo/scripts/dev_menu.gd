@@ -21,6 +21,8 @@ const GOLD := Color(0.85, 0.72, 0.38)
 const PARCHMENT := Color(0.92, 0.89, 0.80)
 const DIM := Color(0.62, 0.66, 0.60)
 
+const BANDIT_SCENE := preload("res://kingdom_demo/scenes/bandit.tscn")
+
 ## The steps F4 walks through. "Off" stops the rain but deliberately leaves the
 ## ground wet, so you can watch the pools dry on their own -- F7 clears those.
 const RAIN_STEPS := [0.0, 0.35, 0.70, 1.0]
@@ -87,6 +89,10 @@ const ACTIONS := [
 	{"key": KEY_H, "name": "H", "text": "horn ×2  — attack", "fn": "_alarm"},
 	{"key": KEY_K, "name": "K", "text": "horn ×3  — blood moon", "fn": "_bloodmoon"},
 	{"key": KEY_L, "name": "L", "text": "rooster (daybreak)", "fn": "_rooster"},
+	{"key": KEY_N, "name": "N", "text": "spawn bandit (mouth)", "fn": "_spawn_bandit"},
+	{"key": KEY_M, "name": "M", "text": "clear bandits", "fn": "_clear_bandits"},
+	{"key": KEY_R, "name": "R", "text": "raid now", "fn": "_raid_now"},
+	{"key": KEY_Y, "name": "Y", "text": "advance night counter", "fn": "_advance_night"},
 ]
 
 var _readout: Label = null
@@ -171,6 +177,41 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == a["key"]:
 			call(a["fn"])
 			return
+
+## Spawns one bandit at the corridor mouth, marching on the hall. Press again for
+## more -- with a wall built they line up at the shut gate (COMBAT_PROMPTS P2).
+## No spawner yet; the raid director (P3) will send them in waves.
+func _spawn_bandit() -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var b := BANDIT_SCENE.instantiate()
+	scene.add_child(b)
+	b.global_position = MapTerrain.corridor_mouth() \
+		+ Vector3(randf_range(-4.0, 4.0), 0.0, randf_range(-1.5, 1.5))
+	print("[dev] bandit spawned at the corridor mouth")
+
+func _clear_bandits() -> void:
+	var n := 0
+	for b in get_tree().get_nodes_in_group("bandit"):
+		b.queue_free()
+		n += 1
+	print("[dev] cleared %d bandit%s" % [n, "" if n == 1 else "s"])
+
+## Send a wave right now, without waiting for dusk.
+func _raid_now() -> void:
+	var dir := _raids()
+	if dir:
+		dir.raid_now()
+
+## Bump the night counter, to reach a raid night (or the blood moon, P7) fast.
+func _advance_night() -> void:
+	var dir := _raids()
+	if dir:
+		dir.advance_night()
+
+func _raids() -> Node:
+	return get_tree().get_first_node_in_group("night_raids")
 
 func _strike() -> void:
 	if _weather():
@@ -290,7 +331,13 @@ func _next_season() -> void:
 func _process(_delta: float) -> void:
 	if not visible or _readout == null:
 		return
-	_readout.text = "%s\n%s\n%s" % [_time_line(), _weather_line(), _camera_line()]
+	_readout.text = "%s\n%s\n%s\n%s" % [_time_line(), _weather_line(), _raid_line(), _camera_line()]
+
+func _raid_line() -> String:
+	var dir := _raids()
+	if dir == null:
+		return "raids   --"
+	return "raids   night %d  ·  %s" % [dir.night(), "RAID" if dir.is_raid_tonight() else "quiet"]
 
 func _camera_line() -> String:
 	return "camera  %s" % CAM_PRESETS[_cam_preset]["name"]

@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://bqptlhs12s71f"]
+
+[node name="Arrow" type="Sprite3D" unique_id=1527631966]
+pixel_size = 0.045
+billboard = 2
+alpha_cut = 1
+texture_filter = 0

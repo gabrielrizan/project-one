@@ -38,6 +38,13 @@ extends StaticBody3D
 
 const MAX_JOBS := 4
 const JOB_COST := 3
+
+# --- HP, collapse & the hall's fall (COMBAT_PROMPTS P6b). PLACEHOLDER numbers. ---
+## A hut's pool; the hall's is bigger and climbs with its tier (it's the run's heart).
+const HUT_HP := 90.0
+const HALL_HP: Array[float] = [200.0, 300.0, 420.0, 560.0]   # L1 Tent .. L4 Castle
+const HUT_REPAIR_COST := 6      # flat, placeholder -- a hut was free to raise
+const REPAIR_TIME := 20.0       # crew-seconds to mend a collapsed hut
 const LOG_MODEL := preload("res://kingdom_demo/assets/3d/props/log_marker.glb")
 const ARROW_MODEL := preload("res://kingdom_demo/assets/3d/props/arrow_marker.glb")
 const HAMMER_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tool-hammer.glb")
@@ -93,6 +100,12 @@ var _model: Node3D = null
 var _height := 1.5
 var _busy := false
 
+# HP, collapse & repair (P6b)
+var _hp := 0.0
+var _hp_max := 0.0
+var _collapsed := false          # a hut knocked flat, awaiting repair
+var _repairing := false          # a crew is mending it
+
 func _ready() -> void:
 	add_to_group("building")
 	_show_model(model_scene, model_scale)
@@ -100,7 +113,108 @@ func _ready() -> void:
 	label.text = display_name
 	if job_type != "":
 		add_to_group("workplace")
+	_refresh_hp()
 	set_process(false)
+	_update_interactable()
+
+# ---- damage, collapse & the hall's fall (COMBAT_PROMPTS P6b) ----
+
+## Only the main building upgrades, so its upgrade slot is what tells it apart from
+## the Workers/Archers huts -- available in _ready, before any group tag lands.
+func _is_hall() -> bool:
+	return upgrade_model_scene != null
+
+func _max_hp() -> float:
+	if _is_hall():
+		var i := 3 if upgraded3 else (2 if upgraded2 else (1 if upgraded else 0))
+		return HALL_HP[i]
+	return HUT_HP
+
+func _refresh_hp() -> void:
+	_hp_max = _max_hp()
+	_hp = _hp_max
+
+## A bandit vandalising the nearest building (bandit.gd, when there's nothing to
+## rob). A hut at zero collapses into a repair site; the hall at zero ends the run.
+func take_hit(amount: float, at: Vector3) -> void:
+	if _collapsed or _repairing or _building_tier > 0:
+		return
+	if _hp_max <= 0.0:
+		_refresh_hp()
+	_hp -= amount
+	MarkFx.hit_flash(self, _model)
+	var hit := at
+	hit.y = 0.6
+	MarkFx.debris(self, hit, Vector3.UP, 4, Color(0.7, 0.66, 0.56, 0.95), 0.016, 0.8)
+	if _hp <= 0.0:
+		if _is_hall():
+			_fall()
+		else:
+			_collapse()
+
+## The hall is gone -- hand the lose condition to the game manager.
+func _fall() -> void:
+	var gm := get_tree().get_first_node_in_group("game_manager")
+	if gm and gm.has_method("end_run"):
+		gm.end_run()
+
+## A hut knocked flat: jobs suspended (no new hires), its offer icons pulled, the
+## model slumped into rubble. It becomes interactable so the monarch can pay to mend.
+func _collapse() -> void:
+	_collapsed = true
+	_hp = 0.0
+	remove_from_group("workplace")
+	_clear_job_icons()
+	if is_instance_valid(_model):
+		var t := create_tween()
+		t.tween_property(_model, "position:y", -_height * 0.4, 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		t.parallel().tween_property(_model, "rotation:z", randf_range(0.18, 0.32), 0.4)
+	_dust()
+	if not is_in_group("interactable"):
+		add_to_group("interactable")
+
+func _clear_job_icons() -> void:
+	for c in _icons.get_children():
+		c.queue_free()
+
+func _rebuild_job_icons() -> void:
+	_clear_job_icons()
+	for i in range(maxi(0, jobs - filled)):
+		_add_job_icon()
+
+# ---- repair (crew-built, like a wall's) ----
+
+func _open_repair() -> void:
+	_repairing = true
+	_progress = 0.0
+	_crew = BuildCrew.new()
+	add_to_group("build_site")
+	remove_from_group("interactable")
+	_banner = MarkFx.banner(self, HAMMER_MODEL, _height + 1.6, BANNER_SCALE)
+	_banner_t = 0.0
+	set_process(true)
+
+func _finish_repair() -> void:
+	_repairing = false
+	_collapsed = false
+	set_process(false)
+	remove_from_group("build_site")
+	if is_instance_valid(_banner):
+		_banner.queue_free()
+	_banner = null
+	_crew = BuildCrew.new()
+	hide_prompt()
+	# heave the hut back upright
+	if is_instance_valid(_model):
+		var t := create_tween()
+		t.tween_property(_model, "position:y", 0.0, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(_model, "rotation:z", 0.0, 0.45)
+	_dust()
+	_raise_sound("wood")
+	if job_type != "" and not is_in_group("workplace"):
+		add_to_group("workplace")
+	_rebuild_job_icons()
+	_refresh_hp()
 	_update_interactable()
 
 # ---- layout ----
@@ -148,6 +262,17 @@ func claim_job() -> bool:
 	_take_job_icon()
 	_refresh_prompt()
 	return true
+
+## A robbed citizen leaves their post (COMBAT_PROMPTS P5): the position re-opens and
+## its vacancy icon comes back, the mirror of claim_job. The workforce recovers when
+## the victim is re-fed and takes the job again.
+func vacate_job() -> void:
+	if filled <= 0:
+		return
+	filled -= 1
+	_add_job_icon()
+	_refresh_prompt()
+	_update_interactable()
 
 func work_point() -> Vector3:
 	# a spot just in front of the building for workers to stand
@@ -204,7 +329,15 @@ func _prompt_text() -> String:
 	return "Hold E  Add Job (%d)   %d/%d" % [JOB_COST, jobs, MAX_JOBS]
 
 func show_prompt() -> void:
-	if _busy or _prompt_text() == "":
+	if _busy or _repairing:
+		return
+	# a collapsed hut offers repair before anything else (P6b)
+	if _collapsed:
+		_prompt.text = ("Hold E  Repair (%d)" % HUT_REPAIR_COST) if _workers_exist() \
+			else "Repair  needs a worker"
+		_prompt.visible = true
+		return
+	if _prompt_text() == "":
 		return
 	_prompt.text = _prompt_text()
 	_prompt.visible = true
@@ -217,7 +350,12 @@ func _refresh_prompt() -> void:
 		_prompt.text = _prompt_text()
 
 func interact(who: Node3D) -> void:
-	if _busy or _building_tier > 0:
+	if _busy or _building_tier > 0 or _repairing:
+		return
+	# repair a collapsed hut (P6b) -- crew-built, like a wall
+	if _collapsed:
+		if _workers_exist():
+			await _buy(who, HUT_REPAIR_COST, _open_repair)
 		return
 	if _can_upgrade():
 		if _workers_exist():
@@ -374,20 +512,24 @@ func _build_time() -> float:
 		_: return TIER3_BUILD_TIME
 
 func _process(delta: float) -> void:
-	if _building_tier == 0:
+	if _building_tier == 0 and not _repairing:
 		return
 	if is_instance_valid(_banner):
 		_banner_t += delta
 		if _banner_t > 0.4:
 			_banner.position.y = _height + 1.6 + sin((_banner_t - 0.4) * 2.6) * 0.08
 	var hands := _crew.hands()
-	_prompt.text = "Needs workers" if hands == 0 else "Building  %d%%   x%d" % [int(_progress * 100.0), hands]
+	var verb := "Repairing" if _repairing else "Building"
+	_prompt.text = "Needs workers" if hands == 0 else "%s  %d%%   x%d" % [verb, int(_progress * 100.0), hands]
 	_prompt.visible = true
 	if hands <= 0:
 		return
-	_progress += delta * _crew.speed() / _build_time()
+	_progress += delta * _crew.speed() / (REPAIR_TIME if _repairing else _build_time())
 	if _progress >= 1.0:
-		_finish_upgrade()
+		if _repairing:
+			_finish_repair()
+		else:
+			_finish_upgrade()
 
 func _finish_upgrade() -> void:
 	var tier := _building_tier
@@ -418,15 +560,21 @@ func _finish_upgrade() -> void:
 		# until a castle set is added, rather than silently landing as nothing.
 		_swap_and_heave(upgrade3_model_scene, upgrade3_display_name, upgrade3_scale,
 			upgrade3_height, "castle")
+	_refresh_hp()   # a new tier is a tougher hall, mended to full (P6b)
 	_update_interactable()
 
 # ---- the crew (asked by villagers, same duck-typed interface as a wall site) ----
 
+## A standing building a bandit can vandalise -- not one already flat, mending, or
+## mid-construction (COMBAT_PROMPTS P6b).
+func is_attackable() -> bool:
+	return not _collapsed and not _repairing and _building_tier == 0 and _hp > 0.0
+
 func site_active() -> bool:
-	return _building_tier > 0
+	return _building_tier > 0 or _repairing
 
 func needs_builders() -> bool:
-	return _building_tier > 0 and _crew.needs_more()
+	return (_building_tier > 0 or _repairing) and _crew.needs_more()
 
 func claim_builder(who: Node3D) -> bool:
 	if not needs_builders():

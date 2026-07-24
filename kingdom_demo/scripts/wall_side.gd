@@ -81,6 +81,25 @@ const DUST := Color(0.78, 0.73, 0.62, 0.95)
 ## extra hands spread out to the flanks
 const STATIONS: Array[float] = [0.0, -3.6, 3.6]
 
+## Six archer perches flanking the gate (COMBAT_PROMPTS P4), ordered **centre-first**
+## so the two nearest the opening fill before the flanks -- fire concentrates where
+## raiders mass at the gate (§9). Offsets are along the run (local x).
+const PERCH_OFFSETS: Array[float] = [1.6, -1.6, 4.0, -4.0, 6.4, -6.4]
+## What an archer's feet stand at, per level (none/twig/wood/stone/fort). The wood
+## tier's float over its 0.52 m fence visual is accepted placeholder (§9, §12.20).
+const PERCH_HEIGHTS: Array[float] = [0.0, 0.75, 1.05, 1.35, 1.64]
+## How far inside the wall the climb starts, on the ground.
+const PERCH_FOOT_IN := 1.4
+
+# --- HP, damage & repair (COMBAT_PROMPTS P6a) ---
+## PLACEHOLDER, scaled by material -- stone is far tougher than wood. Two pools per
+## side: the arc (all the sections either side of the gate) and a smaller, separate
+## one for the gate itself, which is where raiders mass and hammer.
+const ARC_HP: Array[float] = [0.0, 60.0, 120.0, 240.0, 400.0]
+const GATE_HP: Array[float] = [0.0, 40.0, 80.0, 160.0, 280.0]
+## Stone sections swap to this ready-made ruin at zero; wood just tilts and sinks.
+const RUIN_SCENE := preload("res://kingdom_demo/assets/3d/kenney_fantasy-town-kit/Models/GLB format/wall-half.glb")
+
 @onready var _marker: Node3D = $MarkerSprite
 @onready var _marker_col: CollisionShape3D = $MarkerCollision
 @onready var _prompt: Label3D = $Prompt
@@ -106,10 +125,23 @@ var _crew: BuildCrew = null
 var _banner: Node3D = null
 var _banner_t := 0.0
 var _site_props: Array[Node3D] = []
+var _perch_taken: Array = []   # index -> claiming archer (or null)
+
+# HP, damage & repair (P6a)
+var _arc_hp := 0.0
+var _arc_hp_max := 0.0
+var _gate_hp := 0.0
+var _gate_hp_max := 0.0
+var _breached := false          # arc collision gone -- a hole in the run
+var _gate_breached := false     # gate collision gone -- the gateway is open
+var _repairing := false         # the open site is mending, not raising/upgrading
+var _left_col: CollisionShape3D = null
+var _right_col: CollisionShape3D = null
 
 func _ready() -> void:
 	add_to_group("interactable")
 	add_to_group("wall_side")
+	_perch_taken.resize(PERCH_OFFSETS.size())
 	set_process(false)
 
 # ---- build interaction ----
@@ -133,6 +165,12 @@ func _hall_tier() -> int:
 func show_prompt() -> void:
 	if building or _busy:
 		return
+	# a damaged side offers repair before anything else (P6a)
+	if _is_damaged():
+		_prompt.text = ("Hold E  Repair (%d)" % _repair_cost()) if _workers_exist() \
+			else "Repair  needs a worker"
+		_prompt.visible = true
+		return
 	var want := _next_level()
 	if want == NONE:
 		hide_prompt()
@@ -151,6 +189,20 @@ func hide_prompt() -> void:
 
 func interact(who: Node3D) -> void:
 	if building or _busy:
+		return
+	# repair a damaged side (P6a) -- same hold-to-pay, at a fraction of the cost
+	if _is_damaged():
+		var rc: int = _repair_cost()
+		if not _workers_exist() or not GoldFx.can_afford(rc):
+			return
+		_busy = true
+		hide_prompt()
+		var ok_r: bool = await GoldFx.pay(who, self, rc, 2.2)
+		_busy = false
+		if ok_r:
+			_open_repair()
+		elif _near_enough(who):
+			show_prompt()
 		return
 	var want := _next_level()
 	if want == NONE:
@@ -239,12 +291,16 @@ func _process(delta: float) -> void:
 	if hands <= 0:
 		return
 	_progress += delta * _crew.speed() / BASE_BUILD_TIME
-	_advance_construction()
-	if _progress >= 1.0:
-		_finish_upgrade() if _upgrading() else _finish()
+	if _repairing:
+		if _progress >= 1.0:
+			_finish_repair()
+	else:
+		_advance_construction()
+		if _progress >= 1.0:
+			_finish_upgrade() if _upgrading() else _finish()
 
 func _show_site_status(hands: int) -> void:
-	var verb := "Upgrading" if _upgrading() else "Building"
+	var verb := "Repairing" if _repairing else ("Upgrading" if _upgrading() else "Building")
 	_prompt.text = "Needs workers" if hands == 0 else "%s  %d%%   x%d" % [verb, int(_progress * 100.0), hands]
 	_prompt.visible = true
 
@@ -259,6 +315,255 @@ func _advance_construction() -> void:
 		else:
 			_raise_section(_plan[_raised])
 		_raised += 1
+
+# ---- archer perches (asked by villagers, COMBAT_PROMPTS P4) ----
+
+## Reserve the centre-most free perch for `who`; -1 if the wall isn't built or all
+## six are taken. Centre-first falls straight out of PERCH_OFFSETS being ordered
+## inward, so the same duck-typed claim every errand uses concentrates fire on the
+## gate without a player order (§1).
+func claim_perch(who: Node) -> int:
+	if level < TWIG:
+		return -1
+	for i in PERCH_OFFSETS.size():
+		if _perch_taken[i] == null or not is_instance_valid(_perch_taken[i]):
+			_perch_taken[i] = who
+			return i
+	return -1
+
+func release_perch(who: Node) -> void:
+	for i in _perch_taken.size():
+		if _perch_taken[i] == who:
+			_perch_taken[i] = null
+
+## True if this wall is built and has at least one free perch -- so an archer can
+## pick the nearest such wall before committing a claim.
+func perch_available() -> bool:
+	if level < TWIG:
+		return false
+	for t in _perch_taken:
+		if t == null or not is_instance_valid(t):
+			return true
+	return false
+
+## Where an archer stands once up: on the wall top, on the line.
+func perch_point(i: int) -> Vector3:
+	return to_global(Vector3(PERCH_OFFSETS[i], _perch_height(), 0.0))
+
+## Where it walks to first: the inner (village-side) face on the ground below the
+## perch. Computed toward the village centre, so it is right whichever way the
+## wall faces.
+func foot_point(i: int) -> Vector3:
+	var ground := to_global(Vector3(PERCH_OFFSETS[i], 0.0, 0.0))
+	var inward := _village_center() - ground
+	inward.y = 0.0
+	if inward.length() < 0.01:
+		inward = global_transform.basis.z
+	return ground + inward.normalized() * PERCH_FOOT_IN
+
+func _perch_height() -> float:
+	return PERCH_HEIGHTS[clampi(level, 0, PERCH_HEIGHTS.size() - 1)]
+
+func _village_center() -> Vector3:
+	var fire := get_tree().get_first_node_in_group("campfire")
+	return fire.global_position if is_instance_valid(fire) else Vector3.ZERO
+
+# ---- damage, breach & repair (COMBAT_PROMPTS P6a) ----
+
+func _reset_hp() -> void:
+	_arc_hp_max = ARC_HP[level]
+	_gate_hp_max = GATE_HP[level]
+	_arc_hp = _arc_hp_max
+	_gate_hp = _gate_hp_max
+
+## A bandit's blow lands (called by bandit.gd when it's wedged against the run). The
+## hit goes to the gate if it struck near the opening, otherwise to the arc. At zero
+## either breaches: the collision drops, the navmesh re-bakes, and raiders stream
+## through the hole -- the breach is real, not cosmetic.
+func take_hit(amount: float, at: Vector3) -> void:
+	if level == NONE or building:
+		return
+	var lx: float = to_local(at).x
+	if absf(lx) <= GATE_HALF + 0.6:
+		if _gate_breached:
+			return
+		_gate_hp -= amount
+		_hit_fx(at)
+		if _gate_hp <= 0.0:
+			_breach_gate()
+	else:
+		if _breached:
+			return
+		_arc_hp -= amount
+		_hit_fx(at)
+		_show_arc_damage()
+		if _arc_hp <= 0.0:
+			_breach_arc()
+
+func _hit_fx(at: Vector3) -> void:
+	var hit := at
+	hit.y = 0.6
+	MarkFx.debris(self, hit, Vector3.UP, 4, DUST, 0.016, 0.8)
+	for s in _sections:
+		if is_instance_valid(s):
+			MarkFx.hit_flash(self, s)
+			break
+
+func _breach_gate() -> void:
+	_gate_breached = true
+	_gate_hp = 0.0
+	if is_instance_valid(_gate_col):
+		_gate_col.disabled = true
+	_blow_off_leaves()
+	_gate_sound("slam")           # stand-in breach crash until P8 sources a real one
+	_became_damaged()
+	NavWorld.rebake(self)
+
+func _breach_arc() -> void:
+	_breached = true
+	_arc_hp = 0.0
+	if is_instance_valid(_left_col):
+		_left_col.disabled = true
+	if is_instance_valid(_right_col):
+		_right_col.disabled = true
+	_show_arc_damage()            # ruin whatever's left standing
+	_became_damaged()
+	NavWorld.rebake(self)
+
+## Ruin sections in step with how far the arc HP has fallen: wood tilts and sinks,
+## stone swaps for the kit's ready-made half-wall ruin.
+func _show_arc_damage() -> void:
+	if _arc_hp_max <= 0.0:
+		return
+	var frac := 1.0 - clampf(_arc_hp / _arc_hp_max, 0.0, 1.0)
+	var want := int(round(frac * float(_sections.size())))
+	for i in range(want):
+		_damage_section(i)
+
+func _damage_section(i: int) -> void:
+	if i < 0 or i >= _sections.size():
+		return
+	var s: Node3D = _sections[i]
+	if not is_instance_valid(s) or s.has_meta("ruined"):
+		return
+	s.set_meta("ruined", true)
+	if _material() == "stone":
+		var x: float = s.position.x
+		var sc: Vector3 = s.scale
+		s.queue_free()
+		var ruin := RUIN_SCENE.instantiate()
+		add_child(ruin)
+		ruin.position = Vector3(x, 0.0, 0.0)
+		ruin.scale = sc
+		ruin.rotation_degrees = Vector3(0, LEVELS[level]["yaw"], 0)
+		_sections[i] = ruin
+	else:
+		var lean := randf_range(0.4, 0.7) * (1.0 if randf() < 0.5 else -1.0)
+		var t := create_tween()
+		t.tween_property(s, "rotation:z", lean, 0.3).set_trans(Tween.TRANS_QUAD)
+		t.parallel().tween_property(s, "position:y", -0.35, 0.3).set_trans(Tween.TRANS_SINE)
+
+func _blow_off_leaves() -> void:
+	for leaf in [_left_model, _right_model]:
+		if not is_instance_valid(leaf):
+			continue
+		var away := Vector3(randf_range(-1.0, 1.0), 1.0, randf_range(0.3, 1.0)).normalized() * 2.0
+		var t := create_tween()
+		t.tween_property(leaf, "position", leaf.position + away, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(leaf, "rotation:z", randf_range(-2.0, 2.0), 0.35)
+		t.parallel().tween_property(leaf, "scale", Vector3.ZERO, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+		t.tween_callback(leaf.queue_free)
+	_left_model = null
+	_right_model = null
+
+## Damaged walls become interactable so the monarch can pay to mend them, even a
+## fortified one that had nothing left to upgrade.
+func _became_damaged() -> void:
+	if not is_in_group("interactable"):
+		add_to_group("interactable")
+
+func _is_damaged() -> bool:
+	return level != NONE and (_breached or _gate_breached \
+		or _arc_hp < _arc_hp_max or _gate_hp < _gate_hp_max)
+
+## How much of the side is still standing, 0..1 -- capped so even a near-whole wall
+## takes a moment of crew work rather than snapping fixed.
+func _standing_fraction() -> float:
+	var total := _arc_hp_max + _gate_hp_max
+	if total <= 0.0:
+		return 0.0
+	return clampf((_arc_hp + _gate_hp) / total, 0.0, 0.95)
+
+## Repair costs a percentage of the build price -- the fraction that's missing,
+## rounded up (house rules), so one rule covers every material.
+func _repair_cost() -> int:
+	var total := _arc_hp_max + _gate_hp_max
+	if total <= 0.0:
+		return 0
+	var missing := 1.0 - clampf((_arc_hp + _gate_hp) / total, 0.0, 1.0)
+	return maxi(1, int(ceil(float(LEVELS[level]["cost"]) * missing)))
+
+## Repair is construction: the damaged side re-enters the build_site flow at the
+## progress it still stands at, and a crew mends it. Paying mid-raid is allowed.
+func _open_repair() -> void:
+	building = true
+	_repairing = true
+	remove_from_group("interactable")
+	add_to_group("build_site")
+	_crew = BuildCrew.new()
+	_progress = _standing_fraction()
+	_banner = MarkFx.banner(self, HAMMER_MODEL, BANNER_Y, BANNER_SCALE)
+	_banner_t = 0.0
+	set_process(true)
+
+func _finish_repair() -> void:
+	_progress = 1.0
+	building = false
+	_repairing = false
+	set_process(false)
+	remove_from_group("build_site")
+	_prompt.visible = false
+	_crew = BuildCrew.new()
+	_clear_site_props()
+	_restore()
+	NavWorld.rebake(self)
+	# a mended wall goes back to offering its next upgrade (unless it's the top rung)
+	if level < TOP_LEVEL:
+		add_to_group("interactable")
+	_gate_sound("close")
+
+func _restore() -> void:
+	var was_breached := _breached
+	var was_gate := _gate_breached
+	_breached = false
+	_gate_breached = false
+	_reset_hp()
+	if is_instance_valid(_left_col):
+		_left_col.disabled = false
+	if is_instance_valid(_right_col):
+		_right_col.disabled = false
+	if is_instance_valid(_gate_col):
+		_gate_col.disabled = false
+	if was_breached or _any_section_ruined():
+		_rebuild_sections()
+	if was_gate:
+		_left_model = _populate_leaf(_left_leaf, 0.5)
+		_right_model = _populate_leaf(_right_leaf, -0.5)
+
+func _any_section_ruined() -> bool:
+	for s in _sections:
+		if is_instance_valid(s) and s.has_meta("ruined"):
+			return true
+	return false
+
+## Tear down the ruined/tilted sections and stand a fresh, whole run in their place.
+func _rebuild_sections() -> void:
+	for s in _sections:
+		if is_instance_valid(s):
+			s.queue_free()
+	_sections.clear()
+	for x in _section_plan():
+		_add_section(x, level)
 
 # ---- the crew (asked by villagers) ----
 
@@ -421,6 +726,7 @@ func _finish() -> void:
 	_clear_site_props()
 	_build_wall_collision()
 	_build_gate()
+	_reset_hp()
 	# the run is solid now and the only way through is the gate -- villagers find
 	# it themselves once the navmesh knows the wall is there
 	NavWorld.rebake(self)
@@ -447,6 +753,7 @@ func _finish_upgrade() -> void:
 		_right_model.queue_free()
 	_left_model = _populate_leaf(_left_leaf, 0.5)
 	_right_model = _populate_leaf(_right_leaf, -0.5)
+	_reset_hp()
 	_celebrate()
 
 func _clear_site_props() -> void:
@@ -577,16 +884,18 @@ func _add_section(x: float, lvl: int, at_index := -1) -> Node3D:
 func _build_wall_collision() -> void:
 	var seg := HALF - GATE_HALF
 	var cx := (HALF + GATE_HALF) * 0.5
-	_add_box_col(-cx, seg)
-	_add_box_col(cx, seg)
+	# kept as refs so a breach can switch them off (P6a)
+	_left_col = _add_box_col(-cx, seg)
+	_right_col = _add_box_col(cx, seg)
 
-func _add_box_col(cx: float, width: float) -> void:
+func _add_box_col(cx: float, width: float) -> CollisionShape3D:
 	var cs := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = Vector3(width, 1.5, 0.5)
 	cs.shape = box
 	cs.position = Vector3(cx, 0.75, 0)
 	add_child(cs)
+	return cs
 
 func _build_gate() -> void:
 	_left_leaf = _make_pivot(-GATE_HALF)

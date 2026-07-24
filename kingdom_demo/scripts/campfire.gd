@@ -260,6 +260,11 @@ func hall_tier() -> int:
 		return 3
 	return 2 if _hall.upgraded else 1
 
+## The main building node, or null before the fire is lit. Bandits march on it
+## (COMBAT_PROMPTS P2) and, later, it is the heart that can fall (P6b).
+func hall() -> Node3D:
+	return _hall
+
 func population() -> int:
 	return get_tree().get_nodes_in_group("villager").size()
 
@@ -278,9 +283,10 @@ func _attract_villagers() -> void:
 	var scene := get_tree().current_scene
 	for i in range(mini(VILLAGER_COUNT, room)):
 		var v := VILLAGER_SCENE.instantiate()
-		var a := randf() * TAU
-		var spawn := global_position + Vector3(cos(a), 0, sin(a)) * randf_range(15.0, 19.0)
-		spawn.y = 0.0
+		# Wanderers walk in up the one open bearing -- the north corridor -- and
+		# through the gate, rather than materialising in a full ring that would now
+		# drop half of them inside the sealed mountains (COMBAT_PROMPTS P1).
+		var spawn := MapTerrain.corridor_spawn_point()
 		v.target = global_position
 		scene.add_child(v)
 		v.global_position = spawn
