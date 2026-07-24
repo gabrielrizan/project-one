@@ -482,14 +482,13 @@ func _watch_the_light() -> void:
 	_last_dark = dark
 
 ## How many blasts nightfall gets: the raid director decides -- 1 for a quiet
-## night, 2 when a raid is coming (3 for a blood moon, in P7). Asking it also
-## *begins* the night (advancing the counter and sending the wave), so this is
-## called exactly once, on the dusk crossing. Without a director it's the plain
-## nightfall call, so an older scene still sounds the horn.
+## night, 2 a raid, 3 a blood moon (P7). Asking it also *begins* the night if the
+## director's own clock watch hasn't already, so the two can't disagree. Without a
+## director it's the plain nightfall call, so an older scene still sounds the horn.
 func _dusk_blasts() -> int:
 	var dir := get_tree().get_first_node_in_group("night_raids")
-	if dir and dir.has_method("begin_night"):
-		return dir.begin_night()
+	if dir and dir.has_method("blasts_tonight"):
+		return dir.blasts_tonight()
 	return HORN_NIGHTFALL
 
 func _village_exists() -> bool:

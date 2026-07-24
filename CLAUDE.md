@@ -57,13 +57,25 @@ navmesh pathfinding round everything solid, re-baked as the village changes ·
 title + pause menus, settings persist · **a dev overlay on F1** for reaching any of it
 instantly.
 
-**⚠️ Nothing can go wrong yet.** There are no enemies, no night waves, no combat, and no
-lose condition. The walls, gates, archers and day/night cycle are all *setup* for a threat
-that does not exist. That is the single biggest gap — see `GAME_DESIGN.md` §9.
+**Combat is now built — `COMBAT_PROMPTS.md` P1–P7.** The first map is a mountain U with a
+single north corridor (`map_terrain.gd` + `mountains.gd`); charcoal bandits (`bandit.gd`,
+archetypes Thug/Brute) march up it. A raid director (`night_raids.gd`) counts nights off
+`darkness()`, sends grace-then-growing waves from a camp at the corridor mouth, and blows
+the dusk horn ×1 quiet / ×2 raid / ×3 blood moon. Archers mount wall perches and shoot;
+bandits rob employed citizens (who flee and must be re-fed), smash walls/gates to breach
+(repair is construction), and vandalise buildings — **the hall at zero ends the run** (end
+screen in `game_manager.gd`). Every 15th night is a **blood moon**: red sky (`blood` factor
+in `day_night_cycle.gd`, parallel to `storm`), a 2.5× wave in pulses mixed with Brutes.
+Numbers throughout (HP, wave sizes, damage) are **placeholder**, like the flat-5 hall costs.
 
-**Also not built:** soup upkeep / morale / desertion · mercenaries
-· map objectives and moving to the next map · **music of any kind** · any mixing beyond
-static bus levels (no limiter, no ducking except rain over the beds).
+**Not built: `COMBAT_PROMPTS.md` P8** — the night audio pass. Bandit blows reuse the axe
+pool pitched down and the breach reuses the gate slam, but the missing set (stone impacts,
+a breach crash, a knockdown thump, bandit voices, a blood-moon night bed) isn't sourced,
+and nothing is on `audio_review.html` yet. The mix still has no ducking or limiter.
+
+**Also not built:** soup upkeep / morale / desertion · mercenaries · the Stealer (bandits
+still ignore the monarch, so the Crown lose-condition is reserved) · map objectives and
+moving to the next map · **music of any kind**.
 
 **Audio is well past "none"** — beds, weather, work, the monarch's horse and a watch horn.
 `ASSETS.md` holds the inventory and the per-role criteria; `audio_review.html` is the

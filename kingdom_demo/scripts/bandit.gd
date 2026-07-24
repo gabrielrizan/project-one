@@ -19,23 +19,24 @@ extends CharacterBody3D
 const MODEL_SCENE := preload("res://kingdom_demo/assets/3d/characters/villager.glb")
 const PICKAXE := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tool-pickaxe.glb")
 
-## Charcoal, per §9 -- Kingdom's Greed register. Slightly blue-cold so it reads as
-## a silhouette rather than mud.
-const CHARCOAL := Color(0.15, 0.15, 0.18)
-
-## A deliberate march: slower than a villager's 3.2 so it reads as a threat
-## closing in rather than someone running an errand. Placeholder, like every pace.
-const SPEED := 2.2
 const ACCEL := 26.0
 const ARRIVE := 2.6
 ## Panic pace when the rooster turns them: faster than the march, so the retreat
-## reads as a rout rather than a stroll home.
+## reads as a rout rather than a stroll home. Shared by every archetype.
 const FLEE_SPEED := 3.6
-## The charge once it has a victim -- a touch faster than a fleeing citizen's 3.2,
-## so a bandit can run one down rather than watching it escape (COMBAT_PROMPTS P5).
-const CHASE_SPEED := 3.8
 const ROB_RANGE := 2.0          # tools are torn off within this of a citizen
 const VICTIM_RESCAN := 0.5      # how often to look for someone to rob
+
+## Archetypes as a stat dictionary, in the GAITS spirit (§9): adding one costs an
+## entry here, not a rewrite. The **Thug** is the baseline -- charcoal, a villager's
+## menace, one arrow to drop. The **Brute** is a blood-moon heavy: bigger, slower,
+## several arrows to drop, and it hits structures far harder. PLACEHOLDER numbers.
+const ARCHETYPES := {
+	"thug":  {"scale": 1.0, "march": 2.2, "chase": 3.8, "damage": 7.0,  "hits": 1,
+		"tint": Color(0.15, 0.15, 0.18)},
+	"brute": {"scale": 1.3, "march": 1.6, "chase": 2.6, "damage": 16.0, "hits": 4,
+		"tint": Color(0.17, 0.10, 0.11)},
+}
 
 ## The loot shouldered after a theft -- a packed bundle, over the shoulder.
 const BUNDLE := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/bedroll-packed.glb")
@@ -45,7 +46,6 @@ const SMASH_AFTER := 0.5        # wedged this long -> start hammering
 const SMASH_BEAT := 0.9         # seconds between blows
 const SMASH_REACH := 1.8        # how close to the wall line a blow can land
 const BUILD_REACH := 2.6        # how close to a building a blow can land (P6b)
-const SMASH_DAMAGE := 7.0       # per blow -- PLACEHOLDER, tuned against wall HP
 ## The villager axe pool, pitched down for blows on timber (§9). Stone impacts are
 ## genuinely missing and get sourced in P8; for now every blow uses this.
 const AXE_CLIPS := [
@@ -69,8 +69,13 @@ var _nav: NavMover = null
 var _model: Node3D = null
 var _goal := Vector3.ZERO         # the FLEE/rout destination (the camp)
 var _hall_goal := Vector3.ZERO    # where to march when there's no one to rob
-var _run := SPEED       # current pace; the rout raises it to FLEE_SPEED
-var dead := false       # read by the archer's shot; one arrow drops a Thug (P4)
+var archetype := "thug"           # set by the spawner before add_child (P7)
+var _march := 2.2                 # this archetype's paces / damage / hardiness
+var _chase := 3.8
+var _dmg := 7.0
+var _hits := 1                    # arrows to drop it
+var _run := 2.2                   # current pace; the rout raises it to FLEE_SPEED
+var dead := false                 # read by the archer's shot
 var _victim: Node3D = null        # the citizen being run down
 var _victim_t := 0.0
 var _robbed_someone := false      # every bandit wants one theft, then leaves (§11)
@@ -84,8 +89,19 @@ var _mill_t := 0.0
 func _ready() -> void:
 	add_to_group("bandit")
 	_nav = NavMover.new(_agent, self)
+	_apply_archetype()
 	_build_model()
 	_hall_goal = _target_point()
+
+## Read this archetype's stats (P7). Set before _build_model so the scale and tint
+## land on the model.
+func _apply_archetype() -> void:
+	var a: Dictionary = ARCHETYPES.get(archetype, ARCHETYPES["thug"])
+	_march = a["march"]
+	_chase = a["chase"]
+	_dmg = a["damage"]
+	_hits = a["hits"]
+	_run = _march
 
 func _exit_tree() -> void:
 	if _nav:
@@ -105,11 +121,13 @@ func _target_point() -> Vector3:
 	return Vector3.ZERO   # nothing to march on yet
 
 func _build_model() -> void:
+	var a: Dictionary = ARCHETYPES.get(archetype, ARCHETYPES["thug"])
 	_model = MODEL_SCENE.instantiate()
 	model_root.add_child(_model)
-	# tint first: it flattens every mesh under the model to one charcoal, so the
-	# pickaxe is added *after* to keep its own wood-and-iron colours.
-	MarkFx.tint(_model, CHARCOAL)
+	_model.scale = Vector3.ONE * float(a["scale"])   # a Brute looms larger
+	# tint first: it flattens every mesh under the model to one dark silhouette, so
+	# the pickaxe is added *after* to keep its own wood-and-iron colours.
+	MarkFx.tint(_model, a["tint"])
 	var axe := PICKAXE.instantiate()
 	_model.add_child(axe)
 	axe.position = Vector3(0.22, 0.62, 0.24)   # roughly shouldered in the hand
@@ -153,6 +171,17 @@ func rout(to: Vector3) -> void:
 func take_arrow(_from: Vector3) -> void:
 	if dead:
 		return
+	_hits -= 1
+	if _hits > 0:
+		# a Brute shrugs off the first few: flinch and stagger, but keep coming (P7)
+		if is_instance_valid(_model):
+			MarkFx.hit_flash(self, _model)
+		var stagger := global_position - _from
+		stagger.y = 0.0
+		if stagger.length() > 0.01:
+			create_tween().tween_property(self, "global_position",
+				global_position + stagger.normalized() * 0.15, 0.12)
+		return
 	dead = true
 	remove_from_group("bandit")
 	set_deferred("collision_layer", 0)
@@ -188,7 +217,7 @@ func _hunt_or_march(delta: float) -> void:
 		_victim_t = VICTIM_RESCAN
 		_acquire_victim()
 	if _victim_robbable():
-		_run = CHASE_SPEED
+		_run = _chase
 		_seek(delta, _victim.global_position, ROB_RANGE * 0.9)
 		if global_position.distance_to(_victim.global_position) <= ROB_RANGE:
 			_rob()
@@ -197,7 +226,7 @@ func _hunt_or_march(delta: float) -> void:
 		return
 	# nothing to rob -> break the nearest standing building (P6b)
 	_victim = null
-	_run = SPEED
+	_run = _march
 	var b := _nearest_building()
 	if b == null:
 		_seek(delta, _hall_goal, ARRIVE)
@@ -217,7 +246,7 @@ func _hunt_or_march(delta: float) -> void:
 ## moment, hammer whatever run it's up against. When the breach opens, the navmesh
 ## re-bakes, the body moves again, and this quietly stops.
 func _smash_if_wedged(delta: float) -> void:
-	if Vector2(velocity.x, velocity.z).length() > SPEED * 0.35:
+	if Vector2(velocity.x, velocity.z).length() > _march * 0.35:
 		_stuck_t = 0.0
 		return
 	_stuck_t += delta
@@ -235,7 +264,7 @@ func _attack_on_beat(target: Node3D, delta: float) -> void:
 		_hit_beat = SMASH_BEAT
 		_swing()
 		if is_instance_valid(target) and target.has_method("take_hit"):
-			target.take_hit(SMASH_DAMAGE, global_position)
+			target.take_hit(_dmg, global_position)
 
 func _swing() -> void:
 	if is_instance_valid(_model):

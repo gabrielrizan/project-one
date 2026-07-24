@@ -93,6 +93,7 @@ const ACTIONS := [
 	{"key": KEY_M, "name": "M", "text": "clear bandits", "fn": "_clear_bandits"},
 	{"key": KEY_R, "name": "R", "text": "raid now", "fn": "_raid_now"},
 	{"key": KEY_Y, "name": "Y", "text": "advance night counter", "fn": "_advance_night"},
+	{"key": KEY_U, "name": "U", "text": "blood moon now", "fn": "_blood_now"},
 ]
 
 var _readout: Label = null
@@ -209,6 +210,13 @@ func _advance_night() -> void:
 	var dir := _raids()
 	if dir:
 		dir.advance_night()
+
+## A blood moon right now (P7) -- skips to night, reddens the sky, horn x3, a big
+## wave in pulses with Brutes.
+func _blood_now() -> void:
+	var dir := _raids()
+	if dir and dir.has_method("blood_moon_now"):
+		dir.blood_moon_now()
 
 func _raids() -> Node:
 	return get_tree().get_first_node_in_group("night_raids")
@@ -337,7 +345,8 @@ func _raid_line() -> String:
 	var dir := _raids()
 	if dir == null:
 		return "raids   --"
-	return "raids   night %d  ·  %s" % [dir.night(), "RAID" if dir.is_raid_tonight() else "quiet"]
+	var kind := "BLOOD" if dir.is_blood_tonight() else ("RAID" if dir.is_raid_tonight() else "quiet")
+	return "raids   night %d  %s  ·  blood in %d" % [dir.night(), kind, dir.nights_until_blood()]
 
 func _camera_line() -> String:
 	return "camera  %s" % CAM_PRESETS[_cam_preset]["name"]

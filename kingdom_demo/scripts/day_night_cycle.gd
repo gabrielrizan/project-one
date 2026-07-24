@@ -79,6 +79,14 @@ const FLASH_ENERGY := 0.85
 const FLASH_AMBIENT_ENERGY := 1.7
 const FLASH_BG := Color(0.76, 0.81, 0.97)
 
+## Blood moon (COMBAT_PROMPTS P7). Built exactly parallel to `storm`: a factor the
+## raid director drives, applied *after* the day/night blend so a blood moon still
+## reads as night -- deep red, not a broken sunset. Deliberately dark: high red,
+## low green/blue, so it dims like night while it reddens.
+const BLOOD_BG := Color(0.30, 0.045, 0.06)
+const BLOOD_AMBIENT := Color(0.34, 0.09, 0.10)
+const BLOOD_SUN := Color(0.62, 0.14, 0.14)
+
 # ---- shadows ----
 #
 ## Shadows are gated on the sun's **real elevation**, never on the clock -- the
@@ -169,6 +177,8 @@ const FOG_STORM_NEAR := 14.0    # ...and brings the wall of grey most of the way
 var storm := 0.0
 ## 0..1 lightning flash, spiked by `weather.gd` and decayed by it too.
 var flash := 0.0
+## 0..1 blood moon, driven by `night_raids.gd` (P7) -- see [constant BLOOD_BG].
+var blood := 0.0
 
 var _time := 0.0
 
@@ -243,6 +253,14 @@ func _process(delta: float) -> void:
 		sun_col = sun_col.lerp(STORM_SUN, storm)
 		ambient = ambient.lerp(STORM_AMBIENT, storm * 0.85)
 		bg = bg.lerp(STORM_BG, storm)
+
+	# Blood moon: the sky bleeds red on top of whatever the night already is. Like
+	# the storm, applied after the time-of-day blend, so it still reads as night --
+	# and a lightning flash below can still punch white through it.
+	if blood > 0.0:
+		bg = bg.lerp(BLOOD_BG, blood)
+		ambient = ambient.lerp(BLOOD_AMBIENT, blood * 0.9)
+		sun_col = sun_col.lerp(BLOOD_SUN, blood * 0.5)
 
 	# Lightning has to lift the **ambient** as well as the sun. Sun energy alone
 	# only brightens surfaces the sun happens to face, so a flash at night --
