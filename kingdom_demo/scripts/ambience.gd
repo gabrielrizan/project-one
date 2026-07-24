@@ -476,10 +476,20 @@ func _watch_the_light() -> void:
 	# fire at dusk would fire a horn for a crossing that already happened.
 	if _village_exists():
 		if _last_dark < HORN_AT_DUSK and dark >= HORN_AT_DUSK:
-			blow_horn(HORN_NIGHTFALL)
+			blow_horn(_dusk_blasts())
 		elif _last_dark > HORN_AT_DAWN and dark <= HORN_AT_DAWN:
 			crow_daybreak()
 	_last_dark = dark
+
+## How many blasts nightfall gets: the raid director decides -- 1 for a quiet
+## night, 2 a raid, 3 a blood moon (P7). Asking it also *begins* the night if the
+## director's own clock watch hasn't already, so the two can't disagree. Without a
+## director it's the plain nightfall call, so an older scene still sounds the horn.
+func _dusk_blasts() -> int:
+	var dir := get_tree().get_first_node_in_group("night_raids")
+	if dir and dir.has_method("blasts_tonight"):
+		return dir.blasts_tonight()
+	return HORN_NIGHTFALL
 
 func _village_exists() -> bool:
 	var fire := get_tree().get_first_node_in_group("campfire")

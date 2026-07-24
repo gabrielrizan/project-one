@@ -13,7 +13,9 @@ const RABBITS := 6
 const STAGS := 3
 const RESTOCK_EVERY := 10.0
 const INNER := 10.5      # keep the spawn ring clear of the village
-const OUTER := 17.0
+# Pulled in from 17 so the ring stays inside the mountain U's belly; the far edge
+# used to spawn game against (and inside) the sealed bearings. See _spawn.
+const OUTER := 15.0
 
 var _t := 0.0
 
@@ -61,6 +63,7 @@ func _spawn(species: String, model: PackedScene, sc: float, gold: int,
 	# parented to the spawner rather than the scene root: this runs during _ready,
 	# before the tree has a current_scene to hang them off
 	add_child(a)
-	var ang := randf() * TAU
-	var r := randf_range(INNER, OUTER)
-	a.global_position = Vector3(cos(ang) * r, 0, sin(ang) * r)
+	# Biased onto open ground: the forest belly on the three sealed sides, never in
+	# the rock and never up the north corridor -- a stag spawned inside a mountain
+	# is stuck forever (COMBAT_PROMPTS P1).
+	a.global_position = MapTerrain.random_belly_point(INNER, OUTER)

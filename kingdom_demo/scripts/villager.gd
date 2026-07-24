@@ -14,7 +14,19 @@ enum State {
 	GO_CHOP, CHOP, LOOT_WAIT, GATHER, DELIVER,
 	GO_HUNT, SHOOT, GO_FORAGE, FORAGE, PRESENT,
 	GO_BUILD, BUILD,
+	GO_PERCH, MOUNT, PERCH, DISMOUNT,   # archer wall defence (P4)
+	ROBBED, SPOOKED,                    # robbery + fear (P5)
 }
+
+## States a citizen will bolt out of when a bandit gets close at night (P5). Left
+## out on purpose: building (workers on a paid site keep working), the perch states
+## (archers stay up), and the wanderer/robbed states (nothing to fear for, or
+## already fled).
+const SPOOKABLE_STATES := [
+	State.WORK, State.LOYAL, State.GO_WORK, State.GO_CHOP, State.CHOP,
+	State.GO_HUNT, State.SHOOT, State.GO_FORAGE, State.FORAGE,
+	State.LOOT_WAIT, State.GATHER, State.DELIVER, State.PRESENT,
+]
 
 const SPEED := 3.2
 const ACCEL := 40.0
@@ -42,6 +54,18 @@ const CARRY_Y := 1.32
 
 const BOW_RANGE := 4.2     # archers loose from beyond the animals' spook range
 const AIM_TIME := 0.55
+
+# --- wall defence (COMBAT_PROMPTS P4) ---
+const DEFEND_RANGE := 7.0       # perched archers reach past the 4.2 m hunt range (§9)
+const MOUNT_TIME := 0.7         # the scripted climb up onto / down off a perch
+const DISMOUNT_GRACE := 3.0     # no bandits this long -> stand down; bridges staggered spawns
+const FIRE_RING := 3.2          # ground-defence ring when a raided side has no wall to man
+
+# --- robbery (COMBAT_PROMPTS P5) ---
+const ROB_DOWN_TIME := 3.0      # how long a robbed citizen lies before fleeing to the fire
+const FLEE_RANGE := 4.0         # civilians bolt from a bandit this close, at night (§9)
+const FLEE_CHECK := 0.35        # how often a citizen looks around for a bandit to flee
+const SPOOK_TIME := 1.4         # how long a spooked citizen runs before resuming
 const FORAGE_REACH := 1.0
 const PICK_TIME := 2.6
 const PICK_BEAT := 0.55
@@ -197,6 +221,20 @@ var _detour_t := 0.0
 var _loot: Array = []               # coins our kill/tree/bush dropped, not gathered yet
 var _purse: Array = []              # carried coin models bobbing over our head
 
+# archer wall defence (P4)
+var _perch_wall: Node3D = null      # the wall being manned, or null for a fire-ring post
+var _perch_index := -1
+var _post_foot := Vector3.ZERO      # ground spot at the wall's inner face
+var _post_top := Vector3.ZERO       # the perch itself, up on the wall
+var _no_bandit_t := 0.0             # counts up while no bandits remain
+
+# robbery + fear (P5)
+var _robbed := false                # once true, tools are gone and a wanderer again
+var _down_t := 0.0                  # time left lying knocked down
+var _spook_t := 0.0                 # time left in a fear-bolt
+var _spook_check_t := 0.0
+var _spook_to := Vector3.ZERO       # where the bolt is running to
+
 func _ready() -> void:
 	add_to_group("villager")
 	_base_y = 0.0
@@ -256,6 +294,7 @@ func _exit_tree() -> void:
 		_nav.cleanup()
 
 func _physics_process(delta: float) -> void:
+	_check_spook(delta)     # fear can interrupt any errand before the state runs (P5)
 	match _state:
 		State.SEEK_FOOD:
 			_seek(delta, target, ARRIVE)
@@ -303,6 +342,21 @@ func _physics_process(delta: float) -> void:
 			_walk_to_site(delta)
 		State.BUILD:
 			_raise_wall(delta)
+		State.GO_PERCH:
+			_walk_to_post(delta)
+		State.MOUNT:
+			pass                     # the climb tween owns the body
+		State.PERCH:
+			_defend(delta)
+		State.DISMOUNT:
+			pass                     # the climb-down tween owns the body
+		State.SPOOKED:
+			_bolt(delta)
+		State.ROBBED:
+			_stand(delta)            # lie still where you were knocked down
+			_down_t -= delta
+			if _down_t <= 0.0:
+				_rise_as_wanderer()
 		State.LOOT_WAIT:
 			_seek(delta, _wait_spot, 0.25)
 			_wait_t -= delta
@@ -374,10 +428,15 @@ func _look_for_errand() -> void:
 		# before going off into the woods after timber
 		if not _claim_build_site():
 			_claim_marked_tree()
-	elif _job_is("archer") and not _is_night():
-		# the monarch's marked bushes come first, then whatever is grazing
-		if not _claim_marked_bush():
-			_claim_quarry()
+	elif _job_is("archer"):
+		# defending the walls comes before any errand, and unlike hunting it happens
+		# at night -- a raid is the whole reason the archers' hut exists (§9)
+		if _should_defend():
+			_claim_defense_post()
+		elif not _is_night():
+			# the monarch's marked bushes come first, then whatever is grazing
+			if not _claim_marked_bush():
+				_claim_quarry()
 
 ## Whichever free archer stands closest gets the bush, so two never set off for
 ## the same one.
@@ -611,9 +670,19 @@ func _loose_arrow() -> void:
 	if not _quarry_alive():
 		_abandon_hunt()
 		return
-	var quarry: Node3D = _quarry
+	_shoot_arrow(_quarry)
+	_wait_spot = global_position
+	_quarry = null
+	_wait_for_loot()
+
+## The reusable shot: bow, arrow in flight, thud and take_arrow at the target, and
+## the archer's rock-back. Both the hunt loop and the wall defence (P4) call it --
+## take_arrow is duck-typed, so it kills a stag or a bandit the same way.
+func _shoot_arrow(target: Node3D) -> void:
+	if not is_instance_valid(target):
+		return
 	var from := global_position + Vector3(0, 0.7, 0)
-	var to: Vector3 = quarry.global_position + Vector3(0, 0.2, 0)
+	var to: Vector3 = target.global_position + Vector3(0, 0.2, 0)
 
 	_play(_bow_pool)
 	var arrow := MarkFx.model(ARROW_MODEL, 0.7)
@@ -626,12 +695,11 @@ func _loose_arrow() -> void:
 	t.tween_property(arrow, "global_position", to, 0.22).set_trans(Tween.TRANS_LINEAR)
 	t.tween_callback(func() -> void:
 		arrow.queue_free()
-		# the thud belongs where the arrow lands, which can be four metres from
-		# the archer -- so it gets its own emitter out at the target rather than
-		# coming from the bow that fired it
+		# the thud belongs where the arrow lands, which can be metres from the
+		# archer -- so it gets its own emitter out at the target
 		_thud_at(to)
-		if is_instance_valid(quarry) and quarry.has_method("take_arrow"):
-			quarry.take_arrow(from)
+		if is_instance_valid(target) and target.has_method("take_arrow"):
+			target.take_arrow(from)
 	)
 
 	# loose: the archer rocks back with the release
@@ -640,9 +708,247 @@ func _loose_arrow() -> void:
 		r.tween_property(_model, "rotation:x", deg_to_rad(-9.0), 0.07)
 		r.tween_property(_model, "rotation:x", 0.0, 0.16)
 
-	_wait_spot = global_position
+# ---- wall defence (COMBAT_PROMPTS P4) ----
+
+## A raid is on while any bandit stands on the map. The director spawns the first
+## of a wave at the dusk horn, so archers mount as the raid begins and are up on the
+## wall while the bandits are still marching the corridor -- itself the sign a raid
+## is coming (§9). Keying off bandits (not the night-long raid flag) means they also
+## stand down for good at dawn, once the survivors have routed, instead of re-manning
+## empty walls.
+func _should_defend() -> bool:
+	return not get_tree().get_nodes_in_group("bandit").is_empty()
+
+## Claim the nearest built wall's centre-most free perch through the same duck-typed
+## station flow every errand uses. Failing that -- no wall on this side -- take a
+## post ringing the campfire, which is the last line (§9). Never a player order (§1).
+func _claim_defense_post() -> void:
+	# the nearest built wall that still has a free perch
+	var best_wall: Node3D = null
+	var best_d := INF
+	for w in get_tree().get_nodes_in_group("wall_side"):
+		if not (w.has_method("perch_available") and w.perch_available()):
+			continue
+		var d: float = global_position.distance_to(w.global_position)
+		if d < best_d:
+			best_d = d
+			best_wall = w
+	if best_wall != null:
+		var idx: int = best_wall.claim_perch(self)
+		if idx >= 0:
+			_perch_wall = best_wall
+			_perch_index = idx
+			_post_foot = best_wall.foot_point(idx)
+			_post_top = best_wall.perch_point(idx)
+			_quarry = null
+			_state = State.GO_PERCH
+			return
+	var fire := get_tree().get_first_node_in_group("campfire")
+	if fire == null:
+		return
+	_perch_wall = null
+	_perch_index = -1
 	_quarry = null
-	_wait_for_loot()
+	var a := randf() * TAU
+	_post_foot = fire.global_position + Vector3(cos(a), 0, sin(a)) * FIRE_RING
+	_post_top = _post_foot
+	_state = State.GO_PERCH
+
+func _walk_to_post(delta: float) -> void:
+	if not _should_defend():
+		_leave_post()
+		return
+	_seek(delta, _post_foot, 0.4)
+	if global_position.distance_to(_post_foot) < 0.7:
+		if is_instance_valid(_perch_wall):
+			_begin_mount()
+		else:
+			_state = State.PERCH        # ground post -- no climb
+
+## Scripted climb tween up onto the marker; collision comes off so the capsule
+## doesn't shove the wall, and the body is parked (no physics) once up.
+func _begin_mount() -> void:
+	_state = State.MOUNT
+	velocity = Vector3.ZERO
+	_set_body_collision(false)
+	var t := create_tween()
+	t.tween_property(self, "global_position", _post_top, MOUNT_TIME) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.tween_callback(func() -> void:
+		if _state == State.MOUNT:
+			_reset_pose()
+			_state = State.PERCH
+	)
+
+func _defend(delta: float) -> void:
+	# stand down once the raid's spent: a few seconds of no bandits bridges the gaps
+	# between staggered arrivals, then the archer climbs down and drifts home.
+	if get_tree().get_nodes_in_group("bandit").is_empty():
+		_no_bandit_t += delta
+		if _no_bandit_t >= DISMOUNT_GRACE:
+			_leave_post()
+			return
+	else:
+		_no_bandit_t = 0.0
+	# keep the current target, or pick the nearest bandit in defensive range
+	if not _bandit_alive(_quarry) \
+			or global_position.distance_to(_quarry.global_position) > DEFEND_RANGE + 1.5:
+		_quarry = _nearest_bandit(DEFEND_RANGE)
+		_aim_t = AIM_TIME
+	if is_instance_valid(_quarry):
+		_face(_quarry.global_position)
+		_aim_t -= delta
+		if _aim_t <= 0.0:
+			_shoot_arrow(_quarry)
+			_quarry = null
+			_aim_t = AIM_TIME
+	# a ground post holds its spot; a perched archer is parked by the tween and must
+	# not run physics, or it would fall off the wall.
+	if not is_instance_valid(_perch_wall):
+		_stand(delta)
+
+func _leave_post() -> void:
+	_no_bandit_t = 0.0
+	_quarry = null
+	if _state == State.PERCH and is_instance_valid(_perch_wall):
+		_state = State.DISMOUNT
+		var t := create_tween()
+		t.tween_property(self, "global_position", _post_foot, MOUNT_TIME) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		t.tween_callback(_finish_dismount)
+	else:
+		_finish_dismount()
+
+func _finish_dismount() -> void:
+	_set_body_collision(true)
+	_release_post()
+	_reset_pose()
+	_state = State.WORK if is_instance_valid(_workplace) else State.LOYAL
+
+func _release_post() -> void:
+	if is_instance_valid(_perch_wall) and _perch_wall.has_method("release_perch"):
+		_perch_wall.release_perch(self)
+	_perch_wall = null
+	_perch_index = -1
+
+func _set_body_collision(on: bool) -> void:
+	var cs := get_node_or_null("CollisionShape3D")
+	if cs:
+		cs.disabled = not on
+
+## A dead bandit leaves the `bandit` group at once (see bandit.take_arrow), so group
+## membership is the liveness test -- and it also rejects a stale animal quarry left
+## over from a hunt the archer broke off to defend.
+func _bandit_alive(b: Node) -> bool:
+	return is_instance_valid(b) and b.is_in_group("bandit")
+
+func _nearest_bandit(within: float) -> Node3D:
+	var best: Node3D = null
+	var bd := within
+	for b in get_tree().get_nodes_in_group("bandit"):
+		if not is_instance_valid(b):
+			continue
+		var d: float = global_position.distance_to(b.global_position)
+		if d < bd:
+			bd = d
+			best = b
+	return best
+
+# ---- robbery + fear (COMBAT_PROMPTS P5) ----
+
+## Asked by a bandit before it charges: only an **employed** citizen is worth robbing.
+## A wanderer or a loyal-but-jobless villager carries nothing and is ignored (§9), a
+## robbed one has nothing left, and a perched archer is out of reach until a breach.
+func is_robbable() -> bool:
+	if _robbed or not is_instance_valid(_workplace):
+		return false
+	match _state:
+		State.MOUNT, State.PERCH, State.DISMOUNT:
+			return false
+	return true
+
+## A bandit tore the tools off this citizen (§9): knocked flat, the job vacated so
+## its vacancy icon returns, the model back to the bare villager. A few seconds down,
+## then up as a hungry wanderer -- the cauldron re-recruits them, which is the soup a
+## robbery costs.
+func get_robbed(_by: Node) -> void:
+	if not is_robbable():
+		return
+	_robbed = true
+	_release_claims()
+	if is_instance_valid(_workplace) and _workplace.has_method("vacate_job"):
+		_workplace.vacate_job()
+	_workplace = null
+	_set_model(VILLAGER_MODEL)          # the tools are gone
+	velocity = Vector3.ZERO
+	if is_instance_valid(_model):
+		MarkFx.hit_flash(self, _model)
+		create_tween().tween_property(_model, "rotation:x", deg_to_rad(-78.0), 0.18) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_down_t = ROB_DOWN_TIME
+	_state = State.ROBBED
+
+func _rise_as_wanderer() -> void:
+	_robbed = false
+	if is_instance_valid(_model):
+		create_tween().tween_property(_model, "rotation:x", 0.0, 0.2)
+	var fire := get_tree().get_first_node_in_group("campfire")
+	target = fire.global_position if is_instance_valid(fire) else global_position
+	_state = State.SEEK_FOOD             # a hungry wanderer again
+
+## Let go of every errand claim -- so a robbed or spooked citizen doesn't leave a
+## tree, bush, animal, site or perch reserved to nobody.
+func _release_claims() -> void:
+	if is_instance_valid(_quarry) and _quarry.has_method("release_hunter"):
+		_quarry.release_hunter(self)
+	_quarry = null
+	if is_instance_valid(_tree) and _tree.has_method("release_cutter"):
+		_tree.release_cutter(self)
+	_tree = null
+	if is_instance_valid(_bush) and _bush.has_method("release_picker"):
+		_bush.release_picker(self)
+	_bush = null
+	if is_instance_valid(_site) and _site.has_method("release_builder"):
+		_site.release_builder(self)
+	_site = null
+	_release_post()
+
+## Fear: at night a bandit within a few metres sends a citizen bolting, the way
+## wildlife spooks. Builders on a paid site keep working; perched archers, wanderers
+## and the already-robbed are left out. Keeps its job -- it resumes once clear.
+func _check_spook(delta: float) -> void:
+	# archers are the army -- they mount the walls or ring the fire, they don't flee
+	if _robbed or _job_is("archer") or not _spookable():
+		return
+	_spook_check_t -= delta
+	if _spook_check_t > 0.0:
+		return
+	_spook_check_t = FLEE_CHECK
+	if not _is_night():
+		return
+	var b := _nearest_bandit(FLEE_RANGE)
+	if b != null:
+		_flee_from(b.global_position)
+
+func _spookable() -> bool:
+	return _state in SPOOKABLE_STATES
+
+func _flee_from(threat: Vector3) -> void:
+	_release_claims()
+	var away := global_position - threat
+	away.y = 0.0
+	if away.length() < 0.01:
+		away = Vector3(randf() - 0.5, 0.0, randf() - 0.5)
+	_spook_to = global_position + away.normalized() * randf_range(3.0, 5.0)
+	_spook_t = SPOOK_TIME
+	_state = State.SPOOKED
+
+func _bolt(delta: float) -> void:
+	_spook_t -= delta
+	_seek(delta, _spook_to, 0.3)
+	if _spook_t <= 0.0 or global_position.distance_to(_spook_to) < 0.6:
+		_reset_pose()
+		_state = State.WORK if is_instance_valid(_workplace) else State.LOYAL
 
 func _abandon_hunt() -> void:
 	if is_instance_valid(_quarry) and _quarry.has_method("release_hunter"):
