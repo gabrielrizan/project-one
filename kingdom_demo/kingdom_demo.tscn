@@ -17,13 +17,14 @@
 [ext_resource type="PackedScene" uid="uid://dnd2gc472qdj4" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/patch-grass-large.glb" id="15_yycvq"]
 [ext_resource type="Script" uid="uid://cm70csskstbyp" path="res://kingdom_demo/scripts/world_decor.gd" id="16_a7p3c"]
 [ext_resource type="Script" uid="uid://bu2fgbb7oab7w" path="res://kingdom_demo/scripts/nav_world.gd" id="17_nav"]
+[ext_resource type="Script" uid="uid://c7gehf4k5e50e" path="res://kingdom_demo/scripts/mountains.gd" id="22_mtn"]
 [ext_resource type="Script" uid="uid://ne85dljhfunf" path="res://kingdom_demo/scripts/ambience.gd" id="18_amb"]
 [ext_resource type="Script" uid="uid://7iou5by44kho" path="res://kingdom_demo/scripts/wind.gd" id="19_wind"]
 [ext_resource type="Script" uid="uid://bq2uoj84hhn8h" path="res://kingdom_demo/scripts/weather.gd" id="20_weather"]
 [ext_resource type="Script" uid="uid://b0b8ey6nvnhxa" path="res://kingdom_demo/scripts/dev_menu.gd" id="21_dev"]
-[ext_resource type="Script" uid="uid://c7gehf4k5e50e" path="res://kingdom_demo/scripts/mountains.gd" id="22_mtn"]
-[ext_resource type="Script" uid="uid://crix8vow1jsp7" path="res://kingdom_demo/scripts/night_raids.gd" id="23_raids"]
 [ext_resource type="Script" uid="uid://c6d1mxxvejufd" path="res://kingdom_demo/scripts/wildlife.gd" id="90_wild"]
+[ext_resource type="Script" uid="uid://crix8vow1jsp7" path="res://kingdom_demo/scripts/night_raids.gd" id="23_raids"]
+[ext_resource type="Script" uid="uid://db0m6hnlf654r" path="res://kingdom_demo/scripts/muster_banner.gd" id="24_muster"]
 [ext_resource type="PackedScene" uid="uid://l3xnslje6465" path="res://kingdom_demo/scenes/berry_bush.tscn" id="91_bush"]
 [ext_resource type="PackedScene" uid="uid://bkmenu0000001" path="res://kingdom_demo/scenes/menu.tscn" id="92_menu"]
 
@@ -65,7 +66,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 material_override = SubResource("StandardMaterial3D_ndqrx")
 mesh = SubResource("BoxMesh_dl8hl")
 
-[node name="Mountains" type="Node3D" parent="." unique_id=206977729]
+[node name="Mountains" type="Node3D" parent="."]
 script = ExtResource("22_mtn")
 
 [node name="NavRegion" type="NavigationRegion3D" parent="." unique_id=272828603]
@@ -105,7 +106,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 1)
 script = ExtResource("4_ndqrx")
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=936210487]
-transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 18.38, 18.38)
+transform = Transform3D(1, 0, 0, 0, 0.7071068, 0.7071068, 0, -0.7071068, 0.7071068, 0, 18.38, 18.38)
 current = true
 fov = 34.0
 
@@ -269,8 +270,11 @@ script = ExtResource("16_a7p3c")
 [node name="Wildlife" type="Node3D" parent="." unique_id=1739401112]
 script = ExtResource("90_wild")
 
-[node name="NightRaids" type="Node3D" parent="." unique_id=1267204793]
+[node name="NightRaids" type="Node3D" parent="."]
 script = ExtResource("23_raids")
+
+[node name="MusterBanner" type="StaticBody3D" parent="."]
+script = ExtResource("24_muster")
 
 [node name="Berries" type="Node3D" parent="." unique_id=398854962]
 

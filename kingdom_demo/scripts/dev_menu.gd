@@ -94,6 +94,8 @@ const ACTIONS := [
 	{"key": KEY_R, "name": "R", "text": "raid now", "fn": "_raid_now"},
 	{"key": KEY_Y, "name": "Y", "text": "advance night counter", "fn": "_advance_night"},
 	{"key": KEY_U, "name": "U", "text": "blood moon now", "fn": "_blood_now"},
+	{"key": KEY_O, "name": "O", "text": "dismiss war party", "fn": "_dismiss_party"},
+	{"key": KEY_I, "name": "I", "text": "burn nearest camp", "fn": "_burn_camp"},
 ]
 
 var _readout: Label = null
@@ -221,6 +223,36 @@ func _blood_now() -> void:
 func _raids() -> Node:
 	return get_tree().get_first_node_in_group("night_raids")
 
+## Send the whole war party home (P9).
+func _dismiss_party() -> void:
+	var banner := get_tree().get_first_node_in_group("muster_banner")
+	if banner and banner.has_method("dismiss"):
+		banner.dismiss()
+
+func _banner() -> Node:
+	return get_tree().get_first_node_in_group("muster_banner")
+
+## Burn the camp nearest the monarch right now (P10), skipping the muster/assault --
+## so the fire, the wreck and the "map cleared" line can be seen without riding the
+## whole loop. Clears that camp's garrison so the wreck reads as abandoned.
+func _burn_camp() -> void:
+	var camps := get_tree().get_nodes_in_group("bandit_camp")
+	if camps.is_empty():
+		print("[dev] no camps left to burn")
+		return
+	var m := get_tree().get_first_node_in_group("monarch")
+	var origin: Vector3 = m.global_position if is_instance_valid(m) else Vector3.ZERO
+	var best: Node3D = null
+	var bd := INF
+	for c in camps:
+		var d: float = origin.distance_to(c.global_position)
+		if d < bd:
+			bd = d
+			best = c
+	if best and best.has_method("dev_burn"):
+		best.dev_burn()
+		print("[dev] burned a camp")
+
 func _strike() -> void:
 	if _weather():
 		_weather().strike_lightning()
@@ -346,7 +378,13 @@ func _raid_line() -> String:
 	if dir == null:
 		return "raids   --"
 	var kind := "BLOOD" if dir.is_blood_tonight() else ("RAID" if dir.is_raid_tonight() else "quiet")
-	return "raids   night %d  %s  ·  blood in %d" % [dir.night(), kind, dir.nights_until_blood()]
+	var party := 0
+	var banner := _banner()
+	if banner and banner.has_method("party_size"):
+		party = banner.party_size()
+	var camps := get_tree().get_nodes_in_group("bandit_camp").size()
+	return "raids   night %d  %s  ·  blood in %d  ·  party %d  ·  camps %d" % [
+		dir.night(), kind, dir.nights_until_blood(), party, camps]
 
 func _camera_line() -> String:
 	return "camera  %s" % CAM_PRESETS[_cam_preset]["name"]

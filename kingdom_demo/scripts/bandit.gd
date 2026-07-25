@@ -57,7 +57,7 @@ const AXE_CLIPS := [
 ]
 const TIMBER_PITCH := 0.85
 
-enum State { MARCH, IDLE, FLEE }
+enum State { MARCH, IDLE, FLEE, GARRISON }
 
 static var _axe_pool: AudioStreamRandomizer = null
 
@@ -70,6 +70,8 @@ var _model: Node3D = null
 var _goal := Vector3.ZERO         # the FLEE/rout destination (the camp)
 var _hall_goal := Vector3.ZERO    # where to march when there's no one to rob
 var archetype := "thug"           # set by the spawner before add_child (P7)
+var garrison := false             # set by a BanditCamp before add_child: posted, not raiding (P10)
+var home := Vector3.ZERO          # where a garrison bandit idles -- its camp fire (P10)
 var _march := 2.2                 # this archetype's paces / damage / hardiness
 var _chase := 3.8
 var _dmg := 7.0
@@ -92,6 +94,10 @@ func _ready() -> void:
 	_apply_archetype()
 	_build_model()
 	_hall_goal = _target_point()
+	# a camp garrison stays home and idles at its fire, rather than marching (P10).
+	# It reacts to nothing by day -- the war party's archers must shoot it down.
+	if garrison:
+		_state = State.GARRISON
 
 ## Read this archetype's stats (P7). Set before _build_model so the scale and tint
 ## land on the model.
@@ -154,11 +160,14 @@ func _physics_process(delta: float) -> void:
 			if global_position.distance_to(_goal) < 2.0 \
 					or global_position.z <= MapTerrain.MOUTH_Z + 1.5:
 				queue_free()
+		State.GARRISON:
+			# posted at the camp fire: mill, never hunt, never march (P10)
+			_mill_near(delta, home, 1.8)
 
 ## Rooster's turned the night: run for the camp and despawn on arrival. Called by
 ## the raid director at first light (COMBAT_PROMPTS P3).
 func rout(to: Vector3) -> void:
-	if dead:
+	if dead or garrison:   # a garrison is already home -- it holds the camp, it doesn't rout (P10)
 		return
 	_goal = to
 	_run = FLEE_SPEED

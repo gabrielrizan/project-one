@@ -11,30 +11,19 @@ extends StaticBody3D
 ## position *is* instant -- that's a decision, not construction; the villager
 ## walking over is the delay.
 
-@export var model_scene: PackedScene            # the 3D model this building shows
+@export var model_scene: PackedScene            # the base (tier 1) model
 @export var display_name: String = ""
 @export var model_scale: float = 1.0
 @export var model_height: float = 1.5           # used to seat prompts / label / collision
 @export var job_type: String = ""              # "worker" | "archer" | "" (no jobs)
+@export var is_hall: bool = false               # the main building -- the run's heart + tech ladder
 
-@export var upgrade_model_scene: PackedScene    # tier 1 -- crew-built, e.g. Tent -> Wooden Hall
-@export var upgrade_display_name: String = ""
-@export var upgrade_scale: float = 1.0
-@export var upgrade_height: float = 0.0
-@export var upgrade_cost: int = 0
-
-@export var upgrade2_model_scene: PackedScene   # tier 2 -- built by a crew, e.g. Wooden Hall -> Stone Hall
-@export var upgrade2_display_name: String = ""
-@export var upgrade2_scale: float = 1.0
-@export var upgrade2_height: float = 0.0
-@export var upgrade2_cost: int = 0
-@export var upgrade2_unlocks_stone: bool = false   # Stone Hall: opens the wall stone upgrade
-
-@export var upgrade3_model_scene: PackedScene   # tier 3 -- the top of the ladder, e.g. Stone Hall -> Castle
-@export var upgrade3_display_name: String = ""
-@export var upgrade3_scale: float = 1.0
-@export var upgrade3_height: float = 0.0
-@export var upgrade3_cost: int = 0
+## The upgrade rungs above the base, in order (COMBAT_PROMPTS P0 / ROADMAP R2). Each is
+## a dict `{model: PackedScene, name: String, scale: float, height: float, cost: int}`.
+## The base (tier 1) is the exports above; every entry here is one more crew-built rung.
+## Empty for a hut. Replaced the old three flat `upgrade_*` slots -- a five-tier ladder
+## needs an array, not a fourth copy of five exports.
+@export var tiers: Array = []
 
 const MAX_JOBS := 4
 const JOB_COST := 3
@@ -42,7 +31,7 @@ const JOB_COST := 3
 # --- HP, collapse & the hall's fall (COMBAT_PROMPTS P6b). PLACEHOLDER numbers. ---
 ## A hut's pool; the hall's is bigger and climbs with its tier (it's the run's heart).
 const HUT_HP := 90.0
-const HALL_HP: Array[float] = [200.0, 300.0, 420.0, 560.0]   # L1 Tent .. L4 Castle
+const HALL_HP: Array[float] = [200.0, 260.0, 340.0, 460.0, 600.0]   # L1 Tent .. L5 Castle
 const HUT_REPAIR_COST := 6      # flat, placeholder -- a hut was free to raise
 const REPAIR_TIME := 20.0       # crew-seconds to mend a collapsed hut
 const LOG_MODEL := preload("res://kingdom_demo/assets/3d/props/log_marker.glb")
@@ -51,10 +40,9 @@ const HAMMER_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/
 const ICON_SCALE := 0.45
 const DUST_TEX := preload("res://kingdom_demo/assets/pixel/wood_chip.png")
 const BANNER_SCALE := 5.0
-## Base seconds for one worker to raise each tier; a crew scales it (see [BuildCrew]).
-const TIER1_BUILD_TIME := 25.0
-const TIER2_BUILD_TIME := 40.0
-const TIER3_BUILD_TIME := 60.0   # the Castle -- placeholder, like the costs
+## Base crew-seconds to raise each rung, indexed by the upgrade being built (L1→L2
+## first). A crew scales it (see [BuildCrew]). PLACEHOLDER, like the costs.
+const BUILD_TIMES: Array[float] = [20.0, 28.0, 45.0, 60.0]
 
 # ---- the sound of a tier landing ----
 #
@@ -88,10 +76,9 @@ static var _raise_pools := {}
 
 var jobs := 0          # positions created (paid for)
 var filled := 0        # positions taken by loyal villagers
-var upgraded := false      # tier 1 reached
-var upgraded2 := false     # tier 2 reached
-var upgraded3 := false     # tier 3 reached -- the top of the ladder
-var _building_tier := 0    # 0 = no site open; 1..3 = the tier a crew is raising
+var _tier := 0         # current rung: 0 = base (tier 1); each upgrade adds one
+var _raising := 0      # the rung a crew is currently raising, as a 1-based upgrade
+                       # number (1 = base→tiers[0]); 0 = no upgrade site open
 var _progress := 0.0
 var _crew: BuildCrew = null
 var _banner: Node3D = null
@@ -119,25 +106,33 @@ func _ready() -> void:
 
 # ---- damage, collapse & the hall's fall (COMBAT_PROMPTS P6b) ----
 
-## Only the main building upgrades, so its upgrade slot is what tells it apart from
-## the Workers/Archers huts -- available in _ready, before any group tag lands.
+## The main building is flagged at spawn (P0). Kept as a method so the P6b call
+## sites read unchanged.
 func _is_hall() -> bool:
-	return upgrade_model_scene != null
+	return is_hall
 
 func _max_hp() -> float:
-	if _is_hall():
-		var i := 3 if upgraded3 else (2 if upgraded2 else (1 if upgraded else 0))
-		return HALL_HP[i]
+	if is_hall:
+		return HALL_HP[clampi(_tier, 0, HALL_HP.size() - 1)]
 	return HUT_HP
 
 func _refresh_hp() -> void:
 	_hp_max = _max_hp()
 	_hp = _hp_max
 
+## The hall's tier: 1-based (1 = L1 Tent .. 5 = L5 Castle). Campfire reads this for
+## hall_tier(), and the wall gating reads it through there (P0).
+func tier() -> int:
+	return _tier + 1
+
+## 0-based tier index, for the campfire's population-cap table.
+func tier_index() -> int:
+	return _tier
+
 ## A bandit vandalising the nearest building (bandit.gd, when there's nothing to
 ## rob). A hut at zero collapses into a repair site; the hall at zero ends the run.
 func take_hit(amount: float, at: Vector3) -> void:
-	if _collapsed or _repairing or _building_tier > 0:
+	if _collapsed or _repairing or _raising > 0:
 		return
 	if _hp_max <= 0.0:
 		_refresh_hp()
@@ -280,23 +275,28 @@ func work_point() -> Vector3:
 
 # ---- interaction ----
 
+## The next rung's data, or `{}` if the ladder is topped out or capped for this map.
+func _next_tier() -> Dictionary:
+	if _raising > 0 or _tier >= tiers.size():
+		return {}
+	# per-map tech cap (P0): the rung's 1-based tier number must be within it. Huts
+	# have no tiers so never reach here; only the hall consults the cap.
+	if is_hall and (_tier + 2) > _hall_cap():
+		return {}
+	return tiers[_tier]
+
 func _can_upgrade() -> bool:
-	return _building_tier == 0 and not upgraded \
-		and upgrade_cost > 0 and upgrade_model_scene != null
+	return not _next_tier().is_empty()
 
-func _can_upgrade2() -> bool:
-	return _building_tier == 0 and upgraded and not upgraded2 \
-		and upgrade2_cost > 0 and upgrade2_model_scene != null
-
-## Guarded on the model being set, like the tiers above it, so a building with no
-## tier 3 wired simply never offers one -- the Workers and Archers huts share this
-## script and must not sprout a Castle upgrade.
-func _can_upgrade3() -> bool:
-	return _building_tier == 0 and upgraded2 and not upgraded3 \
-		and upgrade3_cost > 0 and upgrade3_model_scene != null
+## Map's tech ceiling, read off the campfire (per-map, P0). No cap found = no cap.
+func _hall_cap() -> int:
+	var fire := get_tree().get_first_node_in_group("campfire")
+	if fire and fire.has_method("hall_cap"):
+		return fire.hall_cap()
+	return 99
 
 func _update_interactable() -> void:
-	var should_be := job_type != "" or _can_upgrade() or _can_upgrade2() or _can_upgrade3()
+	var should_be := job_type != "" or _can_upgrade()
 	if should_be and not is_in_group("interactable"):
 		add_to_group("interactable")
 	elif not should_be and is_in_group("interactable"):
@@ -314,14 +314,11 @@ func _upgrade_offer(dname: String, cost: int) -> String:
 	return ("Hold E  %s (%d)" % [dname, cost]) if _workers_exist() else "%s  needs a worker" % dname
 
 func _prompt_text() -> String:
-	if _building_tier > 0:
+	if _raising > 0:
 		return ""   # the site status line takes over the prompt while building
-	if _can_upgrade():
-		return _upgrade_offer(upgrade_display_name, upgrade_cost)
-	if _can_upgrade2():
-		return _upgrade_offer(upgrade2_display_name, upgrade2_cost)
-	if _can_upgrade3():
-		return _upgrade_offer(upgrade3_display_name, upgrade3_cost)
+	var next := _next_tier()
+	if not next.is_empty():
+		return _upgrade_offer(next["name"], next["cost"])
 	if job_type == "":
 		return ""
 	if jobs >= MAX_JOBS:
@@ -350,22 +347,17 @@ func _refresh_prompt() -> void:
 		_prompt.text = _prompt_text()
 
 func interact(who: Node3D) -> void:
-	if _busy or _building_tier > 0 or _repairing:
+	if _busy or _raising > 0 or _repairing:
 		return
 	# repair a collapsed hut (P6b) -- crew-built, like a wall
 	if _collapsed:
 		if _workers_exist():
 			await _buy(who, HUT_REPAIR_COST, _open_repair)
 		return
-	if _can_upgrade():
+	var next := _next_tier()
+	if not next.is_empty():
 		if _workers_exist():
-			await _buy(who, upgrade_cost, _open_upgrade_site.bind(1))
-	elif _can_upgrade2():
-		if _workers_exist():
-			await _buy(who, upgrade2_cost, _open_upgrade_site.bind(2))
-	elif _can_upgrade3():
-		if _workers_exist():
-			await _buy(who, upgrade3_cost, _open_upgrade_site.bind(3))
+			await _buy(who, int(next["cost"]), _open_upgrade_site.bind(_tier + 1))
 	elif job_type != "" and jobs < MAX_JOBS:
 		await _buy(who, JOB_COST, _add_job)
 
@@ -494,9 +486,9 @@ func _dust() -> void:
 # ---- upgrades (every tier is built by a crew) ----
 
 ## Paying doesn't raise the building -- it opens a site. Workers walk over and
-## put it up; see [BuildCrew] for the pace.
-func _open_upgrade_site(tier: int) -> void:
-	_building_tier = tier
+## put it up; see [BuildCrew] for the pace. `upgrade_no` is the 1-based rung.
+func _open_upgrade_site(upgrade_no: int) -> void:
+	_raising = upgrade_no
 	_progress = 0.0
 	_crew = BuildCrew.new()
 	add_to_group("build_site")
@@ -506,13 +498,10 @@ func _open_upgrade_site(tier: int) -> void:
 	_update_interactable()
 
 func _build_time() -> float:
-	match _building_tier:
-		1: return TIER1_BUILD_TIME
-		2: return TIER2_BUILD_TIME
-		_: return TIER3_BUILD_TIME
+	return BUILD_TIMES[clampi(_raising - 1, 0, BUILD_TIMES.size() - 1)]
 
 func _process(delta: float) -> void:
-	if _building_tier == 0 and not _repairing:
+	if _raising == 0 and not _repairing:
 		return
 	if is_instance_valid(_banner):
 		_banner_t += delta
@@ -532,8 +521,9 @@ func _process(delta: float) -> void:
 			_finish_upgrade()
 
 func _finish_upgrade() -> void:
-	var tier := _building_tier
-	_building_tier = 0
+	var t: Dictionary = tiers[_raising - 1]
+	_tier = _raising
+	_raising = 0
 	set_process(false)
 	remove_from_group("build_site")
 	hide_prompt()
@@ -541,25 +531,12 @@ func _finish_upgrade() -> void:
 		_banner.queue_free()
 	_banner = null
 	_crew = BuildCrew.new()
-	if tier == 1:
-		upgraded = true
-		_swap_and_heave(upgrade_model_scene, upgrade_display_name, upgrade_scale,
-			upgrade_height, "wood")
-	elif tier == 2:
-		upgraded2 = true
-		_swap_and_heave(upgrade2_model_scene, upgrade2_display_name, upgrade2_scale,
-			upgrade2_height, "stone")
-		if upgrade2_unlocks_stone:
-			var gm := get_tree().get_first_node_in_group("game_manager")
-			if gm and gm.has_method("unlock_stone_walls"):
-				gm.unlock_stone_walls()
-	else:
-		upgraded3 = true
-		# "castle" has no set of its own in RAISE_SFX yet, and `_raise_sfx()` falls
-		# back to wood for any material it doesn't know -- so this lands as timber
-		# until a castle set is added, rather than silently landing as nothing.
-		_swap_and_heave(upgrade3_model_scene, upgrade3_display_name, upgrade3_scale,
-			upgrade3_height, "castle")
+	# Stone from the Stone Hall (tier 4) up; timber below. `_raise_sfx()` falls back
+	# to wood for any material with no set of its own, so this never lands silent.
+	var material := "stone" if _tier >= 3 else "wood"
+	_swap_and_heave(t["model"], t["name"], float(t["scale"]), float(t["height"]), material)
+	# The wall stone/fortified unlocks read hall_tier() live now, so there is no
+	# stone-unlocked flag to raise here any more (P0 deleted it).
 	_refresh_hp()   # a new tier is a tougher hall, mended to full (P6b)
 	_update_interactable()
 
@@ -568,13 +545,13 @@ func _finish_upgrade() -> void:
 ## A standing building a bandit can vandalise -- not one already flat, mending, or
 ## mid-construction (COMBAT_PROMPTS P6b).
 func is_attackable() -> bool:
-	return not _collapsed and not _repairing and _building_tier == 0 and _hp > 0.0
+	return not _collapsed and not _repairing and _raising == 0 and _hp > 0.0
 
 func site_active() -> bool:
-	return _building_tier > 0 or _repairing
+	return _raising > 0 or _repairing
 
 func needs_builders() -> bool:
-	return (_building_tier > 0 or _repairing) and _crew.needs_more()
+	return (_raising > 0 or _repairing) and _crew.needs_more()
 
 func claim_builder(who: Node3D) -> bool:
 	if not needs_builders():

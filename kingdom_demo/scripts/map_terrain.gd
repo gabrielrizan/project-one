@@ -42,6 +42,14 @@ const WALL_Z := -8.0
 ## wanderer walk-in. Comfortably inside [constant EXTENT] so the camp bakes.
 const MOUTH_Z := -22.0
 
+## The muster banner (P9): just outside the north gate, beside the opening, in the
+## corridor -- the staging point a war party is raised at before riding out.
+const MUSTER_AT := Vector3(2.5, 0.0, -10.5)
+
+## Where a war party is raised (P9). Per-map data, like the corridor mouth.
+static func muster_point() -> Vector3:
+	return MUSTER_AT
+
 ## True when p sits inside any mountain box (x/z only -- the world is flat).
 static func is_mountain(p: Vector3) -> bool:
 	for m in MOUNTAINS:

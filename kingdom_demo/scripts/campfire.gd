@@ -15,20 +15,20 @@ const VILLAGER_COUNT := 5
 ## the *angle* onto open ground is the map's job; this is just the distance.
 const WANDER_IN := Vector2(15.0, 19.0)   # min .. max metres
 
-## How many souls the main building can house, by tier: L1 Tent, L2 Wooden Hall,
-## L3 Stone Hall. Room to grow is what an upgrade buys -- the hall is the reason
-## more people can live here, so the cap reads off its tier rather than sitting
-## in the game manager.
-##
-## Note this counts everyone drawn in, wanderers included, not just citizens who
-## have eaten and taken a job.
-const TIER_CAPS: Array[int] = [6, 9, 12, 16]
+## How many souls the main building can house, by tier index 0..4: L1 Tent,
+## L2 Upgraded Tent, L3 Wooden Town Hall, L4 Stone Hall, L5 Castle (P0 / ROADMAP R2).
+## Room to grow is what an upgrade buys -- the cap reads off the hall's tier rather
+## than sitting in the game manager. Counts everyone drawn in, wanderers included.
+const TIER_CAPS: Array[int] = [6, 8, 10, 13, 16]
 
-# PLACEHOLDER COSTS -- flat 5 so play-testing isn't gated behind grinding gold. These
-# want a real progression curve later; don't read "all tiers cost the same" as intent.
-const WOODEN_HALL_COST := 5   # L2
-const STONE_HALL_COST := 5    # L3
-const CASTLE_COST := 5        # L4
+## This map's tech ceiling (P0): the hall stops offering upgrades past this 1-based
+## tier, so stone/fortified walls stay unreachable here. Map 1 caps at L3 Wooden
+## Town Hall; the Stone Hall (L4) waits on map 2's mine shaft. One constant per map.
+const HALL_CAP := 3
+
+# PLACEHOLDER COSTS -- flat 5 so play-testing isn't gated behind grinding gold. Costs
+# for L2..L5, in order; want a real curve later. Don't read "all tiers cost the same".
+const HALL_COSTS: Array[int] = [5, 5, 5, 5]
 
 ## The main-building ladder, as **cells-x, cells-z, storeys, target height in
 ## metres**. Composed at runtime from kit modules ([HallBuilder]) rather than
@@ -46,14 +46,18 @@ const CASTLE_COST := 5        # L4
 ## 2.3 -> 2.9 -> 4.6 m, which is. Sizes are held where the current spawn positions
 ## still clear each other -- growing them further needs the village laid out
 ## again, which is D2 in `DEPTH_PROMPTS.md` and not done yet.
-const HALL_L2 := [3, 2, 2, 2.0]    # Wooden Hall -- timber
-const HALL_L3 := [3, 3, 2, 2.5]    # Stone Hall
-const HALL_L4 := [4, 3, 2, 3.0]    # Castle
+const HALL_L3 := [3, 2, 2, 2.0]    # Wooden Town Hall -- timber (the first composed hall)
+const HALL_L4 := [3, 3, 2, 2.5]    # Stone Hall
+const HALL_L5 := [4, 3, 2, 3.0]    # Castle
 const WORKER_HUT := [2, 2, 1, 1.4]  # a shed, deliberately shorter than any hall
 
 ## L1. The raw tent model is 0.88 m -- shorter than the villager who sleeps in it.
 const TENT_SCALE := 3.075
 const TENT_HEIGHT := 1.5
+## L2 Upgraded Tent -- the same canvas tent grown a rung, no HallBuilder composition.
+## Reads as more camp, not yet a hall (P0: "only has to read as a rung").
+const TENT2_SCALE := 3.7
+const TENT2_HEIGHT := 1.75
 ## Kept just under the L3 hall: a watchtower may out-top a tent, but it should not
 ## out-top the stone hall it stands next to.
 const ARCHER_SCALE := 1.525
@@ -247,23 +251,18 @@ func take_serving() -> bool:
 func villager_cap() -> int:
 	if not is_instance_valid(_hall):
 		return TIER_CAPS[0]
-	# Read top-down: each flag implies the ones below it, so the first hit wins.
-	if _hall.upgraded3:
-		return TIER_CAPS[3]
-	if _hall.upgraded2:
-		return TIER_CAPS[2]
-	return TIER_CAPS[1] if _hall.upgraded else TIER_CAPS[0]
+	return TIER_CAPS[clampi(_hall.tier_index(), 0, TIER_CAPS.size() - 1)]
 
-## The main building's tier, 1..4, or 0 before the village exists. `wall_side.gd`
-## gates each of its four levels on this, so a wall can never outrun the hall.
+## The main building's tier, 1..5, or 0 before the village exists. `wall_side.gd`
+## gates each wall level on this via its `requires`, so a wall can't outrun the hall.
 func hall_tier() -> int:
 	if not is_instance_valid(_hall):
 		return 0
-	if _hall.upgraded3:
-		return 4
-	if _hall.upgraded2:
-		return 3
-	return 2 if _hall.upgraded else 1
+	return _hall.tier()
+
+## This map's tech ceiling (P0), read by the hall's upgrade checks.
+func hall_cap() -> int:
+	return HALL_CAP
 
 ## The main building node, or null before the fire is lit. Bandits march on it
 ## (COMBAT_PROMPTS P2) and, later, it is the heart that can fall (P6b).
@@ -302,18 +301,20 @@ func _spawn_village() -> void:
 	if _village_spawned:
 		return
 	_village_spawned = true
-	# The main building's ladder: L0 unlit campfire -> L1 Tent -> L2 Wooden Hall
-	# -> L3 Stone Hall -> L4 Castle (not built yet). Lighting the fire raises the
-	# Tent for free; every tier after that is paid for AND raised by a crew, and
-	# reaching the Stone Hall is what opens the walls' own stone upgrade.
-	# Positions are **offsets from the campfire** (see `_spawn_building`), not world
-	# coordinates -- so the whole village follows wherever the fire is placed on a
-	# new map, instead of always spawning around the world origin. The fire sits at
-	# origin today, so these read the same as the old absolute numbers.
-	_hall = _spawn_building(TENT_MODEL, "Tent", Vector3(-3.6, 0, -2.6), TENT_SCALE, TENT_HEIGHT, "",
-		_hall_tier(HALL_L2, false), "Wooden Hall", _hall_scale(HALL_L2), HALL_L2[3], WOODEN_HALL_COST,
-		_hall_tier(HALL_L3, true), "Stone Hall", _hall_scale(HALL_L3), HALL_L3[3], STONE_HALL_COST, true,
-		_hall_tier(HALL_L4, true), "Castle", _hall_scale(HALL_L4), HALL_L4[3], CASTLE_COST)
+	# The main building's ladder (P0 / ROADMAP R2): L0 unlit campfire -> L1 Tent ->
+	# L2 Upgraded Tent -> L3 Wooden Town Hall -> L4 Stone Hall -> L5 Castle. Lighting
+	# the fire raises the Tent free; every rung after is paid for AND crew-built. What
+	# each tier unlocks is gated per map by HALL_CAP -- map 1 stops at L3.
+	# Positions are **offsets from the campfire** (see `_spawn_building`), so the whole
+	# village follows wherever the fire is placed. The fire sits at origin today, so
+	# these read the same as the old absolute numbers.
+	var hall_tiers := [
+		{model = TENT_MODEL, name = "Upgraded Tent", scale = TENT2_SCALE, height = TENT2_HEIGHT, cost = HALL_COSTS[0]},
+		{model = _hall_tier(HALL_L3, false), name = "Wooden Town Hall", scale = _hall_scale(HALL_L3), height = HALL_L3[3], cost = HALL_COSTS[1]},
+		{model = _hall_tier(HALL_L4, true), name = "Stone Hall", scale = _hall_scale(HALL_L4), height = HALL_L4[3], cost = HALL_COSTS[2]},
+		{model = _hall_tier(HALL_L5, true), name = "Castle", scale = _hall_scale(HALL_L5), height = HALL_L5[3], cost = HALL_COSTS[3]},
+	]
+	_hall = _spawn_building(TENT_MODEL, "Tent", Vector3(-3.6, 0, -2.6), TENT_SCALE, TENT_HEIGHT, "", hall_tiers, true)
 	_spawn_building(_hall_tier(WORKER_HUT, false), "Workers", Vector3(3.6, 0, -2.6),
 		_hall_scale(WORKER_HUT), WORKER_HUT[3], "worker")
 	_spawn_building(ARCHER_MODEL, "Archers", Vector3(0, 0, -4.6), ARCHER_SCALE, ARCHER_HEIGHT, "archer")
@@ -329,33 +330,16 @@ func _hall_tier(spec: Array, stone: bool) -> PackedScene:
 func _hall_scale(spec: Array) -> float:
 	return float(spec[3]) / HallBuilder.height(spec[2])
 
-func _spawn_building(scene: PackedScene, bname: String, pos: Vector3, sc: float, height: float, job: String,
-		up_scene: PackedScene = null, up_name := "", up_scale := 1.0, up_height := 0.0, up_cost := 0,
-		up2_scene: PackedScene = null, up2_name := "", up2_scale := 1.0, up2_height := 0.0, up2_cost := 0,
-		up2_unlocks_stone := false,
-		up3_scene: PackedScene = null, up3_name := "", up3_scale := 1.0, up3_height := 0.0, up3_cost := 0) -> Node3D:
+func _spawn_building(scene: PackedScene, bname: String, pos: Vector3, sc: float, height: float,
+		job: String, tiers: Array = [], is_hall := false) -> Node3D:
 	var b := BUILDING_SCENE.instantiate()
 	b.model_scene = scene
 	b.display_name = bname
 	b.model_scale = sc
 	b.model_height = height
 	b.job_type = job
-	b.upgrade_model_scene = up_scene
-	b.upgrade_display_name = up_name
-	b.upgrade_scale = up_scale
-	b.upgrade_height = up_height
-	b.upgrade_cost = up_cost
-	b.upgrade2_model_scene = up2_scene
-	b.upgrade2_display_name = up2_name
-	b.upgrade2_scale = up2_scale
-	b.upgrade2_height = up2_height
-	b.upgrade2_cost = up2_cost
-	b.upgrade2_unlocks_stone = up2_unlocks_stone
-	b.upgrade3_model_scene = up3_scene
-	b.upgrade3_display_name = up3_name
-	b.upgrade3_scale = up3_scale
-	b.upgrade3_height = up3_height
-	b.upgrade3_cost = up3_cost
+	b.tiers = tiers
+	b.is_hall = is_hall
 	get_tree().current_scene.add_child(b)
 	# `pos` is an offset from the fire, so the village travels with it. Translation
 	# only, not rotation -- a rotated campfire isn't a real case and turning the

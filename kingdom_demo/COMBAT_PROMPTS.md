@@ -296,9 +296,10 @@ terrible night, or just as a broken sunset?
 - **Every sound wired or re-purposed gets a row in `audio_review.html` in this same
   pass** — a sound that isn't on the listening desk can't be reviewed (house rule).
 - List what is genuinely missing — stone impacts, a breach crash, a knockdown thump,
-  bandit vocalisations, a blood-moon layer for the night bed — with the per-role listening
-  criteria from `ASSETS.md`, restated, so Andrei can audition candidates. **Ask before
-  downloading anything**; CC0 or CC-BY only.
+  bandit vocalisations, a blood-moon layer for the night bed, **and a fire-arrow whoosh +
+  camp-burn crackle (P10)** — with the per-role listening criteria from `ASSETS.md`,
+  restated, so Andrei can audition candidates. **Ask before downloading anything**; CC0 or
+  CC-BY only.
 - Surface the mix problem rather than solving it unasked: there is no ducking and no
   limiter, and a night wave is the first thing that will genuinely fight the beds.
 
