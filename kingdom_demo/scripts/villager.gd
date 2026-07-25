@@ -16,6 +16,7 @@ enum State {
 	GO_BUILD, BUILD,
 	GO_PERCH, MOUNT, PERCH, DISMOUNT,   # archer wall defence (P4)
 	ROBBED, SPOOKED,                    # robbery + fear (P5)
+	FOLLOW,                             # mustered into the monarch's war party (P9)
 }
 
 ## States a citizen will bolt out of when a bandit gets close at night (P5). Left
@@ -60,6 +61,7 @@ const DEFEND_RANGE := 7.0       # perched archers reach past the 4.2 m hunt rang
 const MOUNT_TIME := 0.7         # the scripted climb up onto / down off a perch
 const DISMOUNT_GRACE := 3.0     # no bandits this long -> stand down; bridges staggered spawns
 const FIRE_RING := 3.2          # ground-defence ring when a raided side has no wall to man
+const FOLLOW_DIST := 2.6        # how close a mustered archer trails the monarch (P9)
 
 # --- robbery (COMBAT_PROMPTS P5) ---
 const ROB_DOWN_TIME := 3.0      # how long a robbed citizen lies before fleeing to the fire
@@ -235,6 +237,9 @@ var _spook_t := 0.0                 # time left in a fear-bolt
 var _spook_check_t := 0.0
 var _spook_to := Vector3.ZERO       # where the bolt is running to
 
+# muster / war party (P9)
+var _leader: Node3D = null          # the monarch, while mustered into the party
+
 func _ready() -> void:
 	add_to_group("villager")
 	_base_y = 0.0
@@ -357,6 +362,8 @@ func _physics_process(delta: float) -> void:
 			_down_t -= delta
 			if _down_t <= 0.0:
 				_rise_as_wanderer()
+		State.FOLLOW:
+			_follow(delta)
 		State.LOOT_WAIT:
 			_seek(delta, _wait_spot, 0.25)
 			_wait_t -= delta
@@ -708,6 +715,52 @@ func _shoot_arrow(target: Node3D) -> void:
 		r.tween_property(_model, "rotation:x", deg_to_rad(-9.0), 0.07)
 		r.tween_property(_model, "rotation:x", 0.0, 0.16)
 
+## The muster's payoff shot (P10): loose a ceremonial fire-arrow at a camp about to
+## burn. No target and no damage -- the BanditCamp drives the burn; this is just the
+## archer's visible part of the volley, so "the squad looses" reads on screen.
+## Reuses the hunt shot's bow, arrow and rock-back, with an ember trail on the arrow.
+func loose_fire_arrow(at: Vector3) -> void:
+	if not is_inside_tree():
+		return
+	_face(at)
+	_play(_bow_pool)
+	var from := global_position + Vector3(0, 0.7, 0)
+	var arrow := MarkFx.model(ARROW_MODEL, 0.7)
+	get_tree().current_scene.add_child(arrow)
+	arrow.global_position = from
+	arrow.look_at(at, Vector3.UP)     # the model points down +X, so aim it along the flight
+	arrow.rotate_object_local(Vector3.UP, -PI / 2.0)
+	var flight := 0.34
+	var t := arrow.create_tween()
+	t.tween_property(arrow, "global_position", at, flight).set_trans(Tween.TRANS_LINEAR)
+	t.tween_callback(arrow.queue_free)
+	_fire_trail(from, at, flight)
+	if is_instance_valid(_model):
+		var r := create_tween()
+		r.tween_property(_model, "rotation:x", deg_to_rad(-9.0), 0.07)
+		r.tween_property(_model, "rotation:x", 0.0, 0.16)
+
+## Ember motes strung along the arrow's flight, so the fire-arrow reads as one (P10).
+## A bounded handful, scheduled at points down the line -- the flight is short and
+## near-straight, so this trails the arrow without sampling it every frame.
+func _fire_trail(from: Vector3, to: Vector3, dur: float) -> void:
+	var motes := 6
+	for i in range(motes):
+		var f := float(i) / float(motes)
+		get_tree().create_timer(dur * f).timeout.connect(_ember_mote.bind(from.lerp(to, f)))
+
+func _ember_mote(at: Vector3) -> void:
+	if not is_inside_tree():
+		return
+	var s := MarkFx.particle(MarkFx.CHIP_TEX, 0.03)
+	s.modulate = Color(1.9, 0.6, 0.12, 1.0)   # ember-hot
+	get_tree().current_scene.add_child(s)
+	s.global_position = at
+	var t := s.create_tween()
+	t.tween_property(s, "global_position", at + Vector3(0, 0.4, 0), 0.5)
+	t.parallel().tween_property(s, "modulate:a", 0.0, 0.5)
+	t.tween_callback(s.queue_free)
+
 # ---- wall defence (COMBAT_PROMPTS P4) ----
 
 ## A raid is on while any bandit stands on the map. The director spawns the first
@@ -717,7 +770,19 @@ func _shoot_arrow(target: Node3D) -> void:
 ## stand down for good at dawn, once the survivors have routed, instead of re-manning
 ## empty walls.
 func _should_defend() -> bool:
-	return not get_tree().get_nodes_in_group("bandit").is_empty()
+	return _raid_pressure()
+
+## True while actual raiders threaten the village -- any bandit that isn't a camp
+## garrison (P10). A garrison sits out at its camp permanently, so keying wall
+## defence off the whole `bandit` group would man the walls every day and night and
+## the archers would never hunt or forage. The escorted war party still targets the
+## full group when it rides out on the offensive (_engage_bandits), so it clears the
+## garrison; only the village's *defensive* mustering filters it out.
+func _raid_pressure() -> bool:
+	for b in get_tree().get_nodes_in_group("bandit"):
+		if is_instance_valid(b) and not b.garrison:
+			return true
+	return false
 
 ## Claim the nearest built wall's centre-most free perch through the same duck-typed
 ## station flow every errand uses. Failing that -- no wall on this side -- take a
@@ -782,30 +847,39 @@ func _begin_mount() -> void:
 
 func _defend(delta: float) -> void:
 	# stand down once the raid's spent: a few seconds of no bandits bridges the gaps
-	# between staggered arrivals, then the archer climbs down and drifts home.
-	if get_tree().get_nodes_in_group("bandit").is_empty():
+	# between staggered arrivals, then the archer climbs down and drifts home. Keys
+	# off raid pressure, not the raw group, so a distant camp garrison doesn't pin
+	# the archers on the wall forever (P10).
+	if not _raid_pressure():
 		_no_bandit_t += delta
 		if _no_bandit_t >= DISMOUNT_GRACE:
 			_leave_post()
 			return
 	else:
 		_no_bandit_t = 0.0
-	# keep the current target, or pick the nearest bandit in defensive range
-	if not _bandit_alive(_quarry) \
-			or global_position.distance_to(_quarry.global_position) > DEFEND_RANGE + 1.5:
-		_quarry = _nearest_bandit(DEFEND_RANGE)
-		_aim_t = AIM_TIME
-	if is_instance_valid(_quarry):
-		_face(_quarry.global_position)
-		_aim_t -= delta
-		if _aim_t <= 0.0:
-			_shoot_arrow(_quarry)
-			_quarry = null
-			_aim_t = AIM_TIME
+	_engage_bandits(delta)
 	# a ground post holds its spot; a perched archer is parked by the tween and must
 	# not run physics, or it would fall off the wall.
 	if not is_instance_valid(_perch_wall):
 		_stand(delta)
+
+## Keep or pick the nearest bandit in defensive range, aim, and loose. Returns true
+## while there's one being engaged, so a caller (perch defence or a follower) knows
+## to hold position. Shared by _defend (P4) and the war party's _follow (P9).
+func _engage_bandits(delta: float) -> bool:
+	if not _bandit_alive(_quarry) \
+			or global_position.distance_to(_quarry.global_position) > DEFEND_RANGE + 1.5:
+		_quarry = _nearest_bandit(DEFEND_RANGE)
+		_aim_t = AIM_TIME
+	if not is_instance_valid(_quarry):
+		return false
+	_face(_quarry.global_position)
+	_aim_t -= delta
+	if _aim_t <= 0.0:
+		_shoot_arrow(_quarry)
+		_quarry = null
+		_aim_t = AIM_TIME
+	return true
 
 func _leave_post() -> void:
 	_no_bandit_t = 0.0
@@ -854,6 +928,48 @@ func _nearest_bandit(within: float) -> Node3D:
 			best = b
 	return best
 
+# ---- muster / the war party (COMBAT_PROMPTS P9) ----
+
+## Asked by the muster banner: an archer citizen not already out or down can join.
+func can_muster() -> bool:
+	return _job_is("archer") and not _robbed and _state != State.FOLLOW
+
+func is_following() -> bool:
+	return _state == State.FOLLOW
+
+## Fall in behind the monarch: leave whatever post or errand this archer was on and
+## trail him, shooting what he walks the party into. Never an order to attack (P9).
+func muster(leader: Node3D) -> void:
+	if not can_muster():
+		return
+	_set_body_collision(true)   # in case it was perched -- P4 turns collision off up there
+	global_position.y = 0.0     # ...and drop it back to the ground
+	_release_claims()
+	_reset_pose()
+	_leader = leader
+	_state = State.FOLLOW
+
+## Home dismisses: back to a post, no order given.
+func disband() -> void:
+	if _state != State.FOLLOW:
+		return
+	_leader = null
+	_reset_pose()
+	_state = State.WORK if is_instance_valid(_workplace) else State.LOYAL
+
+func _follow(delta: float) -> void:
+	if not is_instance_valid(_leader):
+		disband()
+		return
+	# the escort *is* the assault: halt to loose on anything in range, else keep up
+	if _engage_bandits(delta):
+		_stand(delta)
+		return
+	if global_position.distance_to(_leader.global_position) > FOLLOW_DIST:
+		_seek(delta, _leader.global_position, FOLLOW_DIST)
+	else:
+		_stand(delta)
+
 # ---- robbery + fear (COMBAT_PROMPTS P5) ----
 
 ## Asked by a bandit before it charges: only an **employed** citizen is worth robbing.
@@ -863,8 +979,8 @@ func is_robbable() -> bool:
 	if _robbed or not is_instance_valid(_workplace):
 		return false
 	match _state:
-		State.MOUNT, State.PERCH, State.DISMOUNT:
-			return false
+		State.MOUNT, State.PERCH, State.DISMOUNT, State.FOLLOW:
+			return false   # up a wall, or marching in the war party -- out of reach
 	return true
 
 ## A bandit tore the tools off this citizen (§9): knocked flat, the job vacated so

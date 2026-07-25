@@ -45,12 +45,17 @@ const FORT_SCENE := preload("res://kingdom_demo/assets/3d/kenney_castle-kit/Mode
 
 ## PLACEHOLDER COSTS, climbing rather than flat -- unlike the hall tiers, a wall
 ## you can rebuild on four sides wants to feel like it costs more each time.
+##
+## `requires` is the hall tier each level needs (P0 / ROADMAP R2). The old invariant
+## "wall level index *is* the required hall tier" broke at five hall tiers, so it is
+## now explicit: twig→L1, wood→**L3** (Wooden Town Hall), stone→**L4** (Stone Hall),
+## fortified→**L5** (Castle). `hall_tier()` returns 1..5.
 const LEVELS := [
 	{},   # 0 -- a bare marker post, nothing to describe
-	{"name": "Twig Fence", "scene": TWIG_SCENE, "yaw": 90.0, "scale": 0.75, "cost": 3, "stone": false},
-	{"name": "Wooden Wall", "scene": WOODWALL_SCENE, "yaw": 90.0, "scale": 1.05, "cost": 5, "stone": false},
-	{"name": "Stone Wall", "scene": STONEWALL_SCENE, "yaw": 90.0, "scale": 1.35, "cost": 8, "stone": true},
-	{"name": "Fortified Wall", "scene": FORT_SCENE, "yaw": 0.0, "scale": 1.25, "cost": 12, "stone": true},
+	{"name": "Twig Fence", "scene": TWIG_SCENE, "yaw": 90.0, "scale": 0.75, "cost": 3, "stone": false, "requires": 1},
+	{"name": "Wooden Wall", "scene": WOODWALL_SCENE, "yaw": 90.0, "scale": 1.05, "cost": 5, "stone": false, "requires": 3},
+	{"name": "Stone Wall", "scene": STONEWALL_SCENE, "yaw": 90.0, "scale": 1.35, "cost": 8, "stone": true, "requires": 4},
+	{"name": "Fortified Wall", "scene": FORT_SCENE, "yaw": 0.0, "scale": 1.25, "cost": 12, "stone": true, "requires": 5},
 ]
 
 const HALF := 8.0             # wall runs local x  -HALF .. +HALF
@@ -152,10 +157,11 @@ func _next_level() -> int:
 	if level >= TOP_LEVEL:
 		return NONE
 	var want := level + 1
-	return want if _hall_tier() >= want else NONE
+	return want if _hall_tier() >= int(LEVELS[want]["requires"]) else NONE
 
-## The main building's tier, 1..4. Walls read this rather than a "stone unlocked"
-## flag, because there are now four gates rather than one.
+## The main building's tier, 1..5. Walls read this rather than a "stone unlocked"
+## flag, and gate each level on its own `requires` (the level index no longer *is*
+## the required tier -- see LEVELS).
 func _hall_tier() -> int:
 	var fire := get_tree().get_first_node_in_group("campfire")
 	if fire != null and fire.has_method("hall_tier"):

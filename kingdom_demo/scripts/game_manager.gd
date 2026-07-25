@@ -1,22 +1,18 @@
 extends Node3D
 
 signal coins_changed(total: int)
+## Every bandit camp on the map is burned -- the map objective is met (P10). The
+## §10 exit (actually leaving for the next map) is a separate future task; for now
+## this just posts a line.
+signal map_cleared
 
 const STARTING_COINS := 100
 
 var coins: int = STARTING_COINS
-var stone_unlocked := false    # true once the main building reaches L3 Stone Hall --
-                                # wall sides can then be individually paid and built into stone
 
 func _ready() -> void:
 	add_to_group("game_manager")
 	coins_changed.emit(coins)
-
-## Called once the L3 Stone Hall finishes. Nothing converts on its own --
-## this only opens the "Upgrade to Stone" offer on each wall side, which still
-## needs its own gold and its own crew.
-func unlock_stone_walls() -> void:
-	stone_unlocked = true
 
 func add_coins(amount: int) -> void:
 	coins += amount
@@ -95,3 +91,46 @@ func _show_end_screen() -> void:
 func _to_title() -> void:
 	get_tree().paused = false
 	get_tree().change_scene_to_file(MENU_SCENE)
+
+# ---- the map is won (COMBAT_PROMPTS P10) ----
+
+const CLEARED_LINE := "The last camp burns. The valley falls quiet."
+
+var _cleared := false
+
+## A [BanditCamp] reports in once it has burned and left the `bandit_camp` group.
+## When the last one is gone the map objective is met: fire [signal map_cleared] and
+## post a modest line. Unlike the hall falling, this does **not** end anything or
+## pause -- leaving the map (the §10 exit) is its own future task.
+func report_camp_burned() -> void:
+	if _cleared:
+		return
+	if not get_tree().get_nodes_in_group("bandit_camp").is_empty():
+		return
+	_cleared = true
+	map_cleared.emit()
+	_show_cleared_line()
+
+func _show_cleared_line() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 90
+	add_child(layer)
+
+	var label := Label.new()
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	label.offset_top = 88
+	label.text = CLEARED_LINE
+	label.add_theme_font_size_override("font_size", 34)
+	label.add_theme_color_override("font_color", END_GOLD)
+	label.add_theme_color_override("font_outline_color", Color(0.1, 0.05, 0.03))
+	label.add_theme_constant_override("outline_size", 8)
+	label.modulate = Color(END_GOLD.r, END_GOLD.g, END_GOLD.b, 0.0)
+	layer.add_child(label)
+
+	var t := label.create_tween()
+	t.tween_property(label, "modulate:a", 1.0, 1.2)
+	t.tween_interval(3.5)
+	t.tween_property(label, "modulate:a", 0.0, 1.6)
+	t.tween_callback(layer.queue_free)

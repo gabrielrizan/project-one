@@ -12,7 +12,6 @@ extends Node3D
 ## depends on ambience's timing at all.
 
 const BANDIT_SCENE := preload("res://kingdom_demo/scenes/bandit.tscn")
-const SK := "res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/"
 
 # --- the wave table: PLACEHOLDER, exactly like the flat-5 hall costs (§11). ---
 const FIRST_RAID := 3        # nights 1-2 are grace, to teach the horn and the walls
@@ -36,10 +35,6 @@ const NIGHTFALL_DARK := 0.04
 ## darkness() falling past here = first light; survivors turn and run.
 const ROUT_AT_DAWN := 0.9
 
-const EMBER := Color(1.0, 0.55, 0.22)
-const EMBER_DIM := 0.9       # a camp always smoulders on the horizon
-const EMBER_FLARE := 4.5     # ...and the fire is stoked at dusk when a raid is coming
-
 var _night := 0
 var _raid_tonight := false
 var _blood := false
@@ -49,19 +44,15 @@ var _queue: Array[String] = []   # archetypes still to trickle in tonight, in or
 var _spawn_t := 0.0
 var _since_pulse := 0
 var _pulse_size := 0         # 0 = steady stagger; >0 = spawn in blood-moon pulses
-var _ember_light: OmniLight3D = null
-var _ember_want := EMBER_DIM
-var _flicker := 0.0
 
 func _ready() -> void:
 	add_to_group("night_raids")
-	_build_camp()
+	_spawn_camps()
 
 func _process(delta: float) -> void:
 	_watch_clock()
 	_drive_blood(delta)
 	_run_spawns(delta)
-	_flicker_ember(delta)
 
 # ---------------------------------------------------------------- the night
 
@@ -161,6 +152,11 @@ func _start_wave(count: int, blood: bool) -> void:
 func _run_spawns(delta: float) -> void:
 	if _queue.is_empty():
 		return
+	# every camp on the map is burned -- there is nowhere left for a wave to come
+	# from, so drop what's queued (P10). The objective is done; the night is quiet.
+	if get_tree().get_nodes_in_group("bandit_camp").is_empty():
+		_queue.clear()
+		return
 	_spawn_t -= delta
 	if _spawn_t > 0.0:
 		return
@@ -177,11 +173,22 @@ func _spawn_one(archetype: String = "thug") -> void:
 	var scene := get_tree().current_scene
 	if scene == null:
 		return
+	var camp := _live_camp()
+	if camp == null:
+		return   # nowhere to spawn from -- every camp on this front is burned (P10)
 	var b := BANDIT_SCENE.instantiate()
 	b.archetype = archetype
 	scene.add_child(b)
-	b.global_position = MapTerrain.corridor_mouth() \
-		+ Vector3(randf_range(-4.0, 4.0), 0.0, randf_range(-2.0, 2.0))
+	b.global_position = camp.spawn_point()
+
+## A random live (unburned) camp to send a wave from -- read straight from the
+## group, so a burned camp (which leaves it) never spawns again (P10). Map 1 has
+## one; later maps have several.
+func _live_camp() -> Node3D:
+	var camps := get_tree().get_nodes_in_group("bandit_camp")
+	if camps.is_empty():
+		return null
+	return camps[randi() % camps.size()]
 
 # ---------------------------------------------------------------- dawn / rout
 
@@ -231,40 +238,20 @@ func blood_moon_now() -> void:
 		amb.blow_horn(3)
 	print("[raids] BLOOD MOON now")
 
-# ---------------------------------------------------------------- the camp
+# ---------------------------------------------------------------- the camps
 
-func _build_camp() -> void:
-	var camp := Node3D.new()
-	add_child(camp)
+## Stamp map 1's single camp at the corridor mouth. A [BanditCamp] is an object with
+## a lifecycle now (P10): it owns its own look, ember fire and garrison, joins the
+## `bandit_camp` group, and can burn -- so the director only ever reads camps *from
+## the group*. Later maps drop several; this is where they'd go.
+func _spawn_camps() -> void:
+	var camp := BanditCamp.new()
 	camp.position = MapTerrain.corridor_mouth()
-	_place(camp, "tent.glb", Vector3(0, 0, -2.8), 2.0, 0.0)          # behind the fire, mouth to the village
-	_place(camp, "campfire-pit.glb", Vector3.ZERO, 1.6, 0.0)
-	_place(camp, "bedroll.glb", Vector3(-2.4, 0, -1.4), 1.6, 0.6)
-	_place(camp, "bedroll.glb", Vector3(2.3, 0, -1.7), 1.6, -0.5)
-	_place(camp, "barrel.glb", Vector3(2.0, 0, 0.9), 1.3, 0.0)
-	_ember_light = OmniLight3D.new()
-	camp.add_child(_ember_light)
-	_ember_light.position = Vector3(0, 0.8, 0)
-	_ember_light.light_color = EMBER
-	_ember_light.light_energy = EMBER_DIM
-	_ember_light.omni_range = 16.0
-	_ember_light.shadow_enabled = false
+	add_child(camp)
 
-func _place(parent: Node3D, file: String, pos: Vector3, sc: float, yaw: float) -> void:
-	var n: Node3D = (load(SK + file) as PackedScene).instantiate()
-	parent.add_child(n)
-	n.position = pos
-	n.scale = Vector3.ONE * sc
-	n.rotation.y = yaw
-
+## Stoke (or bank) every live camp's fire. Called with true when a wave starts, and
+## false at dawn -- the camp does the easing itself (BanditCamp::flare).
 func _flare(on: bool) -> void:
-	_ember_want = EMBER_FLARE if on else EMBER_DIM
-
-## A little life in the fire, and it eases toward whatever _flare last asked for.
-func _flicker_ember(delta: float) -> void:
-	if not is_instance_valid(_ember_light):
-		return
-	_flicker += delta * 9.0
-	var jitter := 0.85 + 0.15 * sin(_flicker) * sin(_flicker * 1.73)
-	_ember_light.light_energy = move_toward(
-		_ember_light.light_energy, _ember_want * jitter, delta * 6.0)
+	for c in get_tree().get_nodes_in_group("bandit_camp"):
+		if c.has_method("flare"):
+			c.flare(on)

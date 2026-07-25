@@ -59,25 +59,38 @@ navmesh pathfinding round everything solid, re-baked as the village changes ·
 title + pause menus, settings persist · **a dev overlay on F1** for reaching any of it
 instantly.
 
-**Combat is now built — `COMBAT_PROMPTS.md` P1–P7.** The first map is a mountain U with a
-single north corridor (`map_terrain.gd` + `mountains.gd`); charcoal bandits (`bandit.gd`,
-archetypes Thug/Brute) march up it. A raid director (`night_raids.gd`) counts nights off
-`darkness()`, sends grace-then-growing waves from a camp at the corridor mouth, and blows
-the dusk horn ×1 quiet / ×2 raid / ×3 blood moon. Archers mount wall perches and shoot;
-bandits rob employed citizens (who flee and must be re-fed), smash walls/gates to breach
-(repair is construction), and vandalise buildings — **the hall at zero ends the run** (end
-screen in `game_manager.gd`). Every 15th night is a **blood moon**: red sky (`blood` factor
-in `day_night_cycle.gd`, parallel to `storm`), a 2.5× wave in pulses mixed with Brutes.
-Numbers throughout (HP, wave sizes, damage) are **placeholder**, like the flat-5 hall costs.
+**Combat is now built — `COMBAT_PROMPTS.md` P1–P10, bar P8's audio pass.** The first map is
+a mountain U with a single north corridor (`map_terrain.gd` + `mountains.gd`); charcoal
+bandits (`bandit.gd`, archetypes Thug/Brute) march up it. A raid director (`night_raids.gd`)
+counts nights off `darkness()` and sends grace-then-growing waves — spawned from **`BanditCamp`
+objects in the `bandit_camp` group** (`bandit_camp.gd`), not a loose camp — blowing the dusk
+horn ×1 quiet / ×2 raid / ×3 blood moon. Archers mount wall perches and shoot; bandits rob
+employed citizens (who flee and must be re-fed), smash walls/gates to breach (repair is
+construction), and vandalise buildings — **the hall at zero ends the run** (end screen in
+`game_manager.gd`). Every 15th night is a **blood moon**: red sky (`blood` factor in
+`day_night_cycle.gd`, parallel to `storm`), a 2.5× wave in pulses mixed with Brutes.
+
+**The offensive loop (P9–P10) closes it.** The **muster banner** (`muster_banner.gd`) outside
+the gate raises a squad of free archers that trail the monarch and fight what he rides them
+into (a `FOLLOW` state in `villager.gd`); coming home to the fire disbands them — never an
+order in either direction. Each `BanditCamp` keeps a **standing garrison** (idle bandits at
+its fire) the party must shoot down; with no defender left and an escorted archer in range the
+squad looses a **fire-arrow volley** (`villager.gd::loose_fire_arrow`), the tents ignite, and
+the camp burns to a charcoal wreck and leaves `bandit_camp` — so raids from that front stop.
+**All camps burned fires `game_manager.map_cleared`** and posts a line; actually *leaving* the
+map (the §10 exit) is still a future task. Numbers throughout (HP, wave/garrison sizes, damage)
+are **placeholder**, like the flat-5 hall costs.
 
 **Not built: `COMBAT_PROMPTS.md` P8** — the night audio pass. Bandit blows reuse the axe
 pool pitched down and the breach reuses the gate slam, but the missing set (stone impacts,
-a breach crash, a knockdown thump, bandit voices, a blood-moon night bed) isn't sourced,
-and nothing is on `audio_review.html` yet. The mix still has no ducking or limiter.
+a breach crash, a knockdown thump, bandit voices, a blood-moon night bed, **and a fire-arrow
+whoosh + camp-burn** from P10) isn't sourced, and nothing is on `audio_review.html` yet. The
+mix still has no ducking or limiter.
 
 **Also not built:** soup upkeep / morale / desertion · mercenaries · the Stealer (bandits
-still ignore the monarch, so the Crown lose-condition is reserved) · map objectives and
-moving to the next map · **music of any kind**.
+still ignore the monarch, so the Crown lose-condition is reserved) · the map exit / moving to
+the next map · camp re-establishment and night-kill garrison depletion (`ROADMAP.md` R8) ·
+**music of any kind**.
 
 **Audio is well past "none"** — beds, weather, work, the monarch's horse and a watch horn.
 `ASSETS.md` holds the inventory and the per-role criteria; `audio_review.html` is the
@@ -195,15 +208,25 @@ Facts that *don't* drift:
 
 ### The main-building ladder (`hall_builder.gd`)
 
+**Five tiers (P0 / `ROADMAP.md` R2): L1 Tent (free) → L2 Upgraded Tent → L3 Wooden Town
+Hall → L4 Stone Hall → L5 Castle.** L1–L2 are survival-kit tents (L2 the same tent grown a
+rung); **L3–L5 are `HallBuilder` compositions**. `building.gd` holds the rungs as a **tier
+array** (`tiers`, each `{model, name, scale, height, cost}`) rather than the old three flat
+`upgrade_*` slots — five tiers needed an array, not a fourth copy. `campfire.gd` builds that
+array in `_spawn_village` and reads the current rung through `hall.tier()` (1–5). A per-map
+**`hall_cap`** (`campfire.gd`, map 1 = 3) stops the upgrade offer past the cap, so stone and
+fortified walls are simply unreachable on map 1 — the prompt never appears. Pop caps are
+`TIER_CAPS = [6, 8, 10, 13, 16]`.
+
 **The hall tiers are composed from kit modules at runtime, not loaded.** The Kenney Fantasy
 Town Kit has no house in it — all 167 pieces are modular wall/roof/doorway panels, and the
 only assembled buildings are a windmill and two watermills — so `HallBuilder.build(cx, cz,
 storeys, stone)` stamps a perimeter of walls and caps it with a flat roof and parapet.
 
 **Every module is a 1 m cell with its panel on the cell's +X face**, and walls are exactly
-1 m tall — measured, not assumed. So the specs in `campfire.gd` (`HALL_L2` etc.) read
-directly as metres, which is the entire point: footprints and heights are comparable to a
-1.2 m villager instead of being guessed through a `model_scale` multiplier. Composed tiers
+1 m tall — measured, not assumed. So the composed specs in `campfire.gd` (`HALL_L3` etc.)
+read directly as metres, which is the entire point: footprints and heights are comparable to
+a 1.2 m villager instead of being guessed through a `model_scale` multiplier. Composed tiers
 therefore carry `model_scale = 1.0`.
 
 Two deliberate choices. The roof is **flat with a parapet** because a pitched roof needs its
@@ -223,18 +246,20 @@ out again (D2 in `DEPTH_PROMPTS.md`).
 
 ### The wall ladder (`wall_side.gd`)
 
-**Four levels — twig · wood · stone · fortified stone — and the level index *is*
-the main-building tier it requires.** You cannot ring a tent with a castle wall; the
-defences can never outrun the hall they defend, which is what stops walls being a way to
-skip the ladder. There is no separate "requires" field precisely so the two cannot drift.
+**Four levels — twig · wood · stone · fortified stone — each gated on the hall tier it
+needs.** You cannot ring a tent with a castle wall; the defences can never outrun the hall
+they defend, which is what stops walls being a way to skip the ladder. The old invariant
+"the level index *is* the required hall tier" broke when the hall went to five tiers (P0),
+so `LEVELS` now carries an explicit **`requires`**: twig→**L1**, wood→**L3** (Wooden Town
+Hall), stone→**L4** (Stone Hall), fortified→**L5** (Castle).
 
 Heights climb **0.75 → 1.05 → 1.35 → 1.64 m** against a 1.2 m villager: something you step
 over, then hide behind, then man. Each rung is its own purchase opening its own site, and
 nothing converts for free — a wall left at twig stays twig however grand the hall gets.
 
-Gating reads `campfire.gd::hall_tier()` (1–4), **not** `game_manager.stone_unlocked` — that
-flag only ever knew "reached L3" and there are four gates now. It is still set and is now
-redundant; removing it means also dropping `building.gd::upgrade2_unlocks_stone`.
+Gating reads `campfire.gd::hall_tier()` (1–5) against each level's `requires`. The old
+`game_manager.stone_unlocked` / `building.gd::upgrade2_unlocks_stone` flags are **deleted**
+(P0) — the wall reads the live hall tier, so there is nothing to keep in sync.
 
 ⚠️ Sections are spaced `STAKE_SPACING` = 1 m but the scaled models are 1.05–1.35 m wide, so
 the upper rungs **overlap slightly**. That is deliberate — butted opaque panels read as a
@@ -374,6 +399,9 @@ Every key reaches into a system directly:
 | **F7** | dry the ground (F4-off leaves pools to dry on their own) |
 | **J / H / K** | horn — 1 blast (nightfall) / 2 (attack) / 3 (blood moon). Needs the fire lit |
 | **L** | rooster — daybreak. Needs the fire lit |
+| **N / M** | spawn one bandit at the mouth / clear all bandits |
+| **R / Y / U** | raid now / advance the night counter / blood moon now |
+| **O / I** | dismiss the war party (P9) / burn the nearest camp (P10, skips the assault) |
 | F3 | navmesh debug — **already taken** by `nav_world.gd` |
 
 **Every tool is a clickable button too**, built from the same `ACTIONS` list that binds

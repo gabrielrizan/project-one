@@ -24,6 +24,7 @@
 [ext_resource type="Script" uid="uid://b0b8ey6nvnhxa" path="res://kingdom_demo/scripts/dev_menu.gd" id="21_dev"]
 [ext_resource type="Script" uid="uid://c6d1mxxvejufd" path="res://kingdom_demo/scripts/wildlife.gd" id="90_wild"]
 [ext_resource type="Script" uid="uid://crix8vow1jsp7" path="res://kingdom_demo/scripts/night_raids.gd" id="23_raids"]
+[ext_resource type="Script" uid="uid://db0m6hnlf654r" path="res://kingdom_demo/scripts/muster_banner.gd" id="24_muster"]
 [ext_resource type="PackedScene" uid="uid://l3xnslje6465" path="res://kingdom_demo/scenes/berry_bush.tscn" id="91_bush"]
 [ext_resource type="PackedScene" uid="uid://bkmenu0000001" path="res://kingdom_demo/scenes/menu.tscn" id="92_menu"]
 
@@ -271,6 +272,9 @@ script = ExtResource("90_wild")
 
 [node name="NightRaids" type="Node3D" parent="."]
 script = ExtResource("23_raids")
+
+[node name="MusterBanner" type="StaticBody3D" parent="."]
+script = ExtResource("24_muster")
 
 [node name="Berries" type="Node3D" parent="." unique_id=398854962]
 
