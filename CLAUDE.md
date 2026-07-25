@@ -475,6 +475,16 @@ for the duration, so the king stays **locked on target** and a second tally can 
   better, but a tally pip fell to ~14px and you could no longer tell a paid pip from an
   unpaid one — which is the entire readout. `PIP_SCALE` / `PIP_SPACING` went up ~1.6× to
   compensate. **Any future camera change has to revisit both, in opposite directions.**
+- **3D audio was coupled to the camera too, and pulling it back silenced the short-range
+  emitters.** Godot uses the current `Camera3D` as the audio listener, so the 26m pull-back
+  put every `AudioStreamPlayer3D` 26m from the action — past the `max_distance` of the horse
+  (22/26m), the cauldron feed (18m), and coin/clink/mark/berry — and they went dead silent
+  (a source is fully cut off beyond `max_distance`). `camera_rig.gd::_setup_listener()` now
+  pins a dedicated **`AudioListener3D`** to the rig at `(0, 6.645, 5.503)` — where the camera
+  sat when the SFX were tuned — and `make_current()`s it, so audio range is decoupled from
+  the camera. It hangs off the rig, so Z / X spin still pans the field; only distance is
+  fixed. **A camera move no longer touches audibility — but changing this listener's offset
+  re-tunes every positional sound at once.**
 - **In a `--script` SceneTree file, autoloads are not resolvable by name** — reach them via
   `root.get_node("/root/GoldFx")`.
 - **`Input.action_press()` in a test also drives the monarch's real `_try_interact()`**, so

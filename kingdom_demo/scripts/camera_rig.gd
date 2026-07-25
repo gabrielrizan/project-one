@@ -18,7 +18,24 @@ var _shake_amp := 0.0
 func _ready() -> void:
 	add_to_group("camera_rig")
 	_cam_base = _camera.position
+	_setup_listener()
 	call_deferred("_find_target")
+
+## The 3D audio listener is pinned to the rig, NOT left on the camera. Godot uses
+## the current Camera3D as the listener by default, so when the camera was pulled
+## back to ~26m for the diorama look (commit 9826645, 8.6m -> 26m) every
+## short-range positional sound fell past its `max_distance` and went silent --
+## the horse (22/26m) and cauldron feed (18m) first, then coin/clink/mark/berry.
+## A dedicated listener sitting where the camera used to be keeps every emitter's
+## tuning intact while the camera is free to frame from anywhere. It hangs off the
+## rig, so the Z / X spin still pans the field; only its distance is decoupled.
+## Position matches the camera transform from before the pull-back, so the mix is
+## exactly what the SFX were tuned against.
+func _setup_listener() -> void:
+	var listener := AudioListener3D.new()
+	listener.position = Vector3(0.0, 6.645, 5.503)
+	add_child(listener)
+	listener.make_current()
 
 ## A thump the player feels -- something heavy landing, e.g. a gate dropping into
 ## a finished wall. It shakes the camera, not the rig, so following the monarch
