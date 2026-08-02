@@ -303,11 +303,17 @@ painted over it and the rain was invisible against lit grass. The curve lifts th
 (0.35 → 0.56) and leaves a downpour exactly where it was. A *floor* says the same thing but
 pops, because intensity ramps up from zero through the gathering phase.
 
-**The season clock gates rain and nothing else.** Four seasons, `CYCLES_PER_SEASON` day/night
-cycles each, with their own rain odds, strength and thunder odds. **Winter is dry** — that
-is a placeholder for snow, not a design statement. Seasons have *no visual identity yet*:
-no tree recolouring, no snow, palette unchanged. That was Andrei's call — keep it simple
-for now.
+**The season clock gates rain, and now dresses the world.** Four seasons,
+`CYCLES_PER_SEASON` day/night cycles each, with their own rain odds, strength and thunder
+odds. **Winter is still dry** (snow is a look, not precipitation yet). Seasons now carry a
+**visual identity** (2026-08-02): `weather.gd` fires a **`season_changed(season)`** signal,
+and the world re-skins off it — `world_decor.gd` re-grows its forest, rocks and bushes in
+the season's coat (green in spring/summer, **autumn** colours, **snow-laden** in winter,
+plus a whitened ground), harvestable trees (`tree_resource.gd`) swap their trunk to match,
+and `wildlife.gd` thins game hard in winter. All the scenery is the imported **nature-pack**
+(`assets/nature-pack/FBX`), planted through **`NaturePack`** (`nature_pack.gd`), which
+auto-scales each raw FBX to a target height by its own bounding box — so model size is one
+number at the call site, not a per-asset guess.
 
 `day_night_cycle.gd` owns the environment; weather never writes it directly. It sets
 `cycle.storm` and `cycle.flash` and the cycle blends them in **after** the time-of-day

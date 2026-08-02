@@ -1,8 +1,6 @@
-[gd_scene load_steps=6 format=3 uid="uid://cuj8werh85dix"]
+[gd_scene load_steps=3 format=3 uid="uid://cuj8werh85dix"]
 
 [ext_resource type="Script" uid="uid://b8quwhbyskihx" path="res://kingdom_demo/scripts/tree_resource.gd" id="1_o35kr"]
-[ext_resource type="PackedScene" uid="uid://b613o171vfbso" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tree.glb" id="2_model"]
-[ext_resource type="PackedScene" uid="uid://gh6y3tnaum5o" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tree-trunk.glb" id="3_stump"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_0tkre"]
 height = 4.5
@@ -27,9 +25,7 @@ text = "Hold E  Mark Tree"
 font_size = 50
 outline_size = 14
 
-[node name="Model" parent="." instance=ExtResource("2_model")]
-transform = Transform3D(3.2, 0, 0, 0, 3.2, 0, 0, 0, 3.2, 0, 0, 0)
+[node name="Model" type="Node3D" parent="." unique_id=884301201]
 
-[node name="Stump" parent="." instance=ExtResource("3_stump")]
-transform = Transform3D(3.2, 0, 0, 0, 3.2, 0, 0, 0, 3.2, 0, 0, 0)
+[node name="Stump" type="Node3D" parent="." unique_id=884301202]
 visible = false

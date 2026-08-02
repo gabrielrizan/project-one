@@ -55,14 +55,84 @@ var _blaze: Sprite3D = null
 var _banner: Node3D = null
 var _banner_t := 0.0
 
+# --- the tree's own body, from the nature-pack (NaturePack), and its season coat.
+#     Family + member index are fixed per tree so a re-skin keeps its shape; only
+#     the variant (green / autumn / snow) changes as the season clock turns. ---
+const TREE_H := Vector2(4.0, 5.2)   # ~ the 4.5 m collider, so blaze/banner heights hold
+const STUMP_H := 0.9
+## Season indices mirror weather.gd's Season enum (SPRING/SUMMER/AUTUMN/WINTER).
+const _AUTUMN_SEASON := 2
+const _WINTER_SEASON := 3
+
+var _family := "common"
+var _idx := 1
+var _tree_h := 4.5
+var _variant := NaturePack.GREEN
+var _tree_rng := RandomNumberGenerator.new()
+
 func _ready() -> void:
 	add_to_group("interactable")
 	add_to_group("tree")
+	# fixed per tree (seeded off its spot) so each trunk differs but a re-skin keeps
+	# the same shape and only changes its seasonal coat
+	_tree_rng.seed = hash(Vector2(global_position.x, global_position.z))
+	_family = NaturePack.TREE_FAMILIES[_tree_rng.randi() % NaturePack.TREE_FAMILIES.size()]
+	_idx = _tree_rng.randi_range(1, NaturePack.TREE_MEMBERS)
+	_tree_h = _tree_rng.randf_range(TREE_H.x, TREE_H.y)
+	_build_model()
+	_build_stump()
 	# the Model sways, never the body -- moving the StaticBody3D would drag its
 	# collider around and the navmesh is baked from exactly that. See wind.gd.
 	model.add_to_group("wind_sway")
 	_base_x = model.position.x
 	set_process(false)   # only marked trees need per-frame work
+	# hook the season clock deferred, so it doesn't matter whether Weather has
+	# joined its group yet when this tree readies (scene _ready order isn't fixed)
+	call_deferred("_hook_weather")
+
+func _hook_weather() -> void:
+	var w := get_tree().get_first_node_in_group("weather")
+	if w == null or not w.has_signal("season_changed"):
+		return
+	if not w.season_changed.is_connected(_on_season_changed):
+		w.season_changed.connect(_on_season_changed)
+	_on_season_changed(w.season())   # dress to the current season now
+
+## Plant this tree's trunk model under the (empty) Model holder, at the current
+## seasonal variant. Rebuilt in place on a season change while the tree still stands.
+func _build_model() -> void:
+	for c in model.get_children():
+		c.queue_free()
+	var body := NaturePack.spawn(NaturePack.tree(_family, _variant, _idx), _tree_h)
+	if body:
+		model.add_child(body)
+
+func _build_stump() -> void:
+	for c in stump.get_children():
+		c.queue_free()
+	var s := NaturePack.spawn(NaturePack.random_stump(_variant, _tree_rng), STUMP_H)
+	if s:
+		stump.add_child(s)
+
+func _variant_for(season: int) -> String:
+	if season == _AUTUMN_SEASON:
+		return NaturePack.AUTUMN
+	if season == _WINTER_SEASON:
+		return NaturePack.SNOW
+	return NaturePack.GREEN
+
+## Re-skin to the new season. A standing tree swaps its trunk (mark/blaze untouched
+## -- they live on separate child nodes); a felled tree, already toppled, only needs
+## its stump re-coated.
+func _on_season_changed(season: int) -> void:
+	var v := _variant_for(season)
+	if v == _variant:
+		return
+	_variant = v
+	if felled:
+		_build_stump()
+	elif not _busy:
+		_build_model()
 
 func _process(delta: float) -> void:
 	if is_instance_valid(_banner):
