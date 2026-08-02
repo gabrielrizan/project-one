@@ -156,9 +156,12 @@ func _physics_process(delta: float) -> void:
 			_mill_near(delta, _hall_goal, 1.4)
 		State.FLEE:
 			_seek(delta, _goal, 1.0)
-			# reached the camp (or run off the end of the corridor) -> gone at dawn
+			# reached the camp it was running for, or fetched up at any other one
+			# -> gone. The second test used to be "ran off the north end of the
+			# corridor", which only meant anything on the one prototype map; every
+			# map now has camps in different directions, so arrival is the test.
 			if global_position.distance_to(_goal) < 2.0 \
-					or global_position.z <= MapTerrain.MOUTH_Z + 1.5:
+					or MapTerrain.at_camp(global_position):
 				queue_free()
 		State.GARRISON:
 			# posted at the camp fire: mill, never hunt, never march (P10)
@@ -356,7 +359,10 @@ func _rob() -> void:
 	_shoulder_bundle()
 	_victim = null
 	_run = FLEE_SPEED
-	_goal = MapTerrain.corridor_mouth()
+	# home is whichever camp is closest, not one fixed mouth -- a map can have its
+	# camps on opposite bearings, and a thief running the length of the map past a
+	# nearer fire would read as pathfinding, not panic
+	_goal = MapTerrain.nearest_camp(global_position, get_tree())
 	_state = State.FLEE
 
 func _shoulder_bundle() -> void:

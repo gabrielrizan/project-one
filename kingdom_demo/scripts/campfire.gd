@@ -290,7 +290,7 @@ func _attract_villagers() -> void:
 		# Wanderers walk in up the one open bearing -- the north corridor -- and
 		# through the gate, rather than materialising in a full ring that would now
 		# drop half of them inside the sealed mountains (COMBAT_PROMPTS P1).
-		var spawn := MapTerrain.corridor_spawn_point()
+		var spawn := MapTerrain.wanderer_spawn_point()
 		v.target = global_position
 		scene.add_child(v)
 		v.global_position = spawn

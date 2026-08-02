@@ -40,33 +40,38 @@ const RAIN_NAMES := ["off", "light", "steady", "downpour"]
 ## than it claims to.
 const SPEED_STEPS := [1.0, 2.0, 4.0, 8.0, 16.0]
 
-## Camera presets, for play-testing the lens (D5 in `DEPTH_PROMPTS.md`). Cycled
-## with C; `pos` is the Camera3D's local offset from the rig, which follows the
-## monarch, so these are pure lens-and-angle changes.
+## Camera presets, cycled with C. `pos` is the Camera3D's local offset from the
+## rig, which follows the monarch, so these are pure lens-and-angle changes.
+## Both aim at the rig origin -- pitch equals the position's elevation, so the
+## monarch sits at frame centre.
 ##
-## **Every preset but `stock` aims at the rig origin** -- pitch equals the
-## position's elevation, so the monarch sits at frame centre. `stock` deliberately
-## does not: the shipped camera sits at 50.4 degrees of elevation but is pitched
-## only 40, so it looks *past* the monarch and puts him low in frame with the
-## ground ahead opened up. That is worth keeping as the baseline to A/B against
-## rather than quietly correcting.
+## The list used to hold seven lenses for the D5 framing pass; that question is
+## settled (`battle 45` shipped) and the five losers are gone. What is left is the
+## one live A/B: **perspective against orthographic.**
 ##
-## The trailing metres are the ground visible across frame centre at 16:9, and
-## they are the point of the list: **the first four are all ~18-20 m.** Distance
-## and field of view cancel, so a longer lens further back buys the diorama look
-## and *no extra coverage at all*. Only the two `battle` presets genuinely show
-## you more -- which is a separate decision from the lens, and the one that
-## matters once there is something to fight (see D6).
+## A preset carrying `size` is **orthographic**; one carrying `fov` is
+## perspective. `iso 30` is the pixel-art isometric projection rebuilt in 3D --
+## parallel edges stay parallel, a hut at the top of the frame is the same size as
+## one at the bottom. Two things it changes that are easy to miss:
+##
+## - **The horizon can never enter frame.** Every ortho ray sits at exactly the
+##   pitch, so there is no angular spread to catch the sky -- which is why 30° is
+##   safe here where a 30° *perspective* pitch would break the `FOG_PALE` seam
+##   rule (see CLAUDE.md, "Fog has to differ from the ground in luminance").
+## - **Depth fog and shadows are still tuned for the perspective frustum.** The
+##   fog band is 22-55 m of slant range and `directional_shadow_max_distance` is
+##   48; ortho puts the far edge of the frame at ~42 m along the view axis, so
+##   both hold, but neither is *tuned* for this. Retune before shipping it.
+##
+## `size` is the vertical extent of the view box in metres, so ground coverage is
+## `size / sin(pitch)` -- 16 / sin 30° = ~32 m, which is deliberately close to
+## `battle 45`'s ~28 m. The A/B is meant to be projection alone, not zoom.
+##
 ## Index 0 must match what `kingdom_demo.tscn` ships, or the readout lies until
-## the first press. `battle 45` is now the shipped camera.
+## the first press. `battle 45` is the shipped camera.
 const CAM_PRESETS := [
 	{"name": "battle 45°  fov34  ~28m", "pos": Vector3(0, 18.38, 18.38), "pitch": 45.0, "fov": 34.0},
-	{"name": "battle 60°  fov32  ~29m", "pos": Vector3(0, 24.25, 14.00), "pitch": 60.0, "fov": 32.0},
-	{"name": "diorama 45°  fov34  ~18m", "pos": Vector3(0, 12.02, 12.02), "pitch": 45.0, "fov": 34.0},
-	{"name": "diorama 60°  fov32  ~19m", "pos": Vector3(0, 16.45, 9.50), "pitch": 60.0, "fov": 32.0},
-	{"name": "tabletop 75° fov30  ~20m", "pos": Vector3(0, 20.28, 5.44), "pitch": 75.0, "fov": 30.0},
-	{"name": "close  50°  fov45  ~18m", "pos": Vector3(0, 9.19, 7.71), "pitch": 50.0, "fov": 45.0},
-	{"name": "stock  40°  fov60  ~18m", "pos": Vector3(0, 6.645, 5.503), "pitch": 40.0, "fov": 60.0},
+	{"name": "iso 30°  ortho16  ~32m", "pos": Vector3(0, 13.00, 22.52), "pitch": 30.0, "size": 16.0},
 ]
 
 ## One list drives both the buttons and the hotkeys, so the two can never drift
@@ -190,9 +195,9 @@ func _spawn_bandit() -> void:
 		return
 	var b := BANDIT_SCENE.instantiate()
 	scene.add_child(b)
-	b.global_position = MapTerrain.corridor_mouth() \
+	b.global_position = MapTerrain.raid_origin() \
 		+ Vector3(randf_range(-4.0, 4.0), 0.0, randf_range(-1.5, 1.5))
-	print("[dev] bandit spawned at the corridor mouth")
+	print("[dev] bandit spawned at the raiding camp")
 
 func _clear_bandits() -> void:
 	var n := 0
@@ -323,7 +328,16 @@ func _step_camera() -> void:
 	var p: Dictionary = CAM_PRESETS[_cam_preset]
 	cam.position = p["pos"]
 	cam.rotation_degrees.x = -float(p["pitch"])
-	cam.fov = p["fov"]
+	# `size` marks an orthographic preset, `fov` a perspective one. Both are always
+	# written, not just the one in use: Godot keeps them as separate properties, so
+	# leaving the other stale means cycling back lands on whatever the last preset
+	# of that kind set rather than on this preset's own number.
+	if p.has("size"):
+		cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+		cam.size = float(p["size"])
+	else:
+		cam.projection = Camera3D.PROJECTION_PERSPECTIVE
+		cam.fov = float(p["fov"])
 	print("[dev] camera: %s" % p["name"])
 
 func _step_rain() -> void:

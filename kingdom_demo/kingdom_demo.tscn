@@ -8,34 +8,33 @@
 [ext_resource type="Script" uid="uid://xqy4jku5m8ob" path="res://kingdom_demo/scripts/coin_ui.gd" id="7_1yp2m"]
 [ext_resource type="Texture2D" uid="uid://dyf0xh70ryu36" path="res://kingdom_demo/assets/pixel/coin.png" id="9_dl8hl"]
 [ext_resource type="Texture2D" uid="uid://clc88gxbfm3l1" path="res://kingdom_demo/assets/pixel/sun.png" id="10_yycvq"]
+[ext_resource type="Script" uid="uid://din3aumti0ij2" path="res://kingdom_demo/scripts/map_forest.gd" id="11_forest"]
 [ext_resource type="PackedScene" uid="uid://clad8q2n673md" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/rock-a.glb" id="11_p6jlh"]
-[ext_resource type="PackedScene" uid="uid://cuj8werh85dix" path="res://kingdom_demo/scenes/tree.tscn" id="11_tree"]
 [ext_resource type="PackedScene" uid="uid://dowbc762jur4v" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/rock-c.glb" id="12_a7p3c"]
-[ext_resource type="PackedScene" uid="uid://bd7k767l1etkf" path="res://kingdom_demo/scenes/wall_side.tscn" id="12_ws"]
+[ext_resource type="Script" uid="uid://n3m3dgvns3km" path="res://kingdom_demo/scripts/map_walls.gd" id="12_walls"]
 [ext_resource type="PackedScene" uid="uid://dnmswfihbrwc2" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/rock-b.glb" id="13_hfmf3"]
 [ext_resource type="PackedScene" uid="uid://dcwgtu1qgcyts" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/grass-large.glb" id="14_dl8hl"]
 [ext_resource type="PackedScene" uid="uid://dnd2gc472qdj4" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/patch-grass-large.glb" id="15_yycvq"]
 [ext_resource type="Script" uid="uid://cm70csskstbyp" path="res://kingdom_demo/scripts/world_decor.gd" id="16_a7p3c"]
 [ext_resource type="Script" uid="uid://bu2fgbb7oab7w" path="res://kingdom_demo/scripts/nav_world.gd" id="17_nav"]
-[ext_resource type="Script" uid="uid://c7gehf4k5e50e" path="res://kingdom_demo/scripts/mountains.gd" id="22_mtn"]
 [ext_resource type="Script" uid="uid://ne85dljhfunf" path="res://kingdom_demo/scripts/ambience.gd" id="18_amb"]
 [ext_resource type="Script" uid="uid://7iou5by44kho" path="res://kingdom_demo/scripts/wind.gd" id="19_wind"]
 [ext_resource type="Script" uid="uid://bq2uoj84hhn8h" path="res://kingdom_demo/scripts/weather.gd" id="20_weather"]
 [ext_resource type="Script" uid="uid://b0b8ey6nvnhxa" path="res://kingdom_demo/scripts/dev_menu.gd" id="21_dev"]
-[ext_resource type="Script" uid="uid://c6d1mxxvejufd" path="res://kingdom_demo/scripts/wildlife.gd" id="90_wild"]
+[ext_resource type="Script" uid="uid://c7gehf4k5e50e" path="res://kingdom_demo/scripts/mountains.gd" id="22_mtn"]
 [ext_resource type="Script" uid="uid://crix8vow1jsp7" path="res://kingdom_demo/scripts/night_raids.gd" id="23_raids"]
 [ext_resource type="Script" uid="uid://db0m6hnlf654r" path="res://kingdom_demo/scripts/muster_banner.gd" id="24_muster"]
-[ext_resource type="PackedScene" uid="uid://l3xnslje6465" path="res://kingdom_demo/scenes/berry_bush.tscn" id="91_bush"]
+[ext_resource type="Script" uid="uid://c6d1mxxvejufd" path="res://kingdom_demo/scripts/wildlife.gd" id="90_wild"]
 [ext_resource type="PackedScene" uid="uid://bkmenu0000001" path="res://kingdom_demo/scenes/menu.tscn" id="92_menu"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hfmf3"]
-size = Vector3(100, 1, 100)
+size = Vector3(180, 1, 180)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ndqrx"]
 albedo_color = Color(0.44, 0.63, 0.33, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_dl8hl"]
-size = Vector3(100, 1, 100)
+size = Vector3(180, 1, 180)
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_nav"]
 
@@ -66,7 +65,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 material_override = SubResource("StandardMaterial3D_ndqrx")
 mesh = SubResource("BoxMesh_dl8hl")
 
-[node name="Mountains" type="Node3D" parent="."]
+[node name="Mountains" type="Node3D" parent="." unique_id=775467426]
 script = ExtResource("22_mtn")
 
 [node name="NavRegion" type="NavigationRegion3D" parent="." unique_id=272828603]
@@ -109,9 +108,6 @@ script = ExtResource("4_ndqrx")
 transform = Transform3D(1, 0, 0, 0, 0.7071068, 0.7071068, 0, -0.7071068, 0.7071068, 0, 18.38, 18.38)
 current = true
 fov = 34.0
-
-[node name="WallSideN" parent="." unique_id=52080125 instance=ExtResource("12_ws")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -8)
 
 [node name="UI" type="CanvasLayer" parent="." unique_id=1334354863]
 
@@ -173,65 +169,6 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("21_dev")
 
-[node name="Trees" type="Node3D" parent="." unique_id=964282607]
-
-[node name="Tree1" parent="Trees" unique_id=354399333 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, 15)
-
-[node name="Tree2" parent="Trees" unique_id=435321349 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0, -6)
-
-[node name="Tree3" parent="Trees" unique_id=1256209789 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.1, 0, 0.2)
-
-[node name="Tree4" parent="Trees" unique_id=977191919 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0, 0)
-
-[node name="Tree5" parent="Trees" unique_id=1493255464 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4, 0, 10.5)
-
-[node name="Tree6" parent="Trees" unique_id=1897117647 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, -6)
-
-[node name="Tree7" parent="Trees" unique_id=1449750199 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, 14.3)
-
-[node name="Tree8" parent="Trees" unique_id=76198437 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 0, 12)
-
-[node name="Tree9" parent="Trees" unique_id=1219199565 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 0, -6.7)
-
-[node name="Tree10" parent="Trees" unique_id=1096499832 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.1, 0, 10.1)
-
-[node name="Tree11" parent="Trees" unique_id=457374484 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.2, 0, 2.6)
-
-[node name="Tree12" parent="Trees" unique_id=361862620 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0, 2.5)
-
-[node name="Tree13" parent="Trees" unique_id=1205035146 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.9, 0, 2.7)
-
-[node name="Tree15" parent="Trees" unique_id=618322699 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.4, 0, 6.4)
-
-[node name="Tree16" parent="Trees" unique_id=725763824 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0, 12)
-
-[node name="Tree18" parent="Trees" unique_id=1483910433 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.1, 0, -0.4)
-
-[node name="Tree19" parent="Trees" unique_id=1345691613 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.7, 0, 5.4)
-
-[node name="Tree20" parent="Trees" unique_id=1338532271 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 0, 2.3)
-
-[node name="Tree21" parent="Trees" unique_id=1341421992 instance=ExtResource("11_tree")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.9, 0, 14.2)
-
 [node name="Decor" type="Node3D" parent="." unique_id=1279072974]
 
 [node name="Rock1" parent="Decor" unique_id=322541372 instance=ExtResource("11_p6jlh")]
@@ -270,34 +207,14 @@ script = ExtResource("16_a7p3c")
 [node name="Wildlife" type="Node3D" parent="." unique_id=1739401112]
 script = ExtResource("90_wild")
 
-[node name="NightRaids" type="Node3D" parent="."]
+[node name="NightRaids" type="Node3D" parent="." unique_id=1810493324]
 script = ExtResource("23_raids")
 
-[node name="MusterBanner" type="StaticBody3D" parent="."]
+[node name="MusterBanner" type="StaticBody3D" parent="." unique_id=1218687572]
 script = ExtResource("24_muster")
 
-[node name="Berries" type="Node3D" parent="." unique_id=398854962]
+[node name="MapWalls" type="Node3D" parent="." unique_id=52080125]
+script = ExtResource("12_walls")
 
-[node name="BerryBush1" parent="Berries" unique_id=371366658 instance=ExtResource("91_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.4, 0, 5.9)
-
-[node name="BerryBush2" parent="Berries" unique_id=31264250 instance=ExtResource("91_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.3, 0, 9.8)
-
-[node name="BerryBush3" parent="Berries" unique_id=893617485 instance=ExtResource("91_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, 4)
-
-[node name="BerryBush4" parent="Berries" unique_id=2134869398 instance=ExtResource("91_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.6, 0, -2.4)
-
-[node name="BerryBush5" parent="Berries" unique_id=1062961578 instance=ExtResource("91_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.2, 0, -4.6)
-
-[node name="BerryBush6" parent="Berries" unique_id=199236209 instance=ExtResource("91_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0, -2)
-
-[node name="BerryBush7" parent="Berries" unique_id=433539089 instance=ExtResource("91_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.8, 0, 11.4)
-
-[node name="BerryBush8" parent="Berries" unique_id=1379531653 instance=ExtResource("91_bush")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.1, 0, 6.8)
+[node name="MapForest" type="Node3D" parent="." unique_id=398854962]
+script = ExtResource("11_forest")

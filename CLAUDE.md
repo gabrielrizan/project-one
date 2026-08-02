@@ -56,15 +56,14 @@ camp lighting ·
 **sun shadows gated on the sun's elevation, and depth fog that thickens with the storm** ·
 **weather: rain, overcast skies, water pools, distant thunderstorms, on a season clock** ·
 navmesh pathfinding round everything solid, re-baked as the village changes ·
-title + pause menus, settings persist · **a dev overlay on F1** for reaching any of it
-instantly.
+title + pause menus, settings persist · **three selectable full-scale maps** picked from the
+title screen · **a dev overlay on F1** for reaching any of it instantly.
 
-**Combat is now built — `COMBAT_PROMPTS.md` P1–P10, bar P8's audio pass.** The first map is
-a mountain U with a single north corridor (`map_terrain.gd` + `mountains.gd`); charcoal
-bandits (`bandit.gd`, archetypes Thug/Brute) march up it. A raid director (`night_raids.gd`)
-counts nights off `darkness()` and sends grace-then-growing waves — spawned from **`BanditCamp`
-objects in the `bandit_camp` group** (`bandit_camp.gd`), not a loose camp — blowing the dusk
-horn ×1 quiet / ×2 raid / ×3 blood moon. Archers mount wall perches and shoot; bandits rob
+**Combat is now built — `COMBAT_PROMPTS.md` P1–P10, bar P8's audio pass.** Charcoal bandits
+(`bandit.gd`, archetypes Thug/Brute) march on the village from camps out on the map. A raid
+director (`night_raids.gd`) counts nights off `darkness()` and sends grace-then-growing waves
+— spawned from **`BanditCamp` objects in the `bandit_camp` group** (`bandit_camp.gd`), not a
+loose camp — blowing the dusk horn ×1 quiet / ×2 raid / ×3 blood moon. Archers mount wall perches and shoot; bandits rob
 employed citizens (who flee and must be re-fed), smash walls/gates to breach (repair is
 construction), and vandalise buildings — **the hall at zero ends the run** (end screen in
 `game_manager.gd`). Every 15th night is a **blood moon**: red sky (`blood` factor in
@@ -205,6 +204,109 @@ Facts that *don't* drift:
   run clock pacing the move to the next map. Don't add regrowth (`GAME_DESIGN.md` §11).
 - **Vocabulary:** a **citizen** is a loyal villager who has eaten and taken a job; a
   **wanderer** has been drawn in but hasn't eaten and isn't yours yet.
+
+### Maps (`map_def.gd` · `map_catalog.gd` · `map_terrain.gd`)
+
+**A map is data, not code.** `MapDef` holds one map's shape — extent, the gate boxes that
+seal bearings, wall offers, camps, muster point, carve lanes, forest config, the wanderer
+walk-in lane, and `keep_clear` arteries. `MapCatalog` holds the built ones and which is
+selected; **`MapTerrain` is the static facade everything else still reads through**, so
+`mountains.gd`, `campfire.gd`, `wildlife.gd`, `night_raids.gd`, `muster_banner.gd` and
+`bandit.gd` never learned that maps are swappable.
+
+**Three concepts for map 1, chosen from the title screen** (Play → Choose a Map; persisted in
+`Settings.selected_map`):
+
+| | Shape | Teaches |
+|---|---|---|
+| **The Mountain U** | rock on three sides, one 16 m corridor north | the canon §9 shape: one door, one wall, one fight |
+| **The Deep Wood** | a clearing walled by forest, one trail out | the second camp is reachable **only by felling a lane** through the wood |
+| **The Twin Passes** | a rock spine splits the north into two passes | two gates, but only one is hot — read the dusk fires |
+
+**These are real scale, not prototype**: 110–120 m across (the old map was 52 m), camps
+45–58 m out, which is a 9–12 s ride at the monarch's 5 m/s. Riding to a camp is an
+expedition you plan against daylight. Verified tree counts land at 72 / 49 / 71, inside
+`ROADMAP.md` R7's 40–80 target.
+
+**Every map carries two camps, far apart, and only one raids.** The dormant one garrisons,
+smokes and must still be burned to clear the map, but it never queues a wave and **never
+flares at dusk** — so the flare stops being decoration and becomes the answer to "which way
+is tonight coming from". Burning the *raiding* camp ends the nights even while the other
+still stands.
+
+**A camp is a rumour until you ride out to it.** Its structures and its garrison stay
+hidden until the monarch has been within `BanditCamp.DISCOVER_R` (26 m); **the smoke column
+and the ember do not**. That split is the whole design — smoke says *something is out
+there, that way* and the dusk flare says *and tonight it is that one*, so a shroud that
+swallowed them would delete the game's only diegetic answer to "which way is the raid
+coming from" and replace it with a quest marker. What scouting buys is the detail (how many
+tents, how many bodies), not the bearing. Discovery is **permanent** — memory of a place,
+not line of sight, so nothing re-shrouds behind you.
+
+26 m is sized against the camera, not the map: `battle 45` reaches ~15 m ahead of the
+monarch, so a camp is always already revealed before it could enter frame and the player
+never sees anything pop in. **Drop it below ~16 m and the reveal happens on screen, which
+reads as a bug.** Hiding is cosmetic only — garrison bandits keep their colliders and stay
+in the `bandit` group, which costs nothing because every engagement happens inside 10 m.
+
+**Hiding a camp is distance and route, not wall height.** Mountain peaks were pushed to
+16–34 m to force occlusion; it worked and cost far more than it bought — a 16 m corridor
+flanked by 30 m cones is a grey slot canyon, and riding out of the gate meant staring at rock
+with no sky in frame. Heights are back to 12–24 m; what keeps a camp unseen is that it sits
+**~36 m+ out** (the play camera shows ~28 m of ground past the monarch) and the route to it
+bends. The peak *count* increase was kept — a ridge of a few 12 m-radius cones reads as
+scattered boulders rather than terrain.
+
+Two rules the layouts must keep, both of which have already bitten:
+- **A wall goes *inside* the pinch, never south of it.** A wall set where the map is still
+  80 m wide plugs nothing and raiders walk round its ends. All three had this bug; a flank
+  test (is the ground solid 8.6 m either side of the wall centre?) caught it.
+- **`keep_clear` reserves the arteries.** The forest is biased outward, so it will happily
+  drop a stand in a 16 m corridor, and a stand that seals one strands the whole map — no
+  wanderers in, no raid out, nothing in the logs.
+
+### Forests, and why density and passability are separate knobs
+
+Two tree populations share the playfield, and the split is what lets a wood be **dense to
+look at and safe to walk through at the same time** — Andrei's two requirements, which are
+only compatible because of it.
+
+| | Solid (`map_forest.gd` → `tree.tscn`) | Filler (`map_forest.gd::_filler`) |
+|---|---|---|
+| Script + collider | yes | **neither** |
+| Markable | yes | no |
+| Blocks / bakes into the navmesh | yes | no — walked through |
+| Sets | how much the wood **blocks** | how dense the canopy **looks** |
+| Count | ~100 (`forest.cap`) | ~320 (`understory.cap`) |
+
+So filler can be packed arbitrarily tight — nothing collider-free can wedge anybody — while
+the solid trees are held apart by **`forest.spacing` (3.4–3.7 m), which is a walkability
+guarantee, not a style choice.** A trunk collider is 0.5 m and the navmesh erodes 0.3 m each
+side, so **two trunks under ~1.6 m apart leave a gap that looks walkable and is not** — that
+is the exact shape of "the character gets stuck randomly". Measured tightest gap across the
+three maps is 3.4–3.7 m, i.e. **1.8–2.1 m of genuinely clear width.** Never tune `spacing`
+below 2.6 without re-measuring.
+
+`understory.cap = 0` gives the sparse look; raising it thickens the wood. **Neither touches
+how the map plays** — that is the whole point of the split.
+
+**Placement is blue noise, not stands.** Even coverage with a minimum-distance rule, radius
+drawn `sqrt(u)` so it is uniform *by area*. Stands (clumps with travel between) were tried
+first and read as blobs of trees separated by suspiciously empty lawn.
+
+**Nothing is planted within `camp_clear` (12 m) of a camp** — the assault is archers shooting
+a garrison, and trunks among the tents mean blocked shots and a payoff you can't see.
+
+⚠️ **Scenery trees never stand on open ground, and never on a rock gate.** `world_decor.gd`
+fills only past the map edge and on **wood** gates; `mountains.gd` dresses wood gates. Two
+separate bugs live here: scenery on reachable ground makes the player ride tree to tree
+finding duds, and scenery inside a *rock* box comes out as pines sprouting from a cliff face.
+
+⚠️ **The navmesh bake now costs 67–91 ms**, up from ~15 ms, because the maps are ~5× the
+area at the same 0.15 m cell. It is synchronous and every felled tree pays it. The bake
+volume is already trimmed to reachable ground (`MapDef.play_min/play_max`). If the hitch
+becomes visible in play, **threaded baking is the lever, not a coarser cell** — `CELL_SIZE`
+is 0.15 to fix a documented bush-oscillation bug and must not be raised casually.
 
 ### The main-building ladder (`hall_builder.gd`)
 
@@ -391,7 +493,7 @@ Every key reaches into a system directly:
 |---|---|
 | **F1** | show/hide the overlay (live time, season, weather readout) |
 | **F2** | skip to night / day — lands *after* dusk and *at* sunrise, not on the phase boundary, which is still fully lit |
-| **C** | camera preset — battle 45/60° · diorama 45/60° · tabletop 75° · close 50° · stock 40°. The `diorama`/`close`/`stock` five all frame **~18–20m** of ground: distance and FOV cancel, so a longer lens further back buys the diorama look and no extra coverage. Only `battle` shows more. Index 0 must stay in sync with the scene's camera or the readout lies |
+| **C** | camera preset — **two now**: the shipped `battle 45°` (perspective, fov 34, ~28m of ground) and `iso 30°` (**orthographic**, size 16, ~32m). The five D5 framing lenses are gone; that question is settled. The live A/B is projection: ortho gives the pixel-art isometric read — parallel edges stay parallel, no size falloff across the frame, and the horizon can never enter shot (every ortho ray sits at exactly the pitch), which is why 30° is safe here where a 30° *perspective* pitch would break the `FOG_PALE` seam rule. **Fog (22–55m slant) and `directional_shadow_max_distance` (48) are still tuned for the perspective frustum** — they hold under ortho but aren't tuned for it. A preset with `size` is ortho, one with `fov` is perspective; index 0 must stay in sync with the scene's camera or the readout lies |
 | **T** | speed ×1 → ×2 → ×4 → ×8 → ×16. `Engine.time_scale`, so the whole game moves, not just the clock. Audio keeps its own clock and stacks up badly past ×4; `max_physics_steps_per_frame` is raised alongside it or anything past ×8 silently runs slower than the label claims |
 | **F4** | step rain: off → light → steady → downpour |
 | **F5** | lightning now |

@@ -152,9 +152,11 @@ func _start_wave(count: int, blood: bool) -> void:
 func _run_spawns(delta: float) -> void:
 	if _queue.is_empty():
 		return
-	# every camp on the map is burned -- there is nowhere left for a wave to come
-	# from, so drop what's queued (P10). The objective is done; the night is quiet.
-	if get_tree().get_nodes_in_group("bandit_camp").is_empty():
+	# The raiding camp is burned -- there is nowhere left for a wave to come from,
+	# so drop what's queued (P10). Note this is the *raiding* camp, not every camp:
+	# burning the front ends the nights even while the dormant camp still stands,
+	# which is the reward for taking the fight to the right one.
+	if _live_camp() == null:
 		_queue.clear()
 		return
 	_spawn_t -= delta
@@ -181,23 +183,29 @@ func _spawn_one(archetype: String = "thug") -> void:
 	scene.add_child(b)
 	b.global_position = camp.spawn_point()
 
-## A random live (unburned) camp to send a wave from -- read straight from the
-## group, so a burned camp (which leaves it) never spawns again (P10). Map 1 has
-## one; later maps have several.
+## A random live (unburned) **raiding** camp to send a wave from -- read straight
+## from the group, so a burned camp (which leaves it) never spawns again (P10).
+## A dormant camp is filtered out here rather than never being built: it is a real
+## camp with a real garrison, it just isn't a front.
 func _live_camp() -> Node3D:
-	var camps := get_tree().get_nodes_in_group("bandit_camp")
-	if camps.is_empty():
+	var out: Array[Node3D] = []
+	for c in get_tree().get_nodes_in_group("bandit_camp"):
+		if is_instance_valid(c) and c.raiding:
+			out.append(c)
+	if out.is_empty():
 		return null
-	return camps[randi() % camps.size()]
+	return out[randi() % out.size()]
 
 # ---------------------------------------------------------------- dawn / rout
 
-## First light: every bandit turns and runs for the camp, then despawns there.
+## First light: every bandit turns and runs for the nearest camp, then despawns
+## there. Nearest rather than one fixed point, because a map's camps can sit on
+## opposite bearings and a raider jogging the length of the map past a closer fire
+## would read as pathfinding rather than a rout.
 func _rout() -> void:
-	var camp := MapTerrain.corridor_mouth()
 	for b in get_tree().get_nodes_in_group("bandit"):
 		if b.has_method("rout"):
-			b.rout(camp)
+			b.rout(MapTerrain.nearest_camp(b.global_position, get_tree()))
 
 # ---------------------------------------------------------------- the red sky
 
@@ -240,14 +248,26 @@ func blood_moon_now() -> void:
 
 # ---------------------------------------------------------------- the camps
 
-## Stamp map 1's single camp at the corridor mouth. A [BanditCamp] is an object with
-## a lifecycle now (P10): it owns its own look, ember fire and garrison, joins the
-## `bandit_camp` group, and can burn -- so the director only ever reads camps *from
-## the group*. Later maps drop several; this is where they'd go.
+## Stamp the selected map's camps. A [BanditCamp] is an object with a lifecycle
+## (P10): it owns its own look, ember fire and garrison, joins the `bandit_camp`
+## group, and can burn -- so the director only ever reads camps *from the group*.
+##
+## Every map carries **two camps, and only one of them raids**. The dormant one is
+## a full camp in every other respect: it garrisons, it smokes, it has to be burned
+## before the map is clear. It simply never sends a wave and never flares at dusk,
+## so the map keeps a single defensive front (`ROADMAP.md` R4 wants map 1 short and
+## single-front) while the *objective* is still two expeditions long.
 func _spawn_camps() -> void:
-	var camp := BanditCamp.new()
-	camp.position = MapTerrain.corridor_mouth()
-	add_child(camp)
+	var raiders := 0
+	for c in MapTerrain.camps():
+		var camp := BanditCamp.new()
+		camp.raiding = bool(c.get("raiding", false))
+		camp.position = c.pos
+		add_child(camp)
+		if camp.raiding:
+			raiders += 1
+	print("[raids] %s: %d camps (%d raiding)"
+		% [MapTerrain.map().id, MapTerrain.camps().size(), raiders])
 
 ## Stoke (or bank) every live camp's fire. Called with true when a wave starts, and
 ## false at dawn -- the camp does the easing itself (BanditCamp::flare).

@@ -1,94 +1,123 @@
 class_name MapTerrain
-## The one source of truth for map 1's shape (COMBAT_PROMPTS P1).
+## The static facade every system reads the map's shape through.
 ##
-## The village sits in a mountain **U that opens to the north**: three bearings
-## (south, east, west) are sealed by invisible box colliders, and a single north
-## corridor is the only way in. The world stays one flat slab -- a "mountain" here
-## is a rock wall standing on flat ground, not real elevation (GAME_DESIGN §9,
-## and the deferral note in COMBAT_PROMPTS P1).
+## This used to *be* map 1 -- a block of consts describing one mountain U. The
+## layout now lives in [MapDef] values held by [MapCatalog], and this file is the
+## thin layer in front of them, so `mountains.gd`, `campfire.gd`, `wildlife.gd`,
+## `night_raids.gd`, `muster_banner.gd` and `bandit.gd` did not each have to learn
+## that maps are selectable. They still ask `MapTerrain` where things are; they
+## just get an answer that depends on what the player picked in the menu.
 ##
-## Everything terrain-shaped reads from here so the collider boxes, the wanderer
-## walk-in and the wildlife ring can never drift apart: `mountains.gd` stamps a
-## collider + a dressing of rocks per [member MOUNTAINS] entry, `campfire.gd`
-## walks wanderers in through [method corridor_spawn_point], and `wildlife.gd`
-## stocks the forest with [method random_belly_point]. Later tasks put the bandit
-## camp at [method corridor_mouth] (P3).
+## Keeping the facade static also keeps the old guarantee: the colliders, the
+## wanderer walk-in, the wildlife ring and the camps cannot drift apart, because
+## there is still exactly one place that knows the shape.
+##
+## The world is still one flat slab -- a "mountain" is a rock wall standing on flat
+## ground, not elevation.
 
-## Matches [constant NavWorld.EXTENT]; the bake volume and the sealed square are
-## the same size on purpose, so a box inside here is a box the navmesh sees.
-const EXTENT := 26.0
+# ---------------------------------------------------------------- the map
 
-## Each mountain is one axis-aligned box: [code]c[/code] centre, [code]s[/code]
-## full size. Their union (within [constant EXTENT]) is the sealed terrain; the
-## complement is the open belly plus the north corridor. Boxes overlap at the
-## corners so the U has no sliver gaps for a raider to thread. Kept low (6 m) --
-## tall enough to block and to sit a rock mass on, no taller.
-const MOUNTAINS := [
-	{c = Vector3(0, 3, 22), s = Vector3(54, 6, 12)},     # south -- the bottom of the U
-	{c = Vector3(22, 3, 1), s = Vector3(12, 6, 56)},     # east arm
-	{c = Vector3(-22, 3, 1), s = Vector3(12, 6, 56)},    # west arm
-	{c = Vector3(13, 3, -18), s = Vector3(10, 6, 20)},   # north-east, narrows the mouth
-	{c = Vector3(-13, 3, -18), s = Vector3(10, 6, 20)},  # north-west, narrows the mouth
-]
+static func map() -> MapDef:
+	return MapCatalog.current()
 
-## Half-width of the corridor in x. The surviving WallSideN spans x -8..+8, so the
-## mouth is exactly a wall wide and a bought wall closes it end to end.
-const CORRIDOR_HALF_X := 8.0
+## Half-size of the square the map lives in.
+static func extent() -> float:
+	return map().extent
 
-## The wall line: the corridor is everything north (more negative z) of here.
-const WALL_Z := -8.0
+## The volume the navmesh bakes. Trimmed to reachable ground -- see [MapDef].
+static func bake_aabb() -> AABB:
+	var m := map()
+	return AABB(m.play_min, m.play_max - m.play_min)
 
-## Where the road runs out to -- the bandit camp's anchor and the far end of the
-## wanderer walk-in. Comfortably inside [constant EXTENT] so the camp bakes.
-const MOUTH_Z := -22.0
+## The sealed bearings, as `{c, s, kind}` boxes. `mountains.gd` dresses these.
+static func gates() -> Array[Dictionary]:
+	return map().gates
 
-## The muster banner (P9): just outside the north gate, beside the opening, in the
-## corridor -- the staging point a war party is raised at before riding out.
-const MUSTER_AT := Vector3(2.5, 0.0, -10.5)
+## Where this map offers a `WallSide`, as `{pos, yaw}`.
+static func walls() -> Array[Dictionary]:
+	return map().walls
 
-## Where a war party is raised (P9). Per-map data, like the corridor mouth.
+## Every camp the map starts with, as `{pos, raiding}`.
+static func camps() -> Array[Dictionary]:
+	return map().camps
+
+## Carve lanes through a wood gate, as `{pos, yaw, width, depth}`.
+static func lanes() -> Array[Dictionary]:
+	return map().lanes
+
+static func village() -> Vector3:
+	return map().village
+
+## Where a war party is raised.
 static func muster_point() -> Vector3:
-	return MUSTER_AT
+	return map().muster
 
-## True when p sits inside any mountain box (x/z only -- the world is flat).
-static func is_mountain(p: Vector3) -> bool:
-	for m in MOUNTAINS:
-		var c: Vector3 = m.c
-		var h: Vector3 = m.s * 0.5
-		if absf(p.x - c.x) <= h.x and absf(p.z - c.z) <= h.z:
+# ---------------------------------------------------------------- ground tests
+
+## True when p sits inside any sealed gate box (x/z only -- the world is flat).
+static func is_blocked(p: Vector3) -> bool:
+	return map().is_blocked(p)
+
+## Open ground: walkable slab, not sealed, inside the map.
+static func is_open(p: Vector3) -> bool:
+	return map().is_open(p)
+
+## Inside the village's own region, as opposed to out among the camps.
+static func is_home(p: Vector3) -> bool:
+	return map().is_home(p)
+
+## Which kind of gate covers p, or "" if it is not sealed.
+static func gate_kind_at(p: Vector3) -> String:
+	return map().gate_kind_at(p)
+
+## A point in the forest belly around the village -- open, home-side ground, never
+## in the rock. Rejection-sampled, so wildlife can't land inside a mountain.
+static func random_belly_point(inner: float, outer: float) -> Vector3:
+	return map().belly_point(inner, outer)
+
+## Where a wanderer walks in from.
+static func wanderer_spawn_point() -> Vector3:
+	return map().spawn_point()
+
+# ---------------------------------------------------------------- the camps
+
+## The raiding camp's position -- the front the wall is for, and where a dev-spawned
+## bandit comes from. Falls back to the first camp if a map has no raider set.
+static func raid_origin() -> Vector3:
+	var raiders := map().raiding_camps()
+	if not raiders.is_empty():
+		return raiders[0].pos
+	return map().default_camp()
+
+## The camp nearest a point -- where a bandit routs or flees to. Reads the live
+## `bandit_camp` group first so a burned camp is never run to; falls back to the
+## map definition when every camp is ash (the run is over anyway, and a body still
+## needs somewhere to go rather than standing in the village).
+static func nearest_camp(from: Vector3, tree: SceneTree) -> Vector3:
+	var best := Vector3.ZERO
+	var best_d := INF
+	if tree:
+		for c in tree.get_nodes_in_group("bandit_camp"):
+			if not is_instance_valid(c):
+				continue
+			var d: float = c.global_position.distance_to(from)
+			if d < best_d:
+				best_d = d
+				best = c.global_position
+	if best_d < INF:
+		return best
+	for c in map().camps:
+		var d: float = (c.pos as Vector3).distance_to(from)
+		if d < best_d:
+			best_d = d
+			best = c.pos
+	return best if best_d < INF else map().village
+
+## Close enough to a camp to count as arrived -- the despawn test for a routed
+## bandit. Uses the map's camp list rather than the live group, because a bandit
+## fleeing to a camp that burns mid-run still needs to be able to leave the field.
+static func at_camp(p: Vector3, radius := 3.0) -> bool:
+	for c in map().camps:
+		if (c.pos as Vector3).distance_to(p) <= radius:
 			return true
 	return false
-
-## Open ground: walkable slab, not rock, inside the baked square.
-static func is_open(p: Vector3) -> bool:
-	return not is_mountain(p) and absf(p.x) < EXTENT and absf(p.z) < EXTENT
-
-## True in the north corridor (in front of / beyond the wall line).
-static func is_corridor(p: Vector3) -> bool:
-	return absf(p.x) < CORRIDOR_HALF_X and p.z < WALL_Z
-
-## The camp anchor at the mouth of the corridor (P3 drops the tent here).
-static func corridor_mouth() -> Vector3:
-	return Vector3(0, 0, MOUTH_Z)
-
-## A spawn point up the north corridor, for wanderers walking in (and, later,
-## bandits marching down). Kept off the walls so nobody spawns wedged in rock.
-static func corridor_spawn_point() -> Vector3:
-	return Vector3(
-		randf_range(-CORRIDOR_HALF_X + 1.5, CORRIDOR_HALF_X - 1.5),
-		0.0,
-		randf_range(WALL_Z - 6.0, MOUTH_Z))
-
-## A point in the forest belly around the village -- open ground on the three
-## sealed sides, never in the rock and never up the corridor. Rejection-samples a
-## ring so wildlife can't land inside a mountain or out on the road.
-static func random_belly_point(inner: float, outer: float) -> Vector3:
-	for i in 24:
-		var a := randf() * TAU
-		var r := randf_range(inner, outer)
-		var p := Vector3(cos(a) * r, 0.0, sin(a) * r)
-		# keep clear of the corridor mouth as well as the rock
-		if is_open(p) and p.z > WALL_Z + 1.0:
-			return p
-	# fallback: due south, dead centre of the belly
-	return Vector3(0.0, 0.0, clampf((inner + outer) * 0.5, 0.0, 14.0))

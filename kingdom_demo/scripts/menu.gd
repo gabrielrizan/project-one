@@ -40,6 +40,11 @@ func _ready() -> void:
 	_pages["main"] = _build_main()
 	_pages["howto"] = _build_howto()
 	_pages["options"] = _build_options()
+	# only the title screen picks a map -- mid-run the map is already the one you
+	# are standing on, and offering to change it from the pause menu would be a
+	# quit-and-restart wearing a misleading label
+	if not pause_mode:
+		_pages["maps"] = _build_maps()
 	for p in _pages.values():
 		center.add_child(p)
 
@@ -116,6 +121,44 @@ func _build_howto() -> Control:
 	box.add_child(_button("Back", func() -> void: _show_page("main")))
 	return box
 
+## The map picker: every map in [MapCatalog], with the one line that says what its
+## shape asks of you. Built from the catalog rather than listed here, so adding a
+## map is one entry in one file and the menu follows.
+func _build_maps() -> Control:
+	var box := _column()
+	box.add_child(_heading("Choose a Map"))
+	var sub := _body("Three shapes for the first map. Each has two bandit camps —\n"
+		+ "only one of them raids at night.")
+	sub.add_theme_color_override("font_color", Color(0.70, 0.74, 0.62))
+	box.add_child(sub)
+	box.add_child(_spacer(12))
+
+	var chosen := MapCatalog.selected_id()
+	for m in MapCatalog.all():
+		var entry := VBoxContainer.new()
+		entry.add_theme_constant_override("separation", 2)
+		# a tick marks the map the run would start on, so "what am I about to
+		# play" is answerable without pressing anything
+		var label := m.title if m.id != chosen else "%s   ✓" % m.title
+		var btn := _button(label, func() -> void: _start_map(m.id))
+		btn.custom_minimum_size = Vector2(520, 44)
+		entry.add_child(btn)
+		var blurb := _body(m.blurb)
+		blurb.add_theme_font_size_override("font_size", 14)
+		blurb.add_theme_color_override("font_color", Color(0.63, 0.67, 0.57))
+		blurb.custom_minimum_size = Vector2(520, 0)
+		blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		entry.add_child(blurb)
+		box.add_child(entry)
+		box.add_child(_spacer(8))
+
+	box.add_child(_button("Back", func() -> void: _show_page("main")))
+	return box
+
+func _start_map(id: String) -> void:
+	MapCatalog.select(id)
+	get_tree().change_scene_to_file(GAME_SCENE)
+
 func _build_options() -> Control:
 	var box := _column()
 	box.add_child(_heading("Options"))
@@ -155,7 +198,10 @@ func _on_primary() -> void:
 	if pause_mode:
 		_close()
 	else:
-		get_tree().change_scene_to_file(GAME_SCENE)
+		# Play opens the map picker rather than starting a run: which map you are
+		# on changes the whole shape of the game, so it is a choice worth making
+		# on the way in rather than a setting buried in Options.
+		_show_page("maps")
 
 func _on_restart() -> void:
 	get_tree().paused = false

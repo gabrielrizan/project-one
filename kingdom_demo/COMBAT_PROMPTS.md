@@ -117,11 +117,14 @@ constants**, not reworking systems:
   mesh + collider. The village now spawns as **offsets from the campfire**
   (`campfire.gd::_spawn_village`), so moving the fire moves the whole village — you no
   longer hand-place three buildings per map.
-- **Retune constants:** `world_decor.gd` (`inner_radius`/`outer_radius`, plus its three
-  hardcoded path strips and four hill spots — this is map dressing, expect to rewrite it),
-  `campfire.gd::WANDER_IN` (walk-in ring), `wildlife.gd` (`INNER`/`OUTER` spawn ring).
-- **⚠️ `nav_world.gd::EXTENT = 26.0`** is the bake half-extent. If the playable area grows
-  past ~52×52 m you **must** raise it or the navmesh silently stops at the old edge.
+- **Retune constants:** `campfire.gd::WANDER_IN` (walk-in ring), `wildlife.gd`
+  (`INNER`/`OUTER` spawn ring).
+  *(Done since: `world_decor.gd`'s hardcoded path strips and hill spots were rewritten to
+  read the map — roads are drawn gate-to-camp and hills are backdrop-only.)*
+- ~~**⚠️ `nav_world.gd::EXTENT = 26.0`** is the bake half-extent.~~ **Superseded.** The bake
+  volume now comes from the selected map (`MapDef.play_min`/`play_max` via
+  `MapTerrain.bake_aabb()`); `EXTENT` survives only as a fallback for a bare test harness.
+  The live cost is 67–91 ms a bake — see the ⚠️ in `CLAUDE.md`'s **Maps** section.
 - Everything tuned for the *camera* (fog band 22–55 m, `GoldFx` pip scale, world-space
   prompt `pixel_size`) only moves if the **camera** changes, not if the map does.
 

@@ -38,12 +38,45 @@ const IGNITE_BEAT := 0.6      # the pause between the volley landing and the fla
 const CHARCOAL := Color(0.12, 0.11, 0.12)
 const FLAME_TIME := 3.0       # how long the fire burns before it's a cold wreck
 
+## The smoke column (see [method _smoke]). Slow and sparse on purpose: it has to
+## read as a landmark from across the map, not as a particle effect up close.
+const SMOKE_EVERY := 0.55
+const SMOKE_RISE := Vector2(6.5, 9.5)   # clears the ~6.5 m treeline
+const SMOKE_COLOR := Color(0.58, 0.56, 0.54, 0.85)   # woodsmoke grey, in palette
+
+## Whether this camp sends the night waves.
+##
+## A map carries two camps and **only one of them raids** (see [MapCatalog]). The
+## other keeps its garrison and has to be ridden out to and burned like any other,
+## but it never queues a wave and -- the part the player actually reads -- its fire
+## never flares at dusk. So the dusk flare stops being decoration and becomes the
+## answer to "which way is tonight coming from", which is exactly the job §9 gives
+## a visible camp: a wall is an informed bet, not a blind tax.
+##
+## Set by the raid director before `add_child`, like [member garrison] on a bandit.
+var raiding := true
+
+## How close the monarch must ride before the camp resolves (see [method
+## _check_discovery]).
+##
+## Sized against the camera, not against the map. `battle 45` shows ~28 m of
+## ground centred on the monarch, so it reaches ~15 m ahead of him -- discovering
+## at 26 m means the camp is *always* already revealed by the time it could enter
+## frame. The player never sees anything pop in; they just find that riding out is
+## the only way to learn what is out there. Raise this above ~16 m at your peril:
+## below that the reveal happens on screen and reads as a bug.
+const DISCOVER_R := 26.0
+
 var _burned := false
 var _burning := false
 var _ember: OmniLight3D = null
 var _ember_want := EMBER_DIM
 var _flicker := 0.0
+var _smoke_t := 0.0
 var _tents: Array[Node3D] = []   # the pieces that char and slump when it burns
+var _props: Node3D = null        # everything you can see of the camp, minus the fire
+var _garrison: Array[Node3D] = []
+var _found := false
 
 func _ready() -> void:
 	add_to_group("bandit_camp")
@@ -54,12 +87,22 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_flicker_ember(delta)
+	_smoke(delta)
+	if not _found:
+		_check_discovery()
 	if not _burned and not _burning:
 		_try_burn()
 
 # ---------------------------------------------------------------- the camp look
 
+## The tents, bedrolls and barrel hang off `_props` rather than off the camp
+## directly, so discovery is one `visible` flag instead of a walk over children --
+## and so the ember below stays out of it, which is the whole point (see
+## [method _check_discovery]).
 func _build() -> void:
+	_props = Node3D.new()
+	add_child(_props)
+	_props.visible = false
 	var tent := _place("tent.glb", Vector3(0, 0, -2.8), 2.0, 0.0)   # behind the fire, mouth to the village
 	_place("campfire-pit.glb", Vector3.ZERO, 1.6, 0.0)
 	_place("bedroll.glb", Vector3(-2.4, 0, -1.4), 1.6, 0.6)
@@ -76,14 +119,54 @@ func _build() -> void:
 
 func _place(file: String, pos: Vector3, sc: float, yaw: float) -> Node3D:
 	var n: Node3D = (load(SK + file) as PackedScene).instantiate()
-	add_child(n)
+	_props.add_child(n)
 	n.position = pos
 	n.scale = Vector3.ONE * sc
 	n.rotation.y = yaw
 	return n
 
+# ---------------------------------------------------------------- discovery
+
+## **The camp is a rumour until you ride out to it.** The structures and the
+## garrison stay hidden until the monarch has been within [constant DISCOVER_R];
+## the smoke column and the ember do not.
+##
+## Which half is hidden is the entire design of this. Smoke says *something is
+## out there, that way* and the dusk flare says *and tonight it is that one* --
+## both are load-bearing (see [method _smoke] and [method flare]), and a shroud
+## that swallowed them would delete the only diegetic answer the game has to
+## "which way is the raid coming from" and put a quest marker in its place. What
+## you are denied is the detail: how many tents, how many bodies, whether the
+## garrison is three or six. Scouting buys the intel, not the bearing.
+##
+## Discovery is permanent -- ride away and the camp stays known. It is memory of a
+## place, not line of sight, so there is no re-shrouding and nothing to
+## re-discover on the way back with the war party.
+func _check_discovery() -> void:
+	var king := get_tree().get_first_node_in_group("monarch")
+	if king == null:
+		return
+	if king.global_position.distance_to(global_position) <= DISCOVER_R:
+		_reveal()
+
+func _reveal() -> void:
+	if _found:
+		return
+	_found = true
+	if is_instance_valid(_props):
+		_props.visible = true
+	for b in _garrison:
+		if is_instance_valid(b):
+			b.visible = true
+
 # ---------------------------------------------------------------- the garrison
 
+## Garrison bandits are loose in the scene, not children of the camp, so they have
+## to be hidden one by one and tracked to be revealed again. Hiding them is only
+## cosmetic -- they keep their colliders and stay in the `bandit` group, so
+## [method _defenders_near] still counts them. That costs nothing, because
+## [constant DISCOVER_R] is 26 m and every engagement in the game happens inside
+## 10: the camp resolves long before anything could shoot at an invisible body.
 func _post_garrison() -> void:
 	var scene := get_tree().current_scene
 	if scene == null:
@@ -95,15 +178,66 @@ func _post_garrison() -> void:
 		scene.add_child(b)                 # loose in the world, so it paths the navmesh
 		var a := TAU * float(i) / float(GARRISON) + randf() * 0.6
 		b.global_position = global_position + Vector3(cos(a), 0, sin(a)) * randf_range(1.6, 2.6)
+		b.visible = _found
+		_garrison.append(b)
 
 # ---------------------------------------------------------------- the fire
 
 ## The director stokes every live camp at dusk when a raid is coming, and lets it
 ## fall back to a smoulder at dawn (night_raids.gd::_flare).
+##
+## **A dormant camp never flares.** It still smoulders, so it is findable and still
+## reads as inhabited, but the flare belongs to the camp that is actually coming --
+## that is the whole signal, and a second fire answering it would erase it.
 func flare(on: bool) -> void:
-	if _burned:
+	if _burned or not raiding:
 		return
 	_ember_want = EMBER_FLARE if on else EMBER_DIM
+
+## A slow column of smoke over the fire -- the camp's daytime beacon.
+##
+## The ember glow finds a camp at night; nothing found one by day, and on the real
+## maps a camp stands 45-55 m out with a treeline in between, so "ride out and burn
+## it" had no landmark to ride *at*. A column that clears the canopy gives the
+## objective a visible bearing from anywhere in the village without a marker, a
+## minimap or a quest arrow -- the same trick the flare pulls at dusk, and diegetic
+## for the same reason: it is a thing in the world, not an overlay on it.
+##
+## Deliberately not tied to [member raiding]: both camps smoke, because smoke says
+## *inhabited*, not *hostile tonight*. Telling the two apart is the flare's job.
+func _smoke(delta: float) -> void:
+	if _burned or _burning:
+		return
+	_smoke_t -= delta
+	if _smoke_t > 0.0:
+		return
+	_smoke_t = SMOKE_EVERY * randf_range(0.8, 1.25)
+	_smoke_puff()
+
+func _smoke_puff() -> void:
+	if not is_inside_tree():
+		return
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var s := MarkFx.particle(MarkFx.CHIP_TEX, randf_range(0.5, 0.85))
+	s.modulate = SMOKE_COLOR
+	scene.add_child(s)
+	var base := global_position + Vector3(randf_range(-0.4, 0.4), 1.0, randf_range(-0.4, 0.4))
+	s.global_position = base
+	# drifts along the wind's bearing as it climbs, so the column leans the same way
+	# the trees and the rain do rather than standing in its own private calm
+	var drift := Vector3(randf_range(-1.6, 1.6), 0.0, randf_range(-1.6, 1.6))
+	var wind := get_tree().get_first_node_in_group("wind")
+	if wind and wind.has_method("wind_dir"):
+		drift = (wind.wind_dir() as Vector3) * randf_range(1.8, 3.4)
+	var top := base + drift + Vector3(0, randf_range(SMOKE_RISE.x, SMOKE_RISE.y), 0)
+	var life := randf_range(3.4, 5.0)
+	var t := s.create_tween()
+	t.tween_property(s, "global_position", top, life).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(s, "modulate:a", 0.0, life).set_ease(Tween.EASE_IN)
+	t.parallel().tween_property(s, "scale", s.scale * randf_range(1.8, 2.6), life)
+	t.tween_callback(s.queue_free)
 
 ## A little life in the fire, easing toward whatever flare last asked for. Stops for
 ## good once burned -- the burn tween owns the light from then on.
@@ -178,6 +312,10 @@ func _flame_point() -> Vector3:
 func _ignite() -> void:
 	_burned = true
 	_burning = false
+	# A camp can be burned without ever having been ridden up to -- `dev_burn()`
+	# does exactly that -- and an undiscovered one would char, slump and flame
+	# behind a hidden holder, leaving a fire with no camp under it.
+	_reveal()
 	remove_from_group("bandit_camp")
 	_flames()
 	_burn_light()

@@ -24,10 +24,8 @@ const SOURCE_GROUP := "nav_source"
 ## Requests that land within this long of each other are folded into one bake.
 const REBAKE_DELAY := 0.15
 
-## Half the square we bake. Comfortably past everything gameplay reaches: the
-## palisade at 8, the tree line at 15, the wildlife ring at 17, and the wanderers
-## who walk in from 19. The forest beyond that is scenery with no collision, so
-## there is nothing out there to bake.
+## Fallback bake half-extent, used only if no map is resolvable (a bare test
+## harness). The real volume comes from the selected map -- see [method _configure].
 const EXTENT := 26.0
 
 ## The baker rounds the agent radius *up* to whole cells, so the cell size decides
@@ -115,13 +113,18 @@ func _configure(m: NavigationMesh) -> void:
 	NavigationServer3D.map_set_cell_size(map, CELL_SIZE)
 	NavigationServer3D.map_set_cell_height(map, m.cell_height)
 	m.cell_size = CELL_SIZE
-	# the ground slab is 100x100; without this we would bake a third of a million
-	# cells of empty grass nobody will ever stand on
-	# y range trimmed to what actually stands here (ground at 0, tallest tree ~2.6)
-	# because a finer cell height would otherwise pay for empty sky
-	m.filter_baking_aabb = AABB(
-		Vector3(-EXTENT, -2.0, -EXTENT),
-		Vector3(EXTENT * 2.0, 8.0, EXTENT * 2.0))
+	# The ground slab is far bigger than any map; without this we would bake a
+	# third of a million cells of empty grass nobody will ever stand on. The y
+	# range is trimmed to what actually stands here (ground at 0, tallest tree
+	# ~6.5 m) because a fine cell height otherwise pays for empty sky.
+	#
+	# **Taken from the selected map, not from a constant.** Baking is O(area) at a
+	# 0.15 m cell, and the real maps are ~5x the old prototype's area, so the
+	# volume is trimmed to the ground units can actually reach rather than to a
+	# square around the origin -- everything outside it is sealed rock or wood.
+	# See the cost note in `CLAUDE.md`; if a bake hitch ever becomes visible when a
+	# tree falls, threaded baking is the lever, not a coarser cell.
+	m.filter_baking_aabb = MapTerrain.bake_aabb()
 
 ## F3 turns the path lines and the pathfinding log on and off.
 func _unhandled_input(event: InputEvent) -> void:
