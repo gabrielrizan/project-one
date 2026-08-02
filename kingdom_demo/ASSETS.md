@@ -18,6 +18,16 @@ Licences for everything live in `assets/licenses/` — keep that true.
   with the palette's burgundy.
 - **Ultimate Animated Animals** (ScratchIO, CC0) — the stag, which is rigged and keeps
   its walk cycle. The only animated third-party model in the project.
+- **Nature pack** (`assets/nature-pack/FBX/`, added 2026-08-02) — 150 stylized FBX: trees
+  (Common / Birch / Pine / Willow, each with **green / autumn / snow / dead** coats),
+  rocks (plain / moss / snow), bushes, grass, flowers, plants, stumps, logs, and desert
+  pieces (cactus, palm) we don't use on this temperate map. This is now the **world's
+  vegetation** — the old Kenney/composed trees and rocks are retired from `world_decor.gd`
+  and the harvestable `tree.tscn`. Planted through **`NaturePack`** (`nature_pack.gd`),
+  which auto-scales each model by its bounding box, and re-skinned per season off
+  `weather.gd`'s `season_changed`. ⚠️ **Licence: CONFIRM WITH ANDREI and record in
+  `assets/licenses/` before shipping** — looks like a Quaternius CC0 nature pack but the
+  source hasn't been logged yet. Embedded diffuse-colour materials, no textures.
 
 **Ours — `assets/3d/characters/` and `assets/3d/props/`**
 Generated procedurally: the villager / worker / archer / monarch-on-horse cast, the rabbit

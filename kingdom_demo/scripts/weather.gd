@@ -172,6 +172,12 @@ func _ready() -> void:
 	_splash = _make_splash()
 	_mist = _make_mist()
 	call_deferred("_find_refs")
+	# announce the (random) starting season once everyone has connected, so the
+	# world dresses itself correctly from the first frame regardless of _ready order
+	call_deferred("_announce_season")
+
+func _announce_season() -> void:
+	season_changed.emit(_season)
 
 func _find_refs() -> void:
 	_rig = get_tree().get_first_node_in_group("camera_rig")
@@ -230,9 +236,15 @@ func stop_rain(snap: bool = true) -> void:
 func dry_out() -> void:
 	_wetness = 0.0
 
+## Fired whenever the season changes (and once at startup, deferred, so every
+## listener has connected). The world re-skins its trees, rocks and bushes off
+## this, and wildlife thins its numbers in winter -- see world_decor.gd / wildlife.gd.
+signal season_changed(season: int)
+
 func set_season(s: int) -> void:
 	_season = s
 	_cycles = 0
+	season_changed.emit(_season)
 
 func next_season() -> void:
 	set_season((_season + 1) % Season.size())

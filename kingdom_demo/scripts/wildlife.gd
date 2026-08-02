@@ -17,21 +17,31 @@ const INNER := 10.5      # keep the spawn ring clear of the village
 # used to spawn game against (and inside) the sealed bearings. See _spawn.
 const OUTER := 15.0
 
+# --- winter thins the woods (season visuals, 2026-08-02). Game is much scarcer and
+#     trickles back far slower, so hunting through winter is lean. The population
+#     tracks the seasonal target both ways: it dwindles as winter sets in and
+#     refills once spring comes. Season index 3 mirrors weather.gd's Season.WINTER. ---
+const WINTER_RABBITS := 2
+const WINTER_STAGS := 1
+const WINTER_RESTOCK := 26.0
+const _WINTER_SEASON := 3
+
 var _t := 0.0
 
 func _ready() -> void:
 	add_to_group("wildlife")
-	for i in range(RABBITS):
+	for i in range(_target_rabbits()):
 		_spawn_rabbit()
-	for i in range(STAGS):
+	for i in range(_target_stags()):
 		_spawn_stag()
 
 func _process(delta: float) -> void:
 	_t -= delta
 	if _t > 0.0:
 		return
-	_t = RESTOCK_EVERY
-	# trickle one back in at a time so the woods refill rather than pop
+	_t = WINTER_RESTOCK if _is_winter() else RESTOCK_EVERY
+	# trickle one in or out at a time so the woods fill and thin rather than pop --
+	# up toward the summer target, down toward winter's much leaner one
 	var rabbits := 0
 	var stags := 0
 	for a in get_tree().get_nodes_in_group("wild_game"):
@@ -39,10 +49,34 @@ func _process(delta: float) -> void:
 			stags += 1
 		else:
 			rabbits += 1
-	if rabbits < RABBITS:
+	var tr := _target_rabbits()
+	var ts := _target_stags()
+	if rabbits < tr:
 		_spawn_rabbit()
-	elif stags < STAGS:
+	elif rabbits > tr:
+		_despawn_one("rabbit")
+	elif stags < ts:
 		_spawn_stag()
+	elif stags > ts:
+		_despawn_one("stag")
+
+func _is_winter() -> bool:
+	var w := get_tree().get_first_node_in_group("weather")
+	return w != null and w.season() == _WINTER_SEASON
+
+func _target_rabbits() -> int:
+	return WINTER_RABBITS if _is_winter() else RABBITS
+
+func _target_stags() -> int:
+	return WINTER_STAGS if _is_winter() else STAGS
+
+## Quietly remove one animal of `species` as winter closes in -- the far end of the
+## renewable-game loop, so the woods empty out instead of staying full and unfed.
+func _despawn_one(species: String) -> void:
+	for a in get_tree().get_nodes_in_group("wild_game"):
+		if a.species == species:
+			a.queue_free()
+			return
 
 func _spawn_rabbit() -> void:
 	_spawn("rabbit", RABBIT_MODEL, 1.0, 1, 3.4, 5.0, 2.2)
