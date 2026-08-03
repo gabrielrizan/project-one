@@ -15,6 +15,10 @@ extends Node3D
 ## through exactly the way `world_decor.gd`'s scenery always has been
 ## (`nav_world.gd` states the rule outright).
 ##
+## Both populations are drawn from [NaturePack] and **both turn with the season** --
+## see [method _grow_filler] for why the filler being the one that did not was the
+## most visible thing on the map.
+##
 ## That split is what lets a wood be dense *and* safe to walk:
 ##
 ## * Filler sets how dense the canopy **looks**, and can be packed arbitrarily
@@ -45,67 +49,55 @@ extends Node3D
 const TREE_SCENE := preload("res://kingdom_demo/scenes/tree.tscn")
 const BUSH_SCENE := preload("res://kingdom_demo/scenes/berry_bush.tscn")
 
-const SK := "res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/"
-const COLORMAP := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/Textures/colormap.png")
+# Season indices -- mirror weather.gd's Season enum (SPRING/SUMMER/AUTUMN/WINTER).
+const AUTUMN := 2
+const WINTER := 3
 
-## Greens the filler is tinted through. Deliberately a **narrow, slightly cooler and
-## darker range than the markable trees wear**, so the wood has variation without the
-## filler ever competing to look like the thing you can sell.
-const FILLER_TINTS := [
-	Color(0.74, 0.88, 0.64), Color(0.64, 0.80, 0.56),
-	Color(0.82, 0.92, 0.70), Color(0.58, 0.74, 0.50),
-]
+## Filler heights. Kept **below** `tree_resource.gd`'s 4.0-5.2 m on purpose: the
+## markable trees should stay the biggest thing in the wood, because that
+## silhouette is what the player learns to look for.
+const FILLER_H := Vector2(2.6, 4.2)
 
 ## Fixed so a map's layout is stable between runs -- the same reason
 ## `world_decor.gd` seeds its scatter. Change it to reroll every map at once.
 @export var forest_seed := 4211
 
-var _filler_scenes: Array = []
-var _filler_mats: Array[StandardMaterial3D] = []
-
-func _load_filler() -> void:
-	if not _filler_scenes.is_empty():
-		return
-	# Weighted toward pine by repeating it. An even four-way split came out roughly
-	# half autumn, and because the colormap bakes those crowns orange the tint cannot
-	# pull them back to green -- a wood that was half ember read as autumn everywhere
-	# and fought the palette's greens for the frame.
-	var pine: PackedScene = load(SK + "tree.glb")
-	var pine_tall: PackedScene = load(SK + "tree-tall.glb")
-	_filler_scenes = [
-		pine, pine_tall, pine, pine_tall, pine, pine_tall,
-		load(SK + "tree-autumn.glb"), load(SK + "tree-autumn-tall.glb"),
-	]
-	for c in FILLER_TINTS:
-		var mat := StandardMaterial3D.new()
-		mat.albedo_texture = COLORMAP
-		mat.albedo_color = c
-		mat.roughness = 1.0
-		# mipmaps + linear so the tiny colour atlas doesn't bleed between swatches
-		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-		_filler_mats.append(mat)
+var _filler_points: Array[Vector3] = []
+var _filler_holder: Node3D = null
+var _variant := "___"
 
 func _ready() -> void:
-	_load_filler()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = forest_seed
 	var m := MapTerrain.map()
 
-	# one pass, two populations: the solid trees fill an exclusion grid, and the
-	# filler pass reuses it so no sprite grows out of a markable trunk
-	var seeded: Array = m.forest_grid(rng)
-	var solid: Array = seeded[0]
-	var grid: Dictionary = seeded[1]
+	# One pass, three populations, one exclusion grid -- **bushes first**, so each
+	# one keeps its glade and the wood cannot close over the berries. See
+	# [method MapDef.forest_plan]; the order is the whole of that design.
+	var plan: Dictionary = m.forest_plan(rng)
+
+	var bushes := 0
+	for p in plan.bushes:
+		var b: Node3D = BUSH_SCENE.instantiate()
+		add_child(b)
+		b.global_position = Vector3(p.x, 0.0, p.z)
+		b.rotation.y = rng.randf() * TAU
+		FogOfWar.hide_until_found(b)
+		bushes += 1
 
 	var trees := 0
-	for p in solid:
+	for p in plan.solid:
 		_tree(p, rng)
 		trees += 1
 
-	var filler := 0
-	for p in m.understory_points(rng, grid):
-		_filler(p, rng)
-		filler += 1
+	# The filler's *positions* are drawn once; only its models are re-made when the
+	# season turns, so the wood keeps its exact shape all year and only its coat
+	# changes -- the same guarantee `world_decor.gd` gets by re-seeding its rng.
+	_filler_points = plan.filler
+	_filler_holder = Node3D.new()
+	add_child(_filler_holder)
+	var filler := _filler_points.size()
+	call_deferred("_hook_weather")
 
 	# The lane plugs come after the stands so they are never displaced by one, and
 	# they ignore the spacing rules entirely: a plug has to be *tight* to seal.
@@ -114,14 +106,6 @@ func _ready() -> void:
 		for p in m.lane_plug_points(lane):
 			_tree(p, rng)
 			plugged += 1
-
-	var bushes := 0
-	for p in m.bush_points(rng):
-		var b: Node3D = BUSH_SCENE.instantiate()
-		add_child(b)
-		b.global_position = Vector3(p.x, 0.0, p.z)
-		b.rotation.y = rng.randf() * TAU
-		bushes += 1
 
 	print("[forest] %s: %d timber trees (+%d in lane plugs), %d filler, %d bushes"
 		% [m.id, trees, plugged, filler, bushes])
@@ -138,26 +122,77 @@ func _tree(p: Vector3, rng: RandomNumberGenerator) -> void:
 	add_child(t)
 	t.global_position = Vector3(p.x, 0.0, p.z)
 	t.rotation.y = rng.randf() * TAU
+	# hidden until the ground under it has been walked, on a map with fog. Cosmetic
+	# only -- the trunk keeps its collider and stays in `tree`, so it still blocks
+	# and still bakes into the navmesh while unseen.
+	FogOfWar.hide_until_found(t)
+
+# ---------------------------------------------------------------- the understory
+
+## Follow the season clock. Deferred so it does not matter whether Weather has
+## joined its group yet; the first grow happens here off the current season.
+func _hook_weather() -> void:
+	var w := get_tree().get_first_node_in_group("weather")
+	if w and w.has_signal("season_changed"):
+		if not w.season_changed.is_connected(_on_season_changed):
+			w.season_changed.connect(_on_season_changed)
+		_on_season_changed(w.season())
+	else:
+		_on_season_changed(0)
+
+func _on_season_changed(season: int) -> void:
+	var variant := _variant_for(season)
+	# spring and summer are the same coat, so an ordinary tick costs nothing
+	if variant != _variant:
+		_variant = variant
+		_grow_filler()
+
+func _variant_for(season: int) -> String:
+	if season == AUTUMN:
+		return NaturePack.AUTUMN
+	if season == WINTER:
+		return NaturePack.SNOW
+	return NaturePack.GREEN
+
+## Rebuild the understory in the current season's coat.
+##
+## **This is the population that sets how dense the wood looks**, so it is also the
+## one that shows most when it disagrees with everything around it. It used to load
+## Kenney GLBs tinted through a colour ramp and never changed with the season -- so
+## in autumn and winter it stood summer-green (and, worse, part of it stood *baked
+## orange* year-round, because the survival kit's colormap paints those crowns and
+## no tint can pull them back) among nature-pack trees that had all turned. Three
+## tree populations, one coat between them.
+##
+## Layout is untouched by a re-skin: the points were drawn once at `_ready` and the
+## rng is re-seeded here, so every tree keeps its place, its family and its member
+## index -- the same tree in a different coat, exactly like `tree_resource.gd`.
+## Filler carries no script and no collider, so none of this can reach the navmesh.
+func _grow_filler() -> void:
+	var old := _filler_holder
+	_filler_holder = Node3D.new()
+	add_child(_filler_holder)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = forest_seed + 1
+	for p in _filler_points:
+		_filler(p, rng)
+	if is_instance_valid(old):
+		old.queue_free()
 
 ## One filler tree: canopy, no script, no collider, cannot be marked and cannot
-## block. Scaled and tinted across a range so the wood is not one tree repeated, and
-## kept a little **smaller on average than a solid trunk** -- the markable trees
-## should stay the biggest thing in the wood, since that is the silhouette the
-## player learns to look for.
+## block. Same models as the markable trees, at a smaller target height -- there is
+## no visual tell between the two populations by design, and there does not need to
+## be, because `world_decor.gd`'s rule 1 keeps every *reachable* tree harvestable.
 func _filler(p: Vector3, rng: RandomNumberGenerator) -> void:
-	var scene: PackedScene = _filler_scenes[rng.randi() % _filler_scenes.size()]
-	var t: Node3D = scene.instantiate()
-	add_child(t)
+	var fam: String = NaturePack.TREE_FAMILIES[rng.randi() % NaturePack.TREE_FAMILIES.size()]
+	var idx := rng.randi_range(1, NaturePack.TREE_MEMBERS)
+	var t := NaturePack.spawn(NaturePack.tree(fam, _variant, idx),
+		rng.randf_range(FILLER_H.x, FILLER_H.y))
+	if t == null:
+		return
+	_filler_holder.add_child(t)
 	t.position = Vector3(p.x, 0.0, p.z)
-	var s := rng.randf_range(1.9, 3.0)
-	t.scale = Vector3(s, s * rng.randf_range(0.9, 1.25), s)
 	t.rotation.y = rng.randf() * TAU
-	_tint(t, _filler_mats[rng.randi() % _filler_mats.size()])
 	# no script, so `wind.gd` has to rock it from the outside
 	t.add_to_group("wind_sway")
-
-func _tint(n: Node, mat: StandardMaterial3D) -> void:
-	if n is MeshInstance3D:
-		n.material_override = mat
-	for c in n.get_children():
-		_tint(c, mat)
+	FogOfWar.hide_until_found(t)

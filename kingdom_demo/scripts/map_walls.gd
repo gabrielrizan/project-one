@@ -10,10 +10,14 @@ extends Node3D
 ## every wall the monarch can buy is one that can matter, because the terrain has
 ## already answered the bearings that can't.
 ##
-## A wall runs its local x from -`HALF` to +`HALF` (16 m end to end) with the gate
-## at its centre, so a map's opening is sized to match and the wall is set just
-## *inside* it -- overlapping the rock or wood a little, since a butted joint with
-## no overlap is where a raider threads through.
+## A wall runs its local x from -`half` to +`half` with the gate at its centre, so
+## a map's opening is sized to match and the wall is set just *inside* it --
+## overlapping the rock or wood a little, since a butted joint with no overlap is
+## where a raider threads through.
+##
+## `half` defaults to `wall_side.gd`'s 8.0 (a 16 m run plugging a doorway) and is
+## per-map: the island passes 16.0 so four 32 m walls enclose a village square
+## rather than sealing a pass.
 
 const WALL_SCENE := preload("res://kingdom_demo/scenes/wall_side.tscn")
 
@@ -21,6 +25,10 @@ func _ready() -> void:
 	var n := 0
 	for w in MapTerrain.walls():
 		var wall: Node3D = WALL_SCENE.instantiate()
+		# **Before `add_child`.** `add_child` runs `_ready`, which lays out the run,
+		# the collision boxes and the gate off `half` -- set afterwards it would be
+		# a wall that reports one length and is built to another.
+		wall.half = float(w.get("half", wall.half))
 		add_child(wall)
 		wall.global_position = w.pos
 		wall.rotation.y = float(w.get("yaw", 0.0))

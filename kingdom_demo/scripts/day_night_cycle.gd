@@ -162,11 +162,24 @@ const SHADOW_FADE_FULL := 28.0  # ...and at full strength from here up
 ## monarch's feet. Fog has to start past the near edge and ramp to the far one.
 ## Any camera change moves these again; the presets on C do not, which is why
 ## they are for looking rather than for shipping.
+## **Every distance here is at zoom 1.0 and is scaled by `CameraRig.zoom`.** The band
+## is tuned to what the camera can see, and the wheel changes exactly that: zoomed
+## out, a fixed 22 m start would put the wall of grey on the grass under the
+## monarch's feet, and zoomed in the whole band would sit behind the horizon and do
+## nothing. Scaling with the camera keeps "fog begins past the near edge of frame
+## and ramps to the far one" true at every stop, which is the actual rule.
 const FOG_NEAR := 22.0          # metres before fog starts at all
 const FOG_FAR := 55.0           # ...and where it reaches its full amount
 const FOG_CURVE := 1.2          # >1 keeps the near ground clean and ramps late
 const FOG_STORM := 0.95         # rain closes the world in
 const FOG_STORM_NEAR := 14.0    # ...and brings the wall of grey most of the way in
+
+## Shadow range, likewise at zoom 1.0. **Capped**, unlike the fog: the shadow map is
+## a fixed resolution, so stretching it over three times the ground trades every
+## contact shadow in the village for shadows at the frame edge nobody is looking at.
+## Past the cap, distant shadows simply pop off -- which is the cheaper failure.
+const SHADOW_DIST := 48.0
+const SHADOW_DIST_MAX := 110.0
 
 @onready var sun: DirectionalLight3D = $Sun
 @onready var world_env: WorldEnvironment = $WorldEnvironment
@@ -292,7 +305,11 @@ func _process(delta: float) -> void:
 		if env.fog_enabled:
 			env.fog_light_color = bg
 			env.fog_density = FOG_STORM * storm
-			env.fog_depth_begin = lerpf(FOG_NEAR, FOG_STORM_NEAR, storm)
+			# ...and the band rides the camera, so the wheel cannot leave the wall of
+			# grey sitting on the monarch's own patch of grass. See FOG_NEAR.
+			var z := CameraRig.zoom
+			env.fog_depth_begin = lerpf(FOG_NEAR, FOG_STORM_NEAR, storm) * z
+			env.fog_depth_end = FOG_FAR * z
 
 ## Fades the sun's shadows in and out with its height above the horizon. `-basis.z`
 ## is the direction the light travels, so negating its Y gives the sine of the
@@ -306,3 +323,6 @@ func _update_shadows() -> void:
 	# gl_compatibility, and it saves the shadow pass for half of every cycle.
 	sun.shadow_enabled = t > 0.0
 	sun.shadow_opacity = t
+	# Follows the zoom, capped -- see SHADOW_DIST_MAX for why this one has a ceiling
+	# where the fog band does not.
+	sun.directional_shadow_max_distance = minf(SHADOW_DIST * CameraRig.zoom, SHADOW_DIST_MAX)

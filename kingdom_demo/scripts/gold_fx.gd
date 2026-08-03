@@ -21,8 +21,14 @@ const HOLD_ACTION := "interact"
 ## the entire readout. Spacing moves with the scale or the coins overlap.
 ##
 ## Everything here is in **metres**, so it is tied to the camera and not to the
-## screen: any future camera change has to revisit these. The pips are the first
-## thing to break on a pull-back -- characters survive much further out.
+## screen. That is exactly why the tally is **counter-scaled against
+## `CameraRig.zoom`** (ISLAND_PROMPTS F2): the wheel is a camera change happening
+## live, and without the counter-scale a tally raised at the near stop shrinks to
+## an unreadable smear if you scroll out mid-hold. The pips are the first thing to
+## break on any pull-back -- characters survive much further out.
+##
+## The scale is re-applied every frame while a tally is up rather than only at
+## spawn, since the player can scroll at any point during a 14-second hold.
 const PIP_SPACING := 0.88
 const PIP_ROW_SPACING := 0.85
 const PIPS_PER_ROW := 8      # bigger asks stack into rows instead of one long line
@@ -64,6 +70,13 @@ const COIN_POLYPHONY := 5
 var _paying := false
 var _target: Node3D = null
 var _payer: Node3D = null
+
+## The tally in flight, kept so it can be re-laid-out live as the camera zooms.
+var _tally_pips: Array = []
+var _tally_base := Vector3.ZERO
+var _tally_zoom := 0.0
+## Pips mid fill-pulse, whose scale belongs to a tween rather than to the layout.
+var _pulsing := {}
 ## Positional, and moved to whatever is being bought -- the clink comes from the
 ## tally over the thing, not from inside the player's head.
 var _clink: AudioStreamPlayer3D = null
@@ -118,6 +131,8 @@ func pay(payer: Node3D, anchor: Node3D, cost: int, tally_y := 1.9) -> bool:
 	for p in pips:
 		if is_instance_valid(p):
 			p.queue_free()
+	_tally_pips.clear()
+	_pulsing.clear()
 
 	_paying = false
 	_target = null
@@ -173,14 +188,45 @@ func _spawn_tally(anchor: Node3D, n: int, tally_y: float) -> Array:
 	var rows := int(ceil(float(n) / float(PIPS_PER_ROW)))
 	for r in range(rows):
 		var count: int = mini(PIPS_PER_ROW, n - r * PIPS_PER_ROW)
-		var start_x := -PIP_SPACING * (count - 1) * 0.5
 		for c in range(count):
 			var p := MarkFx.model(COIN_MODEL, PIP_SCALE)
 			MarkFx.tint(p, PIP_UNPAID)
 			get_tree().current_scene.add_child(p)
-			p.global_position = base + Vector3(start_x + c * PIP_SPACING, r * PIP_ROW_SPACING, 0)
 			pips.append(p)
+	# remembered so the layout can be re-applied live as the wheel moves
+	_tally_pips = pips
+	_tally_base = base
+	_tally_zoom = 0.0
+	_layout_tally()
 	return pips
+
+## Lay the tally out at the current zoom. Called once at spawn and again whenever
+## the wheel has moved -- see the note on [constant PIP_SPACING] for why this has to
+## track the camera live rather than being fixed when the tally goes up.
+func _layout_tally() -> void:
+	var z := CameraRig.zoom
+	if _tally_pips.is_empty() or absf(z - _tally_zoom) < 0.005:
+		return
+	_tally_zoom = z
+	var i := 0
+	var rows := int(ceil(float(_tally_pips.size()) / float(PIPS_PER_ROW)))
+	for r in range(rows):
+		var count: int = mini(PIPS_PER_ROW, _tally_pips.size() - r * PIPS_PER_ROW)
+		var start_x := -PIP_SPACING * z * (count - 1) * 0.5
+		for c in range(count):
+			var p: Node3D = _tally_pips[i]
+			i += 1
+			if not is_instance_valid(p):
+				continue
+			p.global_position = _tally_base + Vector3(
+				start_x + c * PIP_SPACING * z, r * PIP_ROW_SPACING * z, 0)
+			# a pip mid-fill-pulse is left alone; its tween lands on the right size
+			if not _pulsing.has(p):
+				p.scale = Vector3.ONE * PIP_SCALE * z
+
+func _process(_delta: float) -> void:
+	if _paying:
+		_layout_tally()
 
 ## `filled` is how many pips were already gold, so the first coin of a purchase
 ## arrives with filled = 0 and the last with filled = cost - 1.
@@ -202,9 +248,14 @@ func _fill_pip(p: Node3D, filled := 0, cost := 1) -> void:
 		_clink.global_position = p.global_position
 		_clink.play()
 	MarkFx.untint(p)      # back to gold: this one's been paid
+	# the pulse is at the live zoom, and the pip is flagged for its duration so
+	# `_layout_tally` doesn't fight the tween if the wheel moves mid-pulse
+	var z := CameraRig.zoom
+	_pulsing[p] = true
 	var t := create_tween()
-	t.tween_property(p, "scale", Vector3.ONE * PIP_SCALE * 1.5, 0.08).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.tween_property(p, "scale", Vector3.ONE * PIP_SCALE, 0.1)
+	t.tween_property(p, "scale", Vector3.ONE * PIP_SCALE * z * 1.5, 0.08).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(p, "scale", Vector3.ONE * PIP_SCALE * z, 0.1)
+	t.tween_callback(func() -> void: _pulsing.erase(p))
 
 func _fly_coin(payer: Node3D, anchor: Node3D, tally_y: float) -> bool:
 	var coin := MarkFx.model(COIN_MODEL, FLYING_SCALE)

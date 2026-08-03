@@ -10,6 +10,11 @@ extends Node3D
 ##   walls are forest rather than cliff (GAME_DESIGN §9 lists "a wood too dense to
 ##   pass" as a terrain gate in its own right).
 ##
+## A map may also carry no boxes at all and be sealed by a **coastline** instead --
+## see [method _shore_ring], which stamps the same kind of invisible boxes round
+## [method MapDef.shore_at] under [constant MapDef.WATER]. That kind dresses
+## nothing: the sea's picture belongs to `sea.gd`, this file only makes it solid.
+##
 ## **Neither dressing carries a collider.** The look is a mountain range or a deep
 ## wood; the navmesh only ever sees the boxes. That is what keeps a bearing free to
 ## seal with no per-prop bookkeeping, and it is why the wood can be drawn far wider
@@ -74,8 +79,9 @@ func _ready() -> void:
 			trees += _wood(box.c, box.s)
 		else:
 			peaks += _ridge(box.c, box.s)
-	print("[terrain] %s: sealed %d boxes, %d peaks, %d gate trees"
-		% [MapTerrain.map().id, MapTerrain.gates().size(), peaks, trees])
+	var sea := _shore_ring()
+	print("[terrain] %s: sealed %d boxes + %d shore, %d peaks, %d gate trees"
+		% [MapTerrain.map().id, MapTerrain.gates().size(), sea, peaks, trees])
 
 	# The colliders were just added, so make the navmesh account for them. If this
 	# node readied before NavWorld it's a harmless no-op (the region isn't in its
@@ -84,15 +90,58 @@ func _ready() -> void:
 	NavWorld.rebake(self)
 
 ## One invisible StaticBody box. No mesh -- the dressing is the only thing you see.
-func _seal(centre: Vector3, size: Vector3) -> void:
+func _seal(centre: Vector3, size: Vector3, yaw := 0.0) -> void:
 	var body := StaticBody3D.new()
 	add_child(body)
 	body.position = centre
+	body.rotation.y = yaw
 	var cs := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = size
 	cs.shape = box
 	body.add_child(cs)
+
+# ---------------------------------------------------------------- the coast
+
+## How many boxes the shore ring is cut into. At the island's ~90 m radius that is
+## a segment every ~9 m, whose chord cuts about 0.2 m inside the true coast --
+## i.e. you are stopped a hand's width before the waterline, which nobody can see.
+## Scale it with the map if a bigger coast ever lands; the boxes are free.
+const SHORE_SEGMENTS := 64
+## How far each box reaches out to sea. Only its inner face matters -- the depth is
+## there so a body sprinting at the water cannot tunnel through in one physics step.
+const SHORE_DEPTH := 8.0
+## Chord width as a multiple of the arc it spans. Over 1 on purpose: neighbouring
+## boxes sit at slightly different radii and slightly different angles, so they have
+## to overlap or the coast gets a sliver gap you can walk out through -- the same
+## corner-overlap rule the gate boxes follow.
+const SHORE_OVERLAP := 1.9
+
+## The seal that makes an island an island: a ring of invisible boxes tangent to
+## [method MapDef.shore_at], under [constant MapDef.WATER].
+##
+## **Nothing is drawn on them.** Unlike ROCK and WOOD, the WATER kind dresses
+## nothing at all -- the sea is `sea.gd`'s picture, and these are only the physics.
+## They matter more than they look: `monarch.gd` has no bounds clamp anywhere in
+## the codebase, so on a map with zero gates this ring is the only thing between
+## the player and riding off the edge of the 180 m slab. It also gives the navmesh
+## one clean outer edge, with no per-prop bookkeeping, exactly as a gate box does.
+func _shore_ring() -> int:
+	if not MapTerrain.has_shore():
+		return 0
+	var made := 0
+	for i in SHORE_SEGMENTS:
+		var theta := TAU * float(i) / float(SHORE_SEGMENTS)
+		var r := MapTerrain.shore_at(theta)
+		var arc := TAU * r / float(SHORE_SEGMENTS)
+		# The box's inner face lands on the coast, so its centre sits half a depth
+		# further out. Yaw of `PI/2 - theta` turns local +z to face straight out to
+		# sea (so `size.z` is the depth) and leaves local +x on the tangent.
+		var c := Vector3(cos(theta), 0.0, sin(theta)) * (r + SHORE_DEPTH * 0.5)
+		c.y = 3.0
+		_seal(c, Vector3(arc * SHORE_OVERLAP, 8.0, SHORE_DEPTH), PI * 0.5 - theta)
+		made += 1
+	return made
 
 # ---------------------------------------------------------------- rock
 

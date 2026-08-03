@@ -58,7 +58,21 @@ const LEVELS := [
 	{"name": "Fortified Wall", "scene": FORT_SCENE, "yaw": 0.0, "scale": 1.25, "cost": 12, "stone": true, "requires": 5},
 ]
 
-const HALF := 8.0             # wall runs local x  -HALF .. +HALF
+const HALF := 8.0             # the default run: local x  -HALF .. +HALF
+## How far this particular wall runs either side of its gate, in metres.
+##
+## **Per-instance, set from map data before the node enters the tree** -- see
+## `map_walls.gd`, which reads `half` off the wall entry and writes it between
+## `instantiate()` and `add_child()`, because `_ready` lays the run out. It was a
+## constant while every map's opening was a 16 m doorway to plug; the island wants
+## four 32 m walls enclosing a village square instead, and length is the only thing
+## that differs between the two.
+##
+## Everything downstream scales off it -- `_section_plan`, the collision boxes, the
+## dust wave, `face_point`. `GATE_HALF` and `PERCH_OFFSETS` deliberately do not: a
+## gate stays a gate and archers still mass at it, however long the wall behind
+## them runs.
+@export var half := HALF
 const GATE_HALF := 1.0        # sections stop this far from centre -> gate opening
 const STAKE_SPACING := 1.0    # one section wide
 const OPEN_ANGLE := 85.0
@@ -72,6 +86,67 @@ const HAMMER_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/
 const TIMBER_MODEL := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tree-log.glb")
 const STONE_PILE_MODEL := preload("res://kingdom_demo/assets/3d/kenney_castle-kit/Models/GLB format/rocks-small.glb")
 const PENNANT_MODEL := preload("res://kingdom_demo/assets/3d/kenney_castle-kit/Models/GLB format/flag-pennant.glb")
+
+# --- watch braziers (ISLAND_PROMPTS F5) ---
+## Lit at dusk on the walls tonight's raid is coming at, out again at dawn. **This
+## is the player's cue and the whole reason the raid bearing can be random** -- with
+## fronts rolled independently of where the camps are, the camps' smoke can no longer
+## forecast anything, so the warning has to come from inside the village. It is
+## better than what it replaces: more precise, visible from the fire, and it costs
+## the player no exploring at all.
+##
+## `lantern.glb` from the **fantasy town kit** -- the kit the wall panels themselves
+## come from, so a lit wall is one piece of art rather than two. (F5's brief looked
+## for it in the survival kit, where there is no lantern; that sent the first pass to
+## `campfire-stand.glb`, which measures 0.41 x 0.28 m -- a cooking tripod, invisible
+## from the play camera, and the reason only its glow ever read. The lantern is a
+## **1.56 m standing lamp post**: taller than a villager, and a silhouette you can
+## pick out unlit in daylight, which is what makes an *unlit* wall legible too.)
+const TORCH_SCENE := preload("res://kingdom_demo/assets/3d/kenney_fantasy-town-kit/Models/GLB format/lantern.glb")
+const TORCH_SCALE := 1.15
+## The kit paints the lantern **blue**, which is nowhere in this game's palette --
+## flatten it to walnut so a wall of them reads as the village's own carpentry. The
+## flattening a tint causes (CLAUDE.md: a 3D model has no `modulate`) costs nothing
+## here: the post has one colour anyway, and the highlight is the flame.
+const TORCH_TINT := Color(0.33, 0.26, 0.20)
+## Where the lamp housing sits on that 1.56 m post -- the flame and the light both
+## belong up there, not at knee height.
+const FLAME_Y := 1.32
+## Metres between braziers along the run. Deliberately not one per section: sections
+## are 1 m apart, and thirty braziers on a 32 m wall is a bonfire, not a watch.
+const TORCH_SPACING := 8.0
+const TORCH_COLOR := Color(1.0, 0.62, 0.26)
+const TORCH_ENERGY := 4.4
+const TORCH_RANGE := 15.0
+
+## ⚠️ **Only the two braziers flanking the gate carry a light.**
+##
+## `gl_compatibility` caps how many omni lights may affect a single object, and the
+## ground is one object -- so six lit braziers per wall across two fronts silently
+## dropped all but the nearest two, and the outer half of every lit wall stayed
+## dark. Two lights of generous range per wall pool into a continuous band, and
+## leave budget for the campfire and the camps.
+##
+## The **flame is unshaded geometry, not a light**, which is what actually makes the
+## cue robust: a self-lit mesh is never subject to any light budget, so every
+## brazier on the run reads even when its glow has been culled.
+const TORCH_LIGHTS := 2
+const FLAME_R := 0.30
+const FLAME_COLOR := Color(1.0, 0.80, 0.42)
+
+## Each brazier also lays a **flat pool of firelight on the ground**, which is what
+## actually carries the cue at the far zoom stop.
+##
+## A glowing ball in the air was tried first and was worse than nothing: a low-poly
+## sphere reads as a hard-edged octagon close up, and additive on a night-dark
+## background makes it an opaque disc rather than a glow. What the eye actually
+## reads as "that wall is burning" is light *on the ground* -- so the pool is drawn
+## as geometry, exactly the way `puddles.gd` and the mist layer draw theirs, with a
+## runtime-generated radial gradient for the falloff (no asset, no licence). Being
+## geometry, it is immune to the light budget that culls the omnis.
+const POOL_R := 3.6
+const POOL_COLOR := Color(1.0, 0.55, 0.20, 0.55)
+const POOL_Y := 0.05
 
 const BANNER_Y := 2.5
 ## tool-hammer.glb is a 0.15m handheld tool -- this brings it up to the size the
@@ -108,6 +183,11 @@ const RUIN_SCENE := preload("res://kingdom_demo/assets/3d/kenney_fantasy-town-ki
 @onready var _marker: Node3D = $MarkerSprite
 @onready var _marker_col: CollisionShape3D = $MarkerCollision
 @onready var _prompt: Label3D = $Prompt
+
+var _torches: Array[Node3D] = []
+var _torch_lights: Array[OmniLight3D] = []
+var _flames: Array[MeshInstance3D] = []
+var _lit := false
 
 var level := NONE             # 0 = marker post only; 1..4 = the ladder above
 var building := false         # a site is open, waiting on or worked by hands
@@ -265,7 +345,7 @@ func _upgrading() -> bool:
 ## and the gate is the last thing to drop in (or, upgrading, the last to convert).
 func _section_plan() -> Array[float]:
 	var out: Array[float] = []
-	var x := HALF
+	var x := half
 	while x > GATE_HALF + 0.01:
 		out.append(-x)
 		out.append(x)
@@ -677,7 +757,7 @@ func _gate_sound(kind: String) -> void:
 
 ## The point on the wall line nearest `from` -- what a builder faces and swings at.
 func face_point(from: Vector3) -> Vector3:
-	var d: float = clampf((from - global_position).dot(_right()), -HALF, HALF)
+	var d: float = clampf((from - global_position).dot(_right()), -half, half)
 	return global_position + _right() * d
 
 func _right() -> Vector3:
@@ -733,10 +813,139 @@ func _finish() -> void:
 	_build_wall_collision()
 	_build_gate()
 	_reset_hp()
+	_build_torches()
 	# the run is solid now and the only way through is the gate -- villagers find
 	# it themselves once the navmesh knows the wall is there
 	NavWorld.rebake(self)
 	_celebrate()
+
+# ---- watch braziers ----
+
+## Stand the braziers along the run, cold. Built with the wall rather than at
+## `_ready` because a lone marker post lined with braziers reads as a wall that is
+## already there. Idempotent, so an upgrade does not stack a second row.
+func _build_torches() -> void:
+	if not _torches.is_empty():
+		return
+	var n := maxi(2, int(half * 2.0 / TORCH_SPACING))
+	# order the run's positions by distance from the gate, so the two that get a
+	# light are the two flanking it -- see TORCH_LIGHTS
+	var xs: Array[float] = []
+	for i in n:
+		var x := lerpf(-half + 1.2, half - 1.2, float(i) / float(n - 1))
+		if absf(x) >= GATE_HALF + 1.0:
+			xs.append(x)
+	xs.sort_custom(func(a, b): return absf(a) < absf(b))
+	for i in xs.size():
+		var t := MarkFx.model(TORCH_SCENE, TORCH_SCALE)
+		add_child(t)
+		t.position = Vector3(xs[i], 0.0, 0.0)
+		MarkFx.tint(t, TORCH_TINT)
+		_torches.append(t)
+		# the flame: unshaded, so it renders whatever the light budget is doing
+		var flame := MeshInstance3D.new()
+		var ball := SphereMesh.new()
+		ball.radius = FLAME_R
+		ball.height = FLAME_R * 2.6
+		ball.radial_segments = 8
+		ball.rings = 4
+		flame.mesh = ball
+		var fm := StandardMaterial3D.new()
+		fm.albedo_color = FLAME_COLOR
+		fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		flame.material_override = fm
+		flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		flame.visible = false
+		t.add_child(flame)
+		flame.position = Vector3(0, FLAME_Y, 0)
+		_flames.append(flame)
+		var pool := MeshInstance3D.new()
+		var quad := QuadMesh.new()
+		quad.size = Vector2(POOL_R * 2.0, POOL_R * 2.0)
+		quad.orientation = PlaneMesh.FACE_Y
+		pool.mesh = quad
+		pool.material_override = _pool_material()
+		pool.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		pool.visible = false
+		add_child(pool)
+		# a child of the wall, not of the brazier, so it lies flat on the ground
+		# whatever the model above it is doing
+		pool.position = Vector3(xs[i], POOL_Y, 0.0)
+		_flames.append(pool)
+		if i < TORCH_LIGHTS:
+			var light := OmniLight3D.new()
+			light.light_color = TORCH_COLOR
+			light.light_energy = 0.0
+			light.omni_range = TORCH_RANGE
+			light.shadow_enabled = false
+			t.add_child(light)
+			light.position = Vector3(0, FLAME_Y, 0)
+			_torch_lights.append(light)
+
+## One shared material for every firelight pool. The radial falloff is a
+## `GradientTexture2D` generated at runtime -- the same trick the mist layer uses,
+## and the reason a soft-edged sheet needs no asset: a flat-alpha quad shows its own
+## square edges the moment two of them overlap, and along a wall they always do.
+static var _pool_mat: StandardMaterial3D = null
+
+static func _pool_material() -> StandardMaterial3D:
+	if _pool_mat != null:
+		return _pool_mat
+	var grad := Gradient.new()
+	grad.set_color(0, Color(1, 1, 1, 1))
+	grad.set_color(1, Color(1, 1, 1, 0))
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	tex.width = 64
+	tex.height = 64
+	_pool_mat = StandardMaterial3D.new()
+	_pool_mat.albedo_texture = tex
+	_pool_mat.albedo_color = POOL_COLOR
+	_pool_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_pool_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_pool_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_pool_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# a flat sheet lying on a flat slab: never write depth, or it z-fights the
+	# roads and ground patches it overlaps
+	_pool_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	return _pool_mat
+
+## Light or bank this wall's braziers. Driven only by `night_raids.gd`, which lights
+## the walls tonight's fronts are coming at and puts them out at dawn -- never by the
+## player, and never by the wall itself. A wall that has not been built has no
+## braziers to light, which is correct: there is nothing there to man.
+func light_torches(on: bool) -> void:
+	if level == NONE:
+		return
+	_build_torches()
+	if _lit == on:
+		return
+	_lit = on
+	for l in _torch_lights:
+		if not is_instance_valid(l):
+			continue
+		var t := create_tween()
+		t.tween_property(l, "light_energy", TORCH_ENERGY if on else 0.0, 0.9)
+	for f in _flames:
+		if is_instance_valid(f):
+			f.visible = on
+
+## True while this wall is one of tonight's threatened fronts. `villager.gd` reads it
+## to decide where to muster: **an unlit wall is never manned.**
+func is_lit() -> bool:
+	return _lit
+
+## How many archers have claimed a perch here -- the number `villager.gd` balances
+## across the lit walls, so fronts fill evenly rather than the nearest one filling first.
+func defenders() -> int:
+	var n := 0
+	for t in _perch_taken:
+		if t != null and is_instance_valid(t):
+			n += 1
+	return n
 
 func _finish_upgrade() -> void:
 	_progress = 1.0
@@ -832,7 +1041,7 @@ func _dust_wave() -> void:
 	var right := _right()
 	var t := create_tween()
 	for i in range(9):
-		var off := (float(i) / 8.0) * HALF
+		var off := (float(i) / 8.0) * half
 		t.tween_callback(func() -> void:
 			_puff(global_position + right * off)
 			_puff(global_position - right * off)
@@ -888,8 +1097,8 @@ func _add_section(x: float, lvl: int, at_index := -1) -> Node3D:
 	return s
 
 func _build_wall_collision() -> void:
-	var seg := HALF - GATE_HALF
-	var cx := (HALF + GATE_HALF) * 0.5
+	var seg := half - GATE_HALF
+	var cx := (half + GATE_HALF) * 0.5
 	# kept as refs so a breach can switch them off (P6a)
 	_left_col = _add_box_col(-cx, seg)
 	_right_col = _add_box_col(cx, seg)

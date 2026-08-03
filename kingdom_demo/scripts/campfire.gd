@@ -141,7 +141,7 @@ func _prompt_text() -> String:
 		# a mystery -- the soup still feeds whoever is already here
 		if village_full():
 			return "Hold E  Fill Cauldron (%d)   village full %d" % [FEED_COST, villager_cap()]
-		return "Hold E  Fill Cauldron (%d)   %d/%d" % [FEED_COST, fill, CAULDRON_MAX]
+		return "Hold E  Fill Cauldron (%d)   %d/%d" % [FEED_COST, fill, cauldron_max()]
 	return ""
 
 func show_prompt() -> void:
@@ -176,7 +176,7 @@ func interact(who: Node3D) -> void:
 		if ok:
 			fill += 1
 			_pour()
-			if fill >= CAULDRON_MAX:
+			if fill >= cauldron_max():
 				cauldron_full = true
 				remove_from_group("interactable")
 				_attract_villagers()
@@ -205,7 +205,7 @@ func _set_soup_level(t: float) -> void:
 	_soup.position.y = SOUP_BASE_Y + SOUP_FULL_H * t * 0.5
 
 func _level() -> float:
-	return clampf(float(fill) / float(CAULDRON_MAX), 0.0, 1.0)
+	return clampf(float(fill) / float(cauldron_max()), 0.0, 1.0)
 
 ## A ladle goes in: the level swells past its mark and settles.
 ##
@@ -238,7 +238,7 @@ func take_serving() -> bool:
 	tw.tween_method(_set_soup_level, maxf(t - 0.06, 0.0), t, 0.20).set_trans(Tween.TRANS_SINE)
 	# anything short of a full pot takes another ladle -- you don't have to let it
 	# run dry before topping it up
-	if fill < CAULDRON_MAX:
+	if fill < cauldron_max():
 		cauldron_full = false
 		if not is_in_group("interactable"):
 			add_to_group("interactable")
@@ -249,9 +249,16 @@ func take_serving() -> bool:
 ## What the main building can house right now. Falls back to the Tent's figure
 ## before the village exists at all.
 func villager_cap() -> int:
+	# the altar's blessing (F6) is room, never citizens -- you still fill the pot
+	var bonus := Blessings.pop_bonus()
 	if not is_instance_valid(_hall):
-		return TIER_CAPS[0]
-	return TIER_CAPS[clampi(_hall.tier_index(), 0, TIER_CAPS.size() - 1)]
+		return TIER_CAPS[0] + bonus
+	return TIER_CAPS[clampi(_hall.tier_index(), 0, TIER_CAPS.size() - 1)] + bonus
+
+## How many servings the cauldron holds. The hermit is the cook, and the one rule he
+## bends is this number (F6 / GAME_DESIGN §9).
+func cauldron_max() -> int:
+	return CAULDRON_MAX + Blessings.serving_bonus()
 
 ## The main building's tier, 1..5, or 0 before the village exists. `wall_side.gd`
 ## gates each wall level on this via its `requires`, so a wall can't outrun the hall.

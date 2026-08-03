@@ -9,9 +9,32 @@ extends NavigationRegion3D
 ## The map changes as the village grows, so the mesh is re-baked on demand:
 ## whoever puts a collider up or takes one down calls [method NavWorld.rebake]
 ## and carries on. Requests inside the same moment are folded into one bake
-## (lighting the campfire raises three buildings at once), and the bake itself is
-## synchronous -- the map is small and a predictable navmesh is worth more here
-## than shaving a frame.
+## (lighting the campfire raises three buildings at once).
+##
+## ## The bake runs on a **background thread**
+##
+## It used to be synchronous, which was defensible while a map was 8 400 m2 and a
+## bake was ~90 ms. The island is 15 400 m2 and bakes in ~170 ms -- ten frames of
+## dead screen, **every time a tree falls**, which is the single most common thing
+## a worker does. Measured across all four maps the cost is a flat ~11 ms per
+## 1 000 m2 of bake volume, so it is the map's *area* that is expensive and no
+## amount of tuning the map's edges was ever going to help.
+##
+## Threading does not make it cheaper. It makes it not the frame's problem: the
+## call returns immediately and Recast finishes on its own thread, then
+## `bake_finished` fires and the region swaps the new mesh in. Two things follow
+## from that and both are easy to get wrong:
+##
+## * **The gates stay lifted until `bake_finished`.** They are disabled so a shut
+##   gate is not baked as a wall across the only gap in the palisade. Re-enabling
+##   them on the next line worked when the next line ran after Recast; with a
+##   thread it runs *before* Recast has looked at anything, and the village bakes
+##   sealed.
+## * **`surface_offset` is measured in the callback**, not after the call, because
+##   until the thread finishes the mesh is still the old one.
+##
+## A rebake requested while one is already running is remembered and run after --
+## `bake_navigation_mesh` on a region that is mid-bake is not something to invite.
 ##
 ## There is no runtime obstacle avoidance: units path around what was standing
 ## when the mesh was last baked. See `GAME_DESIGN.md` for where this is headed.
@@ -63,10 +86,17 @@ static var _ready_frame := -1
 
 var _dirty := false
 var _timer := 0.0
+## A bake is on the thread right now. Guards against overlapping bakes and against
+## the gates going back up before Recast has read them.
+var _baking := false
+## Gate colliders held down for the bake in flight -- see the file header.
+var _lifted: Array[CollisionShape3D] = []
+var _bake_started := 0
 
 func _ready() -> void:
 	add_to_group(GROUP)
 	get_parent().add_to_group(SOURCE_GROUP)
+	bake_finished.connect(_on_bake_finished)
 	# The scene carries an empty NavigationMesh purely so the editor doesn't warn
 	# that the region has none -- the settings below are the real ones, and they
 	# are here rather than in the .tscn so they sit next to the reasoning.
@@ -119,11 +149,13 @@ func _configure(m: NavigationMesh) -> void:
 	# ~6.5 m) because a fine cell height otherwise pays for empty sky.
 	#
 	# **Taken from the selected map, not from a constant.** Baking is O(area) at a
-	# 0.15 m cell, and the real maps are ~5x the old prototype's area, so the
-	# volume is trimmed to the ground units can actually reach rather than to a
-	# square around the origin -- everything outside it is sealed rock or wood.
-	# See the cost note in `CLAUDE.md`; if a bake hitch ever becomes visible when a
-	# tree falls, threaded baking is the lever, not a coarser cell.
+	# 0.15 m cell -- measured at a flat ~11 ms per 1 000 m2 across every map -- so
+	# the volume is trimmed to the ground units can actually reach rather than to a
+	# square around the origin. Everything outside it is sealed rock, wood or sea.
+	# A round map is the worst case for a box filter: the island's corners are 22%
+	# open water nobody can stand on, and there is no way to trim a circle. That is
+	# what pushed the bake onto a thread (see the file header) -- a coarser cell is
+	# still not the lever, because CELL_SIZE is 0.15 to fix a real bug.
 	m.filter_baking_aabb = MapTerrain.bake_aabb()
 
 ## F3 turns the path lines and the pathfinding log on and off.
@@ -163,18 +195,31 @@ func request_rebake() -> void:
 
 # ---- baking ----
 
+## Kick a bake off onto the thread. Returns straight away; the work lands in
+## [method _on_bake_finished]. See the file header for why the gates and the
+## surface measurement have to wait for it.
 func _bake() -> void:
-	var lifted := _lift_gates()
-	var t := Time.get_ticks_msec()
-	bake_navigation_mesh(false)
-	for c in lifted:
+	if _baking:
+		# already running -- re-arm so the change that just came in is not lost
+		request_rebake()
+		return
+	_baking = true
+	_lifted = _lift_gates()
+	_bake_started = Time.get_ticks_msec()
+	bake_navigation_mesh(true)
+
+func _on_bake_finished() -> void:
+	_baking = false
+	for c in _lifted:
 		c.disabled = false
+	_lifted.clear()
 	surface_offset = _measure_surface()
 	if _ready_frame < 0 and navigation_mesh.get_polygon_count() > 0:
 		_ready_frame = Engine.get_physics_frames() + 1
 	if debug:
-		print("[nav] baked %d polys in %d ms (surface +%.2f)"
-			% [navigation_mesh.get_polygon_count(), Time.get_ticks_msec() - t, surface_offset])
+		print("[nav] baked %d polys in %d ms off-thread (surface +%.2f)"
+			% [navigation_mesh.get_polygon_count(),
+				Time.get_ticks_msec() - _bake_started, surface_offset])
 
 ## The ground is one flat slab and everything walks on it, so the lowest polygon
 ## in the mesh is that slab -- and how far it sits above y = 0 is the offset every
@@ -192,8 +237,10 @@ func _measure_surface() -> float:
 
 ## A shut gate is a solid box filling the only gap in its wall. Baked in, it
 ## would seal the village and no villager would ever find a way out again -- so
-## gates come down for the bake and go straight back up. They swing open for
-## anyone walking up to them anyway, which is exactly what the path assumes.
+## gates come down for the bake and go back up in [method _on_bake_finished],
+## **not on the next line**: the bake is threaded, so the next line runs long
+## before Recast has read any geometry. They swing open for anyone walking up to
+## them anyway, which is exactly what the path assumes.
 func _lift_gates() -> Array[CollisionShape3D]:
 	var lifted: Array[CollisionShape3D] = []
 	for w in get_tree().get_nodes_in_group("wall_side"):

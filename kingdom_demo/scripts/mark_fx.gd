@@ -49,6 +49,52 @@ static func untint(node: Node3D) -> void:
 	for m in meshes(node):
 		m.material_override = null
 
+## Undo [method repaint], putting every surface back to the material the model
+## shipped with.
+##
+## ⚠️ It is **not** [method untint]: `tint` writes `material_override` on the mesh,
+## `repaint` writes `set_surface_override_material` per surface, and clearing one
+## does nothing to the other. The wreck came back from being repaired still weathered
+## grey because of exactly this.
+static func unpaint(node: Node3D) -> void:
+	for m in meshes(node):
+		var mi := m as MeshInstance3D
+		for s in mi.get_surface_override_material_count():
+			mi.set_surface_override_material(s, null)
+
+## Recolour **individual named materials** on a model, leaving the rest alone.
+##
+## This is the palette tool [method tint] is not. `tint` flattens a whole model to
+## one colour, which is right for a coin pip and destructive for anything with its
+## own material set. `repaint` takes a `{material_name: Color}` map and swaps only
+## those, so a house keeps its plaster, timber and stonework and only its roof
+## changes — which is what "bring an off-palette asset into the palette" actually
+## means.
+##
+## It works because the Quaternius packs **name their materials** (`RoofTiles`,
+## `Plaster`, `Wood`, `Stone_Dark`...) rather than baking everything into one
+## texture atlas. No image editing and no external tool: reskinning here is a
+## dictionary.
+##
+## ⚠️ The material is **duplicated** before it is written to. FBX materials are
+## shared resources, so editing one in place would repaint every other instance in
+## the map — and every other model in the pack that uses the same material.
+static func repaint(node: Node3D, swaps: Dictionary) -> int:
+	var done := 0
+	for m in meshes(node):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var mat := mi.get_active_material(s)
+			if mat == null or not swaps.has(mat.resource_name):
+				continue
+			var dup: StandardMaterial3D = mat.duplicate()
+			dup.albedo_color = swaps[mat.resource_name]
+			mi.set_surface_override_material(s, dup)
+			done += 1
+	return done
+
 static func meshes(n: Node) -> Array:
 	var out: Array = []
 	var stack: Array = [n]
