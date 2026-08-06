@@ -70,7 +70,7 @@ const SPEED_STEPS := [1.0, 2.0, 4.0, 8.0, 16.0]
 ## Index 0 must match what `kingdom_demo.tscn` ships, or the readout lies until
 ## the first press. `battle 45` is the shipped camera.
 const CAM_PRESETS := [
-	{"name": "battle 45°  fov34  ~28m", "pos": Vector3(0, 18.38, 18.38), "pitch": 45.0, "fov": 34.0},
+	{"name": "battle 45°  fov40  ~28m", "pos": Vector3(0, 16.5, 16.5), "pitch": 45.0, "fov": 40.0},
 	{"name": "iso 30°  ortho16  ~32m", "pos": Vector3(0, 13.00, 22.52), "pitch": 30.0, "size": 16.0},
 ]
 

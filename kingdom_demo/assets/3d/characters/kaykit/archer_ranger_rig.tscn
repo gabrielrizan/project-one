@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://cmq4w4t72o21o"]
+
+[ext_resource type="Script" uid="uid://dn7sfpi68joi2" path="res://kingdom_demo/scripts/kaykit_rig.gd" id="1_prk0t"]
+[ext_resource type="PackedScene" uid="uid://6fwklksxopg0" path="res://kingdom_demo/assets/3d/characters/kaykit/Ranger.glb" id="2_myd4w"]
+[ext_resource type="PackedScene" uid="uid://r6qjg7nrl5jx" path="res://kingdom_demo/assets/KayKit_Adventurers_2.0_FREE/Assets/fbx/bow_withString.fbx" id="3_ayikm"]
+
+[node name="ArcherRangerRig" type="Node3D" unique_id=1665609590]
+script = ExtResource("1_prk0t")
+body_scene = ExtResource("2_myd4w")
+weapon_scene = ExtResource("3_ayikm")
+weapon_bone = "handslot.l"

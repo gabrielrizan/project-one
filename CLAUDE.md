@@ -504,7 +504,7 @@ Every key reaches into a system directly:
 |---|---|
 | **F1** | show/hide the overlay (live time, season, weather readout) |
 | **F2** | skip to night / day — lands *after* dusk and *at* sunrise, not on the phase boundary, which is still fully lit |
-| **C** | camera preset — **two now**: the shipped `battle 45°` (perspective, fov 34, ~28m of ground) and `iso 30°` (**orthographic**, size 16, ~32m). The five D5 framing lenses are gone; that question is settled. The live A/B is projection: ortho gives the pixel-art isometric read — parallel edges stay parallel, no size falloff across the frame, and the horizon can never enter shot (every ortho ray sits at exactly the pitch), which is why 30° is safe here where a 30° *perspective* pitch would break the `FOG_PALE` seam rule. **Fog (22–55m slant) and `directional_shadow_max_distance` (48) are still tuned for the perspective frustum** — they hold under ortho but aren't tuned for it. A preset with `size` is ortho, one with `fov` is perspective; index 0 must stay in sync with the scene's camera or the readout lies |
+| **C** | camera preset — **two now**: the shipped `battle 45°` (perspective, fov 40 at 16.5m, ~28m of ground) and `iso 30°` (**orthographic**, size 16, ~32m). The five D5 framing lenses are gone; that question is settled. The live A/B is projection: ortho gives the pixel-art isometric read — parallel edges stay parallel, no size falloff across the frame, and the horizon can never enter shot (every ortho ray sits at exactly the pitch), which is why 30° is safe here where a 30° *perspective* pitch would break the `FOG_PALE` seam rule. **Fog (22–55m slant) and `directional_shadow_max_distance` (48) are still tuned for the perspective frustum** — they hold under ortho but aren't tuned for it. A preset with `size` is ortho, one with `fov` is perspective; index 0 must stay in sync with the scene's camera or the readout lies |
 | **T** | speed ×1 → ×2 → ×4 → ×8 → ×16. `Engine.time_scale`, so the whole game moves, not just the clock. Audio keeps its own clock and stacks up badly past ×4; `max_physics_steps_per_frame` is raised alongside it or anything past ×8 silently runs slower than the label claims |
 | **F4** | step rain: off → light → steady → downpour |
 | **F5** | lightning now |
@@ -693,11 +693,13 @@ for the duration, so the king stays **locked on target** and a second tally can 
 - **Tune fog to what the camera sees, not to the size of the map.** The first depth-fog
   pass used an 18–65m band for a "~30m world" and did nothing at all on screen — at the
   camera of the day the far edge of the frame was only ~32m out, so two thirds of the band
-  sat behind the horizon. **The camera has since moved** (now `battle 45`: 18.38m up, 45°,
-  fov 34), and the visible ground is a *slant* range of **21–39m**, not 3–32m — so the old
-  band would now fog the grass under the monarch's feet. Band is 22–55m to match. Any
-  camera change moves these again: work out the slant distance at the top and bottom of the
-  frame first, then set the band inside it.
+  sat behind the horizon. **The camera has since moved** (now `battle 45`: 16.5m up, 45°,
+  fov 40 — a light Northgard-framing tweak from the earlier 18.38m/fov 34), and the visible
+  ground is a *slant* range of roughly **21–40m**, not 3–32m — so the old band would now fog
+  the grass under the monarch's feet. Band is 22–55m to match, and the fov-40 change is small
+  enough that it still holds (fog is storm-only anyway). Any larger camera change moves these
+  again: work out the slant distance at the top and bottom of the frame first, then set the
+  band inside it.
 - **The `.tscn` writes a basis row-major; the GDScript `Transform3D(...)` constructor takes
   columns.** Decoding a hand-written scene transform with the constructor's convention
   transposes it and makes a camera that looks *down* appear to look *up*. The shipped

@@ -78,7 +78,7 @@ var jobs := 0          # positions created (paid for)
 var filled := 0        # positions taken by loyal villagers
 var _tier := 0         # current rung: 0 = base (tier 1); each upgrade adds one
 var _raising := 0      # the rung a crew is currently raising, as a 1-based upgrade
-                       # number (1 = base→tiers[0]); 0 = no upgrade site open
+					   # number (1 = base→tiers[0]); 0 = no upgrade site open
 var _progress := 0.0
 var _crew: BuildCrew = null
 var _banner: Node3D = null

@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://dutjj3um6qqdi"]
+
+[ext_resource type="Script" uid="uid://dn7sfpi68joi2" path="res://kingdom_demo/scripts/kaykit_rig.gd" id="1_weji7"]
+[ext_resource type="PackedScene" uid="uid://dludvttbifxol" path="res://kingdom_demo/assets/3d/characters/kaykit/Knight.glb" id="2_uvwfd"]
+[ext_resource type="PackedScene" uid="uid://bfjf5g5te0jnh" path="res://kingdom_demo/assets/KayKit_Adventurers_2.0_FREE/Assets/fbx/sword_1handed.fbx" id="3_iuwem"]
+
+[node name="MonarchKnightRig" type="Node3D" unique_id=2071130471]
+script = ExtResource("1_weji7")
+body_scene = ExtResource("2_uvwfd")
+weapon_scene = ExtResource("3_iuwem")
+target_height = 1.3

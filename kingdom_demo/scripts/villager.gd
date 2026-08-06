@@ -55,6 +55,11 @@ const CARRY_Y := 1.32
 
 const BOW_RANGE := 4.2     # archers loose from beyond the animals' spook range
 const AIM_TIME := 0.55
+## Degrees of forward lean at full draw, shared by the hunt (`_take_aim`) and the
+## wall/escort combat loop (`_engage_bandits`) -- both count `_aim_t` down against
+## `AIM_TIME`, so one pose function serves an archer whichever kind of target they
+## have. Small: this is meant to read as "pulling", not a lunge.
+const DRAW_LEAN := 4.0
 
 # --- wall defence (COMBAT_PROMPTS P4) ---
 const DEFEND_RANGE := 7.0       # perched archers reach past the 4.2 m hunt range (§9)
@@ -84,7 +89,7 @@ const SITE_WALK_TIMEOUT := 25.0   # can't reach the line -> free the slot for so
 ## job someone holds is readable at a glance from across the camp.
 const VILLAGER_MODEL := preload("res://kingdom_demo/assets/3d/characters/villager.glb")
 const WORKER_MODEL := preload("res://kingdom_demo/assets/3d/characters/worker.glb")
-const ARCHER_MODEL := preload("res://kingdom_demo/assets/3d/characters/archer.glb")
+const ARCHER_MODEL := preload("res://kingdom_demo/assets/3d/characters/kaykit/archer_ranger_rig.tscn")
 const ARROW_MODEL := preload("res://kingdom_demo/assets/3d/props/arrow_marker.glb")
 const COIN_MODEL := preload("res://kingdom_demo/assets/3d/props/coin.glb")
 const CARRY_SCALE := 0.75
@@ -510,19 +515,33 @@ func _chop(delta: float) -> void:
 
 ## The worker model carries its own axe, so the swing is the whole body rocking
 ## back and driving forward rather than a separate prop being animated.
+##
+## The two steps up to `_land_blow` keep their **original durations** (0.17 +
+## 0.07 = 0.24s to contact) -- that callback is also where the chop sound fires,
+## and nothing here should touch when it lands. The added torque (`rotation:y`)
+## and impact squash are `.parallel()` calls layered onto those same steps, so
+## they cost no extra time; only the follow-through after contact is new.
 func _swing_axe() -> void:
 	if not is_instance_valid(_model):
 		return
 	var t := create_tween()
-	# rear back over the shoulder...
+	# rear back over the shoulder, winding up with a little torque...
 	t.tween_property(_model, "rotation:x", deg_to_rad(-15.0), 0.17).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(_model, "rotation:y", _yaw + deg_to_rad(10.0), 0.17).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	t.parallel().tween_property(_model, "position:y", _base_y + 0.05, 0.17)
-	# ...and drive it into the trunk
+	# ...and drive it into the trunk, compressing on contact
 	t.tween_property(_model, "rotation:x", deg_to_rad(28.0), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	t.parallel().tween_property(_model, "rotation:y", _yaw - deg_to_rad(6.0), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	t.parallel().tween_property(_model, "position:y", _base_y - 0.04, 0.07)
+	t.parallel().tween_property(_model, "scale", Vector3(1.07, 0.93, 1.07), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	t.tween_callback(_land_blow)
-	t.tween_property(_model, "rotation:x", 0.0, 0.16).set_trans(Tween.TRANS_SINE)
-	t.parallel().tween_property(_model, "position:y", _base_y, 0.16)
+	# follow-through: the blade bites and the body keeps travelling a beat
+	# before it settles, rather than snapping straight back to rest
+	t.tween_property(_model, "rotation:x", deg_to_rad(-4.0), 0.09).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(_model, "rotation:y", _yaw, 0.09).set_trans(Tween.TRANS_SINE)
+	t.parallel().tween_property(_model, "scale", Vector3.ONE, 0.09)
+	t.tween_property(_model, "rotation:x", 0.0, 0.14).set_trans(Tween.TRANS_SINE)
+	t.parallel().tween_property(_model, "position:y", _base_y, 0.14)
 
 func _land_blow() -> void:
 	if not _tree_standing():
@@ -597,18 +616,26 @@ func _raise_wall(delta: float) -> void:
 		_swing_hammer()
 
 ## The same rock-back-and-drive as felling, but shorter and quicker: driving
-## stakes into the line rather than burying an axe in a trunk.
+## stakes into the line rather than burying an axe in a trunk. Same rule as
+## `_swing_axe`: the two steps up to `_land_hammer` (0.13 + 0.07 = 0.20s) keep
+## their original durations, since that callback is also where the hammer
+## sound fires -- the torque and squash ride along as `.parallel()` calls.
 func _swing_hammer() -> void:
 	if not is_instance_valid(_model):
 		return
 	var t := create_tween()
 	t.tween_property(_model, "rotation:x", deg_to_rad(-12.0), 0.13).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(_model, "rotation:y", _yaw + deg_to_rad(6.0), 0.13).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	t.parallel().tween_property(_model, "position:y", _base_y + 0.04, 0.13)
 	t.tween_property(_model, "rotation:x", deg_to_rad(24.0), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	t.parallel().tween_property(_model, "rotation:y", _yaw - deg_to_rad(4.0), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	t.parallel().tween_property(_model, "position:y", _base_y - 0.03, 0.07)
+	t.parallel().tween_property(_model, "scale", Vector3(1.04, 0.96, 1.04), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	t.tween_callback(_land_hammer)
 	t.tween_property(_model, "rotation:x", 0.0, 0.14).set_trans(Tween.TRANS_SINE)
+	t.parallel().tween_property(_model, "rotation:y", _yaw, 0.1).set_trans(Tween.TRANS_SINE)
 	t.parallel().tween_property(_model, "position:y", _base_y, 0.14)
+	t.parallel().tween_property(_model, "scale", Vector3.ONE, 0.1)
 
 func _land_hammer() -> void:
 	if not _site_open():
@@ -670,8 +697,20 @@ func _take_aim(delta: float) -> void:
 	_stand(delta)
 	_face(_quarry.global_position)
 	_aim_t -= delta
+	_apply_draw_pose(_aim_t)
 	if _aim_t <= 0.0:
 		_loose_arrow()
+
+## A subtle lean building through the draw, so an archer reads as pulling a bow
+## rather than standing dead still until the arrow appears. Shared by the hunt
+## and the wall/escort combat loop -- both count `_aim_t` down against
+## `AIM_TIME`, and `_shoot_arrow`'s own release rock-back picks up smoothly from
+## wherever this leaves `rotation:x`, so draw and release read as one motion.
+func _apply_draw_pose(t_left: float) -> void:
+	if not is_instance_valid(_model):
+		return
+	var drawn := 1.0 - clampf(t_left / AIM_TIME, 0.0, 1.0)
+	_model.rotation.x = deg_to_rad(-DRAW_LEAN * drawn)
 
 func _loose_arrow() -> void:
 	if not _quarry_alive():
@@ -875,6 +914,7 @@ func _engage_bandits(delta: float) -> bool:
 		return false
 	_face(_quarry.global_position)
 	_aim_t -= delta
+	_apply_draw_pose(_aim_t)
 	if _aim_t <= 0.0:
 		_shoot_arrow(_quarry)
 		_quarry = null
@@ -1383,14 +1423,22 @@ func _mill_near(delta: float, center: Vector3, radius: float) -> void:
 func _animate(delta: float, moving: bool) -> void:
 	if not is_instance_valid(_model):
 		return
+	# a rigged KayKit model (currently just the archer) plays real bone
+	# animation instead of the bob, which is baked into its walk/run clips
+	var rigged := _model.has_method("play")
 	if moving:
-		_bob += delta * 10.0
-		_model.position.y = _base_y + abs(sin(_bob)) * 0.06
+		if rigged:
+			_model.play("Running_A" if Vector2(velocity.x, velocity.z).length() > SPEED * 0.75 else "Walking_A")
+		else:
+			_bob += delta * 10.0
+			_model.position.y = _base_y + abs(sin(_bob)) * 0.06
 		# turn to face the way we're walking, easing round rather than snapping
 		if Vector2(velocity.x, velocity.z).length() > 0.1:
 			_yaw = lerp_angle(_yaw, atan2(velocity.x, velocity.z), 0.2)
 			_model.rotation.y = _yaw
 			_facing = 1.0 if velocity.x >= 0.0 else -1.0
+	elif rigged:
+		_model.play("Idle_A")
 	else:
 		_model.position.y = move_toward(_model.position.y, _base_y, delta * 0.5)
 	# carried gold rides along with the bob

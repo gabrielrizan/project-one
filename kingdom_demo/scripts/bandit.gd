@@ -11,13 +11,10 @@ extends CharacterBody3D
 ## (see [WallSide]) -- physically stops the body. No targeting code, exactly as
 ## GAME_DESIGN §9 intends.
 ##
-## Visuals are placeholder-then-pack (§11): `villager.glb` flat-tinted charcoal
-## into a featureless dark silhouette, a pickaxe scaled into the hands. The final
-## look is a downloaded character pack, chosen later under the ask-first licence
-## rule (§12).
+## Visuals are the KayKit Adventurers pack (§11, ask-first licence rule §12):
+## the hooded Rogue, a dagger socketed onto its `handslot.r` bone.
 
-const MODEL_SCENE := preload("res://kingdom_demo/assets/3d/characters/villager.glb")
-const PICKAXE := preload("res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tool-pickaxe.glb")
+const MODEL_SCENE := preload("res://kingdom_demo/assets/3d/characters/kaykit/bandit_rig.tscn")
 
 const ACCEL := 26.0
 const ARRIVE := 2.6
@@ -28,14 +25,12 @@ const ROB_RANGE := 2.0          # tools are torn off within this of a citizen
 const VICTIM_RESCAN := 0.5      # how often to look for someone to rob
 
 ## Archetypes as a stat dictionary, in the GAITS spirit (§9): adding one costs an
-## entry here, not a rewrite. The **Thug** is the baseline -- charcoal, a villager's
+## entry here, not a rewrite. The **Thug** is the baseline -- a villager's
 ## menace, one arrow to drop. The **Brute** is a blood-moon heavy: bigger, slower,
 ## several arrows to drop, and it hits structures far harder. PLACEHOLDER numbers.
 const ARCHETYPES := {
-	"thug":  {"scale": 1.0, "march": 2.2, "chase": 3.8, "damage": 7.0,  "hits": 1,
-		"tint": Color(0.15, 0.15, 0.18)},
-	"brute": {"scale": 1.3, "march": 1.6, "chase": 2.6, "damage": 16.0, "hits": 4,
-		"tint": Color(0.17, 0.10, 0.11)},
+	"thug":  {"scale": 1.0, "march": 2.2, "chase": 3.8, "damage": 7.0,  "hits": 1},
+	"brute": {"scale": 1.3, "march": 1.6, "chase": 2.6, "damage": 16.0, "hits": 4},
 }
 
 ## The loot shouldered after a theft -- a packed bundle, over the shoulder.
@@ -99,8 +94,8 @@ func _ready() -> void:
 	if garrison:
 		_state = State.GARRISON
 
-## Read this archetype's stats (P7). Set before _build_model so the scale and tint
-## land on the model.
+## Read this archetype's stats (P7). Set before _build_model so the scale
+## lands on the model.
 func _apply_archetype() -> void:
 	var a: Dictionary = ARCHETYPES.get(archetype, ARCHETYPES["thug"])
 	_march = a["march"]
@@ -131,14 +126,6 @@ func _build_model() -> void:
 	_model = MODEL_SCENE.instantiate()
 	model_root.add_child(_model)
 	_model.scale = Vector3.ONE * float(a["scale"])   # a Brute looms larger
-	# tint first: it flattens every mesh under the model to one dark silhouette, so
-	# the pickaxe is added *after* to keep its own wood-and-iron colours.
-	MarkFx.tint(_model, a["tint"])
-	var axe := PICKAXE.instantiate()
-	_model.add_child(axe)
-	axe.position = Vector3(0.22, 0.62, 0.24)   # roughly shouldered in the hand
-	axe.rotation = Vector3(0.2, 0.0, -0.6)
-	axe.scale = Vector3.ONE * 1.1
 	_model.rotation.y = _yaw
 
 func _physics_process(delta: float) -> void:
@@ -402,11 +389,20 @@ func _mill_near(delta: float, center: Vector3, radius: float) -> void:
 func _animate(delta: float, moving: bool) -> void:
 	if not is_instance_valid(_model):
 		return
+	# the rigged KayKit model plays real bone animation instead of the bob,
+	# which is baked into its walk/run clips
+	var rigged := _model.has_method("play")
 	if moving:
-		_bob += delta * 9.0
-		_model.position.y = abs(sin(_bob)) * 0.06
+		if rigged:
+			# a rout (FLEE_SPEED, well past any march pace) reads as a run
+			_model.play("Running_A" if Vector2(velocity.x, velocity.z).length() > 3.0 else "Walking_A")
+		else:
+			_bob += delta * 9.0
+			_model.position.y = abs(sin(_bob)) * 0.06
 		if Vector2(velocity.x, velocity.z).length() > 0.1:
 			_yaw = lerp_angle(_yaw, atan2(velocity.x, velocity.z), 0.2)
 			_model.rotation.y = _yaw
+	elif rigged:
+		_model.play("Idle_A")
 	else:
 		_model.position.y = move_toward(_model.position.y, 0.0, delta * 0.5)

@@ -105,9 +105,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 1)
 script = ExtResource("4_ndqrx")
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=936210487]
-transform = Transform3D(1, 0, 0, 0, 0.7071068, 0.7071068, 0, -0.7071068, 0.7071068, 0, 18.38, 18.38)
+transform = Transform3D(1, 0, 0, 0, 0.7071068, 0.7071068, 0, -0.7071068, 0.7071068, 0, 16.5, 16.5)
 current = true
-fov = 34.0
+fov = 40.0
 
 [node name="UI" type="CanvasLayer" parent="." unique_id=1334354863]
 

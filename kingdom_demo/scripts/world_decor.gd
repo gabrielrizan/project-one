@@ -99,12 +99,14 @@ var _season := SPRING
 var _variant := "___"                     # NaturePack variant currently planted
 var _ground_mat: StandardMaterial3D = null
 var _ground_base := Color(1, 1, 1)
+var _turf: Node3D = null   # holder for the flat tiles _build_turf() scatters
 
 func _ready() -> void:
 	_rng.seed = world_seed
 	_build_paths()
 	_build_hills()
 	_scatter_patches()
+	_build_turf()
 	_veg = Node3D.new()
 	add_child(_veg)
 	_cache_ground()
@@ -124,6 +126,10 @@ func _hook_weather() -> void:
 func _on_season_changed(season: int) -> void:
 	_season = season
 	_apply_ground_snow()
+	if is_instance_valid(_turf):
+		# the base ground already whitens for snow (`_apply_ground_snow`); grass
+		# grain showing through it would read as bare ground under snow, wrong
+		_turf.visible = season != WINTER
 	var variant := _variant_for(season)
 	# Spring and summer are both green: only re-grow when the coat actually changes,
 	# so an ordinary spring->summer tick costs nothing.
@@ -402,6 +408,89 @@ func _add_hill(pos: Vector3, radius: float, height: float, mat: Material) -> voi
 	# No trees crowning the hill any more: hills are built once at _ready, and a
 	# permanent green canopy sitting on one through winter would contradict the
 	# season re-skin going on around it. The forest pass plants around them instead.
+
+# ---------------------------------------------------------------- ground turf grain
+#
+## A fine mottling across the ground near the village, so it stops reading as
+## one flat plastic slab up close -- without touching the art direction's **no
+## textures** rule (`CLAUDE.md` §4): every tile is a flat solid colour off
+## `_flat_mat()`, no image anywhere, the same construction `_scatter_patches()`
+## already uses, just smaller and far more numerous.
+##
+## ⚠️ **That construction is load-bearing, not a style choice.** The first pass
+## here built one big mesh with smoothly-blended **per-vertex** colours via
+## `SurfaceTool` + `vertex_color_use_as_albedo` -- cheaper (one draw call for
+## the whole field) and it *should* work, but on this project's renderer it
+## silently rendered as nothing: not "too subtle", literally zero pixel
+## difference between a pure-black and a pure-white vertex colour, confirmed by
+## measuring rendered pixels rather than trusting the screenshot (a wasted
+## tuning pass chasing "contrast" before that measurement caught it). Flat
+## per-tile `MeshInstance3D.material_override.albedo_color` is the one
+## construction already proven to render in this game -- patches and roads are
+## visible in every screenshot taken of it. **Don't reintroduce per-vertex
+## colour here without first confirming it renders**, e.g. with the
+## black-vs-white test above, or the same afternoon gets spent twice.
+##
+## **Grain, not more patches.** `_scatter_patches()`'s own history is the
+## other warning: bumped to 85 once, the ground "came out a brown patchwork
+## quilt instead of grass with some wear in it" (file header). What keeps this
+## from repeating that is scale and palette, not the technique: `TURF_CELL` is
+## roughly half a patch's smallest size, so it reads as texture rather than
+## shapes, and `TURF_COLORS` stays in the green family close to the base
+## `Ground` albedo rather than patches' bolder wear tones.
+##
+## Sits at y=0.01: above the base `Ground` mesh (y=0), below the patches
+## (0.02+) and the roads (0.09), so nothing z-fights. No collider, no script,
+## so it needs none of `_backdrop()`'s gating -- it can't be marked and can't
+## block a path, the same reasoning that exempts patches and rocks (rule 2,
+## file header).
+
+const TURF_CELL := 5.2               # metres per tile
+## How far from the village the grain reaches -- most of what is actually
+## walked and looked at closely, not the far backdrop the forest already covers.
+const TURF_RADIUS_FRAC := 0.75       # fraction of MapTerrain.extent()
+const TURF_NOISE_SCALE := 0.22
+## The middle entry **is** the base `Ground` albedo, so grain never disagrees
+## with the ground it sits on; the outer two are a real, checked-by-rendering
+## step away from it and each other, not a guessed subtle nudge.
+const TURF_COLORS := [
+	Color(0.34, 0.54, 0.24), Color(0.44, 0.63, 0.33), Color(0.52, 0.69, 0.38),
+]
+
+func _build_turf() -> void:
+	var radius: float = MapTerrain.extent() * TURF_RADIUS_FRAC
+	var n := maxi(2, int(radius * 2.0 / TURF_CELL))
+	var half := float(n) * TURF_CELL * 0.5
+	var noise := FastNoiseLite.new()
+	noise.seed = world_seed
+	noise.frequency = TURF_NOISE_SCALE
+	noise.noise_type = FastNoiseLite.TYPE_VALUE_CUBIC
+
+	_turf = Node3D.new()
+	add_child(_turf)
+	var origin: Vector3 = MapTerrain.village()
+	for gz in range(n):
+		for gx in range(n):
+			var cx := origin.x - half + (float(gx) + 0.5) * TURF_CELL
+			var cz := origin.z - half + (float(gz) + 0.5) * TURF_CELL
+			_add_turf_tile(cx, cz, noise)
+
+func _add_turf_tile(cx: float, cz: float, noise: FastNoiseLite) -> void:
+	var mi := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	# a hair oversized so adjoining tiles overlap rather than leave a hairline gap
+	plane.size = Vector2(TURF_CELL, TURF_CELL) * 1.02
+	mi.mesh = plane
+	mi.material_override = _flat_mat(_turf_color(noise, cx, cz))
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_turf.add_child(mi)
+	mi.position = Vector3(cx, 0.01, cz)
+
+func _turf_color(noise: FastNoiseLite, x: float, z: float) -> Color:
+	var v := (noise.get_noise_2d(x, z) + 1.0) * 0.5   # 0..1
+	var f := v * float(TURF_COLORS.size() - 1)
+	var i := clampi(int(f), 0, TURF_COLORS.size() - 2)
+	return TURF_COLORS[i].lerp(TURF_COLORS[i + 1], f - float(i))
 
 # ---------------------------------------------------------------- ground patches
 
