@@ -28,7 +28,10 @@ Paste one prompt per session, under this preamble:
 
 | | |
 |---|---|
-| **Map** | `id = "flat_island"`, title **"Prototype 1 — Flat Terrain"**. Fourth entry in `MapCatalog`. Village stays at `Vector3.ZERO`. |
+| **Map** | `id = "flat_island"`, title **"Prototype 1 — Flat Terrain"**. Built as the fourth entry in `MapCatalog`. Village stays at `Vector3.ZERO`. |
+| **The other three maps** | Prototypes and concepts, **to be deleted — but not on a task boundary.** Andrei removes them once he is happy with the island (2026-08-02: *"after something I like"*). **Do not delete them as part of F1–F8**; they stay compiling and playable as working references until he says so. Assume the island is eventually the only map, but never that it already is. |
+| **Map picker** | **Stays**, even while the island is the only entry (Andrei, 2026-08-02). Don't "simplify" Play → Choose a Map into a straight launch — it earns its place again as soon as a second real map exists. |
+| **Art** | The **nature-pack** (`NaturePack`, `assets/nature-pack/FBX`) and the **season re-skin** merged on 2026-08-02 are the island's art basis — decided by Andrei, not a default to re-argue. **The season reaches the water and the beach too**, not just the ground and the vegetation (see F1). One gap to close first: "The forest is not all one asset pack yet", below. |
 | **Shape** | Round-ish island, water on all bearings, **no rock or wood gates at all**. Still one flat slab — no elevation, no ramps. |
 | **Fog of war** | Full black. **Permanent reveal**, never re-shrouds. The monarch reveals a larger radius than villagers; roaming archers reveal too. |
 | **Camera** | Keep the Z / X spin, add smooth mouse-wheel zoom at a fixed 45° pitch. |
@@ -58,6 +61,31 @@ scouting lead and a standing objective, not a raid forecast.
 
 **Rewrite those notes in `CLAUDE.md` in the pass that lands them (F3 and F5).** If they are
 left standing, a later session will read the old rationale and "fix" the fog back.
+
+### The forest is not all one asset pack yet
+
+The 2026-08-02 nature-pack swap reached **two** of the three tree populations. Verified on
+that date, re-check before relying on it:
+
+| Population | Source | Follows the season? |
+|---|---|---|
+| Solid / markable trees (`tree_resource.gd`) | `NaturePack` | yes |
+| `world_decor.gd` scenery ring | `NaturePack` | yes |
+| **`map_forest.gd` filler / understory (`_load_filler`)** | **old Kenney GLBs + colormap** | **no** |
+
+⚠️ **This one does not go away with the prototype maps.** `map_forest.gd` is the general
+forest system, and **F4 pushes `understory.cap` to ~420** — so on the island that is ~420
+Kenney trees standing among nature-pack ones, and in autumn and winter the understory
+stays summer-green while every tree around it turns and takes on snow. The understory is
+specifically the population that sets how dense the wood *looks*, so it is the most
+visible thing on the map.
+
+**Port `_load_filler()` to `NaturePack` as part of F4**, and give it the season hook
+`world_decor.gd` already models (`_hook_weather` / `_on_season_changed` / `_variant_for`,
+re-growing under a holder with a re-seeded rng so the layout holds and only the coat
+changes). Filler carries no script and no collider, so this is cosmetic only — it cannot
+touch the navmesh, and `forest.spacing` is unaffected because spacing governs the *solid*
+trees.
 
 ---
 
@@ -101,10 +129,25 @@ edge with no per-prop bookkeeping.
 - **Beach ring** — sand-coloured flat quads between the forest edge and the shore, reusing
   `world_decor.gd::_add_strip` / `_scatter_patches`. Keep them **non-casting**: they are
   sheets at y≈0.02 and a low sun projects a sheet's silhouette clear across the map.
+- **The water and the beach follow the season** (Andrei, 2026-08-02). Build the hook here,
+  in F1, even if the winter look is tuned later — retrofitting it once the shader and the
+  quads are settled is the expensive order. Use the path that already exists rather than a
+  new one: subscribe to `weather.gd`'s **`season_changed`** and tint on `WINTER`, exactly as
+  `world_decor.gd::_apply_ground_snow` does for the ground (cache the base colour once, lerp
+  toward the winter colour, restore otherwise). The **ring of distant islands** is part of
+  the same picture — a green horizon around a white island reads as a bug.
+  ⚠️ Whatever winter does to the water must not fight the rule the shader is built on:
+  from this camera standing water reads *lighter* than ground because what you see in it is
+  **sky**. Push it paler and flatter (less chop, more sky), not darker or grey-blue.
+  Exact colours are placeholder — tune by playing, like everything else here.
 - ⚠️ **`world_decor.gd::_backdrop()` will put scenery on the sea.** It permits scenery
   anywhere `is_open` is false, which after this change means the entire ocean. Reject
   anything past the shore, and replace the backdrop it loses with a **ring of distant
   islands** out on the water — that is the horizon this map wants anyway.
+  Since the 2026-08-02 merge `_backdrop()` gates **bushes as well as trees** (through
+  `_backdrop_point`), so a shore test that only covers `_plant` leaves bushes floating.
+  `_near_point()` — rocks, ground patches, small detail — needs the same treatment: it
+  draws off `MapTerrain.extent()` with no shore test at all.
 
 ### Data to start from (all placeholder, tune by playing)
 
@@ -219,6 +262,10 @@ only compatible because of the split the codebase already has — **use it, don'
   and the navmesh erodes 0.3 m each side, so two trunks under ~1.6 m apart leave a gap that
   looks walkable and is not — that is the exact shape of "the character gets stuck
   randomly". **Never go below 2.6 without re-measuring.**
+- ⚠️ **Port the filler to `NaturePack` first** — see "The forest is not all one asset pack
+  yet" above. `_load_filler()` still loads Kenney GLBs and never changes season, and this
+  task is what raises it to ~420 trees. Do it before tuning density, or you will be tuning
+  the look of an understory you are about to replace.
 - **Berries must be easy to see.** Add a small glade clearance around bush points in
   `_plantable` so bushes sit in openings rather than under canopy.
 - `keep_clear` for the shrine clearing and the two beach approaches. `camp_clear` already

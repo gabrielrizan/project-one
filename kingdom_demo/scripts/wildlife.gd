@@ -101,3 +101,8 @@ func _spawn(species: String, model: PackedScene, sc: float, gold: int,
 	# the rock and never up the north corridor -- a stag spawned inside a mountain
 	# is stuck forever (COMBAT_PROMPTS P1).
 	a.global_position = MapTerrain.random_belly_point(INNER, OUTER)
+	# Game in unexplored country is out of sight, like everything else standing on
+	# it. It **stays** hidden only until the ground it is on is revealed, not until
+	# it is looked at -- the mask is memory of a place, so once a stretch of wood is
+	# known the deer in it are simply visible, wherever they wander inside it.
+	FogOfWar.hide_until_found(a)

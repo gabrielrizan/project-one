@@ -1,10 +1,30 @@
 extends Node3D
-## Dresses the world beyond the village: roads out of the gates, patches of varied
-## ground, gentle hills, and a lively ring of forest -- trees, rocks, bushes and
-## ground detail -- all from the imported nature-pack via [NaturePack].
+## Dresses the world beyond the village: gentle hills, and a lively ring of forest --
+## trees, rocks, bushes and ground detail -- all from the imported nature-pack via
+## [NaturePack].
 ##
-## **Two layers, one seed.** The colliding, unchanging things (paths, hills, colour
-## patches) are built once at _ready. The vegetation lives under a `_veg` holder and
+## ⚠️ **Two things this file used to draw and deliberately no longer does** (2026-08-04),
+## both flat quads lying on the slab, and both removed for the same reason: on a wooded
+## island they read as *maintenance*, not as wilderness.
+##
+## * **Dirt roads out of each gate and on to the nearest camp.** The argument for them
+##   was that a road is the cheapest direction-giver on a 120 m map -- it says "the way
+##   out is here, and it leads somewhere" with no marker and no HUD. What it actually
+##   drew was a mown strip pointing straight at the thing the player is supposed to
+##   discover, which is the same mistake the island's `keep_clear` camp lanes made and
+##   were removed for. What leads outward now: the smoke columns, the lit wall lanterns
+##   on a raid bearing, and the fog frontier itself.
+## * **Scattered colour patches** -- 15 tan and green sheets 3.5-8 m across, meant as
+##   ground variation. From the map camera they are unmistakably rectangles, because
+##   that is what they are, and no amount of recolouring fixes a shape. `_scatter_detail`
+##   (grass, flowers, stumps, logs) is what dresses the floor now; it is *models*, so it
+##   never has an edge to give itself away.
+##
+## Don't re-add either as a flat quad. If the ground needs variation, it wants to come
+## from the ground material or from more scattered models, not from sheets laid on top.
+##
+## **Two layers, one seed.** The colliding, unchanging things (the hills) are built once
+## at _ready. The vegetation lives under a `_veg` holder and
 ## is **re-grown whenever the season changes** (weather.gd's `season_changed`): the
 ## layout rng is reset to the same seed every time, so the forest keeps its exact
 ## shape and only its *coat* changes -- green in spring/summer, autumn colours in
@@ -34,22 +54,13 @@ extends Node3D
 ## obstacle the navmesh bakes and no map definition knows about. They are backdrop
 ## now, placed only where the ground is already sealed.
 ##
-## Rocks, ground patches and small detail (grass, flowers, stumps, logs) are exempt
-## from rule 1 -- none of them is markable, so none can be mistaken for something
-## the monarch could buy -- and they are what keeps the village clearing from
-## reading as bare billiard-table green.
+## Rocks and small detail (grass, flowers, stumps, logs) are exempt from rule 1 --
+## neither is markable, so neither can be mistaken for something the monarch could buy
+## -- and they are what keeps the village clearing from reading as bare
+## billiard-table green.
 
 @export var tree_count := 420        # scattered woodland (rejected samples are cheap)
 @export var grove_count := 10        # dense clumps that read as forest
-# Scaled up with the map -- the playable belly is roughly 5x the prototype's area,
-# so the old counts spread that thin read as a bare field. Patches are raised far
-# less than rocks: they are 4-8 m sheets, so their *coverage* grows much faster
-# than their count, and at 85 the ground came out a brown patchwork quilt instead
-# of grass with some wear in it.
-# Patches went down again once the forest filled the playfield: with trees carrying
-# the ground detail, big tan sheets stopped being welcome variation and started
-# reading as bald dirt.
-@export var patch_count := 15
 @export var rock_count := 42         # lots of rock for a lived-in, varied floor
 @export var bush_count := 16
 @export var detail_count := 60       # grass, flowers, plants, the odd stump/log
@@ -82,17 +93,12 @@ const LOG_H := Vector2(0.35, 0.6)
 ## never the ground, so there is no second writer to fight (see its gotcha note).
 const SNOW_GROUND := Color(0.86, 0.89, 0.95)
 
-const PATCH_COLORS := [
-	Color(0.33, 0.5, 0.24), Color(0.3, 0.55, 0.28), Color(0.44, 0.34, 0.2),
-	Color(0.5, 0.42, 0.26), Color(0.72, 0.66, 0.42),
-]
-
 ## Tries a rejection-sampled placement gets before it gives up. Trees can afford to
 ## skip outright -- there are hundreds of samples -- but the low-count categories
 ## (hills, bushes) would come out visibly short, so they retry.
 const PLACE_TRIES := 24
 
-var _rng := RandomNumberGenerator.new()   # one-time layout: hills, paths, patches
+var _rng := RandomNumberGenerator.new()   # one-time layout: the hills
 var _vrng := RandomNumberGenerator.new()  # vegetation layout, reset every re-skin
 var _veg: Node3D = null
 var _season := SPRING
@@ -103,9 +109,7 @@ var _turf: Node3D = null   # holder for the flat tiles _build_turf() scatters
 
 func _ready() -> void:
 	_rng.seed = world_seed
-	_build_paths()
 	_build_hills()
-	_scatter_patches()
 	_build_turf()
 	_veg = Node3D.new()
 	add_child(_veg)
@@ -202,6 +206,7 @@ func _plant(pos: Vector3) -> void:
 	t.rotation.y = _vrng.randf() * TAU
 	# scenery trees carry no script, so `wind.gd` rocks them from the outside
 	t.add_to_group("wind_sway")
+	FogOfWar.hide_until_found(t)
 
 func _scatter_rocks() -> void:
 	for i in range(rock_count):
@@ -214,7 +219,13 @@ func _scatter_rocks() -> void:
 func _scatter_bushes() -> void:
 	for i in range(bush_count):
 		var b := NaturePack.spawn(NaturePack.random_bush(_variant, _vrng), _vrng.randf_range(BUSH_H.x, BUSH_H.y))
-		_place_veg(b, _backdrop_point(_vrng), true)
+		var p := _backdrop_point(_vrng)
+		# `_backdrop_point` falls back to its last draw when every try was rejected,
+		# which on a map with no backdrop at all (an island) is every time -- so the
+		# gate has to be re-checked here or the fallback plants a shrub in the sea.
+		if not _backdrop(p):
+			continue
+		_place_veg(b, p, true)
 
 ## Grass, flowers and plants in the green seasons; in winter the ground detail is
 ## snow-covered stumps and logs, sparse, so the floor reads as frozen over.
@@ -249,6 +260,7 @@ func _place_veg(node: Node3D, pos: Vector3, sway := false) -> void:
 	node.rotation.y = _vrng.randf() * TAU
 	if sway:
 		node.add_to_group("wind_sway")
+	FogOfWar.hide_until_found(node)
 
 # ---------------------------------------------------------------- ground snow
 
@@ -290,7 +302,21 @@ func _ring_point(rng: RandomNumberGenerator) -> Vector3:
 ## Used for the things that are safe on open ground -- ground patches, loose rocks
 ## and small detail, which carry no collider and, crucially, are **not markable**,
 ## so they cannot be mistaken for something the monarch could buy.
+##
+## It draws off [method MapTerrain.extent], which on an island reaches well out
+## past the coast -- so it resamples until it finds land. Without that, a third of
+## the rocks and grass tufts on the island map end up bobbing on the sea.
 func _near_point(rng: RandomNumberGenerator) -> Vector3:
+	var p := _near_draw(rng)
+	if not MapTerrain.has_shore():
+		return p
+	for tries in PLACE_TRIES:
+		if not MapTerrain.beyond_shore(p):
+			return p
+		p = _near_draw(rng)
+	return MapTerrain.village()
+
+func _near_draw(rng: RandomNumberGenerator) -> Vector3:
 	var a := rng.randf() * TAU
 	var r := rng.randf_range(4.0, MapTerrain.extent() * 0.9)
 	return MapTerrain.village() + Vector3(cos(a) * r, 0, sin(a) * r)
@@ -314,60 +340,17 @@ func _backdrop_point(rng: RandomNumberGenerator) -> Vector3:
 ##   a stone face, and where the cone geometry does not happen to cover it you get a
 ##   pine sprouting out of a cliff. Wood gates are exactly where trees belong, and
 ##   past the map edge is the true backdrop.
+## * **The sea is out.** This test permits anything `is_open` calls false, and since
+##   the shore landed that means the entire ocean -- so on the island every one of
+##   these samples was a tree, bush or hill floating on the water. An island map
+##   therefore has *no* backdrop scenery at all, which is correct: every square metre
+##   of it is reachable, so every tree on it has to be one you can fell. What stands
+##   in for the lost backdrop is `sea.gd`'s ring of distant islands.
 func _backdrop(p: Vector3) -> bool:
 	if MapTerrain.is_open(p):
 		return false
-	return MapTerrain.gate_kind_at(p) != MapDef.ROCK
-
-# ---------------------------------------------------------------- path
-
-## Roads drawn from the map rather than hand-plotted: one out of every gate, and
-## one on from each gate toward the camp that lies beyond it.
-##
-## This is doing more than dressing. On a 120 m map a camp is over the horizon from
-## the fire, and a road is the cheapest possible direction-giver -- it says "the
-## way out is here, and it leads somewhere" without a marker, an arrow or a minimap.
-## The camp's own smoke column (`bandit_camp.gd`) takes over once you are moving.
-func _build_paths() -> void:
-	var dirt := _flat_mat(Color(0.46, 0.34, 0.21))
-	var village := MapTerrain.village()
-	var camps := MapTerrain.camps()
-	for w in MapTerrain.walls():
-		var gate: Vector3 = w.pos
-		# Start clear of the village, not at its centre. Drawn from the origin the
-		# strip runs straight under the campfire and out through the Archers hut,
-		# and the first thing the player sees is a dirt slab across their camp.
-		var out := (gate - village).normalized()
-		_add_strip(village + out * 7.0, gate, 3.0, dirt)
-		# and on from the gate to whichever camp lies that way
-		var best := Vector3.ZERO
-		var best_d := INF
-		for c in camps:
-			var d: float = (c.pos as Vector3).distance_to(gate)
-			if d < best_d:
-				best_d = d
-				best = c.pos
-		if best_d < INF:
-			# stop short of the camp -- a road running into the fire pit reads as
-			# something the bandits built, and the last stretch wants to feel wild
-			var stop := best + (gate - best).normalized() * 6.0
-			_add_strip(gate, stop, 3.0, dirt)
-
-func _add_strip(from: Vector3, to: Vector3, width: float, mat: Material) -> void:
-	var mi := MeshInstance3D.new()
-	var length := from.distance_to(to)
-	var box := BoxMesh.new()
-	box.size = Vector3(width, 0.08, length + width)   # overlap ends so joins don't gap
-	mi.mesh = box
-	mi.material_override = mat
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mi)
-	var mid := (from + to) * 0.5
-	# clear of the whole staggered patch stack, so a road always reads on top of
-	# the ground variation rather than flickering through it
-	mi.position = Vector3(mid.x, 0.09, mid.z)
-	var dir := to - from
-	mi.rotation.y = atan2(dir.x, dir.z)
+	var kind := MapTerrain.gate_kind_at(p)
+	return kind != MapDef.ROCK and kind != MapDef.WATER
 
 # ---------------------------------------------------------------- hills
 

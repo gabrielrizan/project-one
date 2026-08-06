@@ -11,6 +11,7 @@
 [ext_resource type="Script" uid="uid://din3aumti0ij2" path="res://kingdom_demo/scripts/map_forest.gd" id="11_forest"]
 [ext_resource type="PackedScene" uid="uid://clad8q2n673md" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/rock-a.glb" id="11_p6jlh"]
 [ext_resource type="PackedScene" uid="uid://dowbc762jur4v" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/rock-c.glb" id="12_a7p3c"]
+[ext_resource type="Script" uid="uid://luuqoengjneh" path="res://kingdom_demo/scripts/map_sites.gd" id="12_sites"]
 [ext_resource type="Script" uid="uid://n3m3dgvns3km" path="res://kingdom_demo/scripts/map_walls.gd" id="12_walls"]
 [ext_resource type="PackedScene" uid="uid://dnmswfihbrwc2" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/rock-b.glb" id="13_hfmf3"]
 [ext_resource type="PackedScene" uid="uid://dcwgtu1qgcyts" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/grass-large.glb" id="14_dl8hl"]
@@ -21,20 +22,22 @@
 [ext_resource type="Script" uid="uid://7iou5by44kho" path="res://kingdom_demo/scripts/wind.gd" id="19_wind"]
 [ext_resource type="Script" uid="uid://bq2uoj84hhn8h" path="res://kingdom_demo/scripts/weather.gd" id="20_weather"]
 [ext_resource type="Script" uid="uid://b0b8ey6nvnhxa" path="res://kingdom_demo/scripts/dev_menu.gd" id="21_dev"]
+[ext_resource type="Script" uid="uid://c7u87q8m5d5f3" path="res://kingdom_demo/scripts/fog_of_war.gd" id="22_fog"]
 [ext_resource type="Script" uid="uid://c7gehf4k5e50e" path="res://kingdom_demo/scripts/mountains.gd" id="22_mtn"]
+[ext_resource type="Script" uid="uid://cvpdc3uktlttr" path="res://kingdom_demo/scripts/sea.gd" id="22_sea"]
 [ext_resource type="Script" uid="uid://crix8vow1jsp7" path="res://kingdom_demo/scripts/night_raids.gd" id="23_raids"]
 [ext_resource type="Script" uid="uid://db0m6hnlf654r" path="res://kingdom_demo/scripts/muster_banner.gd" id="24_muster"]
 [ext_resource type="Script" uid="uid://c6d1mxxvejufd" path="res://kingdom_demo/scripts/wildlife.gd" id="90_wild"]
 [ext_resource type="PackedScene" uid="uid://bkmenu0000001" path="res://kingdom_demo/scenes/menu.tscn" id="92_menu"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hfmf3"]
-size = Vector3(180, 1, 180)
+size = Vector3(240, 1, 240)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ndqrx"]
 albedo_color = Color(0.44, 0.63, 0.33, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_dl8hl"]
-size = Vector3(180, 1, 180)
+size = Vector3(240, 1, 240)
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_nav"]
 
@@ -67,6 +70,12 @@ mesh = SubResource("BoxMesh_dl8hl")
 
 [node name="Mountains" type="Node3D" parent="." unique_id=775467426]
 script = ExtResource("22_mtn")
+
+[node name="Sea" type="Node3D" parent="." unique_id=9831160]
+script = ExtResource("22_sea")
+
+[node name="FogOfWar" type="Node3D" parent="." unique_id=1767588458]
+script = ExtResource("22_fog")
 
 [node name="NavRegion" type="NavigationRegion3D" parent="." unique_id=272828603]
 navigation_mesh = SubResource("NavigationMesh_nav")
@@ -215,6 +224,9 @@ script = ExtResource("24_muster")
 
 [node name="MapWalls" type="Node3D" parent="." unique_id=52080125]
 script = ExtResource("12_walls")
+
+[node name="MapSites" type="Node3D" parent="." unique_id=1821561675]
+script = ExtResource("12_sites")
 
 [node name="MapForest" type="Node3D" parent="." unique_id=398854962]
 script = ExtResource("11_forest")

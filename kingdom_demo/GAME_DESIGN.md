@@ -644,6 +644,21 @@ Genuine forks. **Do not silently pick one** — raise it.
     redundancy answer: a camp that packs up and reappears on another open bearing makes
     already-built walls value-in-waiting, and early prowlers would make off-front walls
     petty-theft insurance rather than dead weight.
+24. **Where do wanderers actually come from?** Raised by Andrei playing the island
+    (2026-08-02) and **deliberately left open** — he chose to revisit it after F6/F7
+    rather than answer it now. On the land maps "they walk in from the wild" is
+    unexamined but not wrong; ring the map with water and the player *will* ask, because
+    a spawn lane on a beach has no visible cause. Three answers on the table, and they
+    are not exclusive:
+    * **By boat.** A rowboat lands, two or three get out, it leaves. Costs no new
+      mechanic — the walk-in lane already exists and only gains a cause — and F7 is
+      bringing a boat kit in anyway. Makes the sea a *source* as well as a wall.
+    * **Survivor camps on the island.** The Kingdom-canon answer: small vagrant camps
+      found by exploring, which makes scouting pay before §F6's chests exist. But the
+      population is finite unless something refills them, so it cannot be the only tap.
+    * **Shipwreck survivors**, tied to F7's two wrecks, which already imply people came
+      ashore and never left.
+    Whatever is chosen has to keep Pillar 2 intact: soup recruits, coin never does.
 
 ## §13. Build order
 

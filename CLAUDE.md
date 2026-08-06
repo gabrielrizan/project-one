@@ -56,14 +56,14 @@ camp lighting ·
 **sun shadows gated on the sun's elevation, and depth fog that thickens with the storm** ·
 **weather: rain, overcast skies, water pools, distant thunderstorms, on a season clock** ·
 navmesh pathfinding round everything solid, re-baked as the village changes ·
-title + pause menus, settings persist · **three selectable full-scale maps** picked from the
-title screen · **a dev overlay on F1** for reaching any of it instantly.
+title + pause menus, settings persist · **four selectable full-scale maps** picked from the
+title screen, including **a round island ringed by sea** · **a dev overlay on F1** for
+reaching any of it instantly.
 
 **Combat is now built — `COMBAT_PROMPTS.md` P1–P10, bar P8's audio pass.** Charcoal bandits
 (`bandit.gd`, archetypes Thug/Brute) march on the village from camps out on the map. A raid
-director (`night_raids.gd`) counts nights off `darkness()` and sends grace-then-growing waves
-— spawned from **`BanditCamp` objects in the `bandit_camp` group** (`bandit_camp.gd`), not a
-loose camp — blowing the dusk horn ×1 quiet / ×2 raid / ×3 blood moon. Archers mount wall perches and shoot; bandits rob
+director (`night_raids.gd`) counts nights off `darkness()` and sends growing waves, blowing
+the dusk horn ×1 quiet / ×2 raid / ×3 blood moon. Archers mount wall perches and shoot; bandits rob
 employed citizens (who flee and must be re-fed), smash walls/gates to breach (repair is
 construction), and vandalise buildings — **the hall at zero ends the run** (end screen in
 `game_manager.gd`). Every 15th night is a **blood moon**: red sky (`blood` factor in
@@ -112,8 +112,18 @@ servings, so refusing the sale at cap would strand the last arrivals hungry for 
   hall ladder, per-map unlocks, the camp-assault objective loop, playtime targets.
   Decided with Andrei; where it and `GAME_DESIGN.md` §9 disagree, the roadmap is newer
   and wins. `COMBAT_PROMPTS.md`'s tasks assume it.
+- **`kingdom_demo/ISLAND_PROMPTS.md`** — the eight tasks (F1–F8) building the island map:
+  shore and water, camera zoom, fog of war, forest density, raids from any bearing, reward
+  sites, the boat exit, polish. Decided with Andrei 2026-07-28. **F1–F7 have landed**;
+  F8 (integration and polish) is the last. It deliberately expands past the frozen
+  map-1 demo scope; that was his call, not drift.
 - **`kingdom_demo/ASSETS.md`** — asset inventory, provenance, model quirks. Read when
   working on art.
+- **`kingdom_demo/ART_PIPELINE.md`** — how polished art *gets made*: the Blender question,
+  the four-layer polish order, the two reskinning routes, and **the animation plan** (the
+  characters are unrigged — that is why the animation looks bad, and it is not tunable).
+  Read before art-pipeline or animation work; `ASSETS.md` is what we have, this is how it
+  gets built.
 
 Before changing behaviour that looks wrong, check **`GAME_DESIGN.md` §11 (Decisions &
 rationale)** — several things that read as bugs are deliberate. Before picking a direction
@@ -208,13 +218,13 @@ Facts that *don't* drift:
 ### Maps (`map_def.gd` · `map_catalog.gd` · `map_terrain.gd`)
 
 **A map is data, not code.** `MapDef` holds one map's shape — extent, the gate boxes that
-seal bearings, wall offers, camps, muster point, carve lanes, forest config, the wanderer
-walk-in lane, and `keep_clear` arteries. `MapCatalog` holds the built ones and which is
-selected; **`MapTerrain` is the static facade everything else still reads through**, so
-`mountains.gd`, `campfire.gd`, `wildlife.gd`, `night_raids.gd`, `muster_banner.gd` and
+seal bearings, the **shore**, wall offers, camps, muster point, carve lanes, forest config,
+the wanderer walk-in lane, and `keep_clear` arteries. `MapCatalog` holds the built ones and
+which is selected; **`MapTerrain` is the static facade everything else still reads through**,
+so `mountains.gd`, `campfire.gd`, `wildlife.gd`, `night_raids.gd`, `muster_banner.gd` and
 `bandit.gd` never learned that maps are swappable.
 
-**Three concepts for map 1, chosen from the title screen** (Play → Choose a Map; persisted in
+**Four maps, chosen from the title screen** (Play → Choose a Map; persisted in
 `Settings.selected_map`):
 
 | | Shape | Teaches |
@@ -222,6 +232,75 @@ selected; **`MapTerrain` is the static facade everything else still reads throug
 | **The Mountain U** | rock on three sides, one 16 m corridor north | the canon §9 shape: one door, one wall, one fight |
 | **The Deep Wood** | a clearing walled by forest, one trail out | the second camp is reachable **only by felling a lane** through the wood |
 | **The Twin Passes** | a rock spine splits the north into two passes | two gates, but only one is hot — read the dusk fires |
+| **Prototype 1 — Flat Terrain** | a round island in open water, no sealed bearing at all | every bearing is a bearing — the answer is a wall on all four sides |
+
+The island is **much bigger than the land maps**: its coast runs 76–94 m out (~180 m across
+against their 110–120), with camps 60 m from the fire — a **12 s ride** each way. That is
+what the ground slab was grown from 180 m to **240 m** for, and the slab is shared, so it
+now has ~25 m of headroom before the coast would run off it.
+
+⚠️ **The first three are temporary.** They are the 2026-07 land prototypes; Andrei deletes
+them once he is happy with the island, and **not on a task boundary** — don't remove them as
+part of the island work. The map picker stays either way, even while the island is the only
+entry. `ISLAND_PROMPTS.md` (F1–F8) is the island's build order; **F1 has landed.**
+
+### The island (`ISLAND_PROMPTS.md` F1)
+
+**The coastline is one predicate, not a pile of boxes.** `MapDef.shore` is `{base, wobble,
+beach}` and `shore_at(theta)` is a base radius plus three fixed sines — **no rng anywhere in
+it**, which is the only reason the collider ring, the water mesh, the beach and every
+plantability test can each compute it independently and still agree. `is_blocked()` answers
+true past it, and that single change made `is_open`, `gate_kind_at`, `_plantable`,
+`_scatter`, `belly_point`, `wildlife.gd` and `world_decor.gd` sea-aware with no edit between
+them. **Don't add a parallel "is this water" concept** — `beyond_shore()` exists only for
+*point generation*, which needs to tell sea from a rock gate (both are blocked; only one is
+where the backdrop belongs).
+
+**The seal is physical, and it has to be.** `monarch.gd` carries no bounds clamp anywhere,
+so on every other map the only thing containing him is a gate collider. `mountains.gd::
+_shore_ring()` stamps 48 invisible boxes tangent to the shore under `MapDef.WATER` — a kind
+that **dresses nothing at all**, unlike ROCK and WOOD. Measured overlap between neighbours
+is ~20 m, so there is no sliver to thread.
+
+**The sea wears a hand-painted coat.** `water.gdshader` samples a seamless watercolour tile
+(Voxel Core Lab, CC0 — see `ASSETS.md`) **twice, at different scales and drift bearings**,
+and **divides each sample by the tile's own mean** so what survives is the paper grain and
+tonal drift, not the tile's colour. The hue still comes from `sky_color`, which is what keeps
+the sea greying under cloud, reddening under a blood moon and going near-black at night. One
+layer reads as wallpaper the moment two tiles are in frame, and on a 640 m sheet they always
+are. The coat and the chop both fade with `length(VERTEX)` — past ~150 m a tile is sub-pixel
+and aliases into shimmer rather than vanishing.
+
+**`sea.gd` + `water.gdshader` draw everything and none of it is solid.** The water is a
+**ring lying above the ground, not a plane below it**: the slab is 240 m square and the
+island is ~180 m across, so green would show past the coast on every bearing — the ring
+starts at the shore, runs to a 320 m horizon, and covers the slab (and the slab's own edge,
+which is now under water level and can never come into shot). The beach is a sand annulus at
+the same width `MapDef` uses as its planting setback, so sand and treeline are one number.
+Both follow `weather.gd`'s `season_changed`, and so does the **ring of distant islands** —
+which is not decoration but the replacement for the backdrop `world_decor.gd` correctly
+loses, since on an island "past the map edge" is the entire ocean.
+
+Three things this cost, all of which will bite again:
+- **A ring mesh has to be wound counter-clockwise seen from above**, even with culling off.
+  A double-sided material flips `NORMAL` on a back face, so a ring wound the other way takes
+  no sun at all — the sand came out dark olive-brown at noon, which reads as a badly chosen
+  colour rather than as a lighting bug. Cost two passes to spot.
+- **Flat sheets need far more vertical clearance than they look like they do.** Beach 6 cm
+  over the slab, water 4 cm over that, distant islands 30 cm — anything tighter z-fought into
+  dashed stripes the moment the coast was seen from a distance.
+- **The puddles' crossed-axis-wave trick does not scale to an ocean.** A *product* of an x
+  wave and a z wave is zero along both axes of every cell, so from height it draws a visible
+  plaid grid across the whole sea. Summing directional waves on bearings that share no common
+  factor is the fix. Chop is also damped by `length(VERTEX)`, because past ~150 m the waves
+  are sub-pixel and alias into moiré bands rather than disappearing.
+
+**Walls carry a per-instance `half`** (`wall_side.gd`, default 8.0), written by
+`map_walls.gd` **before `add_child`** because `_ready` lays the run out. The island passes
+16.0: four 32 m walls at radius 16, one gate per side, enclosing a 32×32 village square
+instead of plugging a 16 m doorway. `GATE_HALF` and `PERCH_OFFSETS` deliberately do not
+scale — a gate stays a gate and archers still mass at it. `MapDef._plantable` measures
+distance to a wall's **run**, not its centre, which a 32 m wall makes necessary.
 
 **These are real scale, not prototype**: 110–120 m across (the old map was 52 m), camps
 45–58 m out, which is a 9–12 s ride at the monarch's 5 m/s. Riding to a camp is an
@@ -234,20 +313,72 @@ flares at dusk** — so the flare stops being decoration and becomes the answer 
 is tonight coming from". Burning the *raiding* camp ends the nights even while the other
 still stands.
 
-**A camp is a rumour until you ride out to it.** Its structures and its garrison stay
-hidden until the monarch has been within `BanditCamp.DISCOVER_R` (26 m); **the smoke column
-and the ember do not**. That split is the whole design — smoke says *something is out
-there, that way* and the dusk flare says *and tonight it is that one*, so a shroud that
-swallowed them would delete the game's only diegetic answer to "which way is the raid
-coming from" and replace it with a quest marker. What scouting buys is the detail (how many
-tents, how many bodies), not the bearing. Discovery is **permanent** — memory of a place,
-not line of sight, so nothing re-shrouds behind you.
+**A camp is composed from three owned kits** (`bandit_camp.gd::_build`), the way
+`HallBuilder` and `reward_site.gd` compose theirs: survival-kit tents, fire pit, bedrolls
+and loot crates; a fantasy-town cart tinted walnut; a castle-kit pennant tinted the
+bandits' own slate, standing 2.8 m so it reads from outside the clearing. **Nothing was
+downloaded** — there is no CC0 bandit-camp pack in any of the usual sources (Quaternius,
+Kenney and KayKit all have medieval kits; none has an encampment).
 
-26 m is sized against the camera, not the map: `battle 45` reaches ~15 m ahead of the
-monarch, so a camp is always already revealed before it could enter frame and the player
-never sees anything pop in. **Drop it below ~16 m and the reveal happens on screen, which
-reads as a bug.** Hiding is cosmetic only — garrison bandits keep their colliders and stay
-in the `bandit` group, which costs nothing because every engagement happens inside 10 m.
+⚠️ **`tent.glb` is a bare A-frame with no canvas** — four poles and a ridge beam. The
+camps were built from it for months, which is most of why they read as scaffolding rather
+than as a place. The kit's real tent is **`tent-canvas.glb`**; `tent-canvas-half.glb` is
+the lean-to. Their bounding boxes are identical to three decimals because the canvas hangs
+*inside* the frame, so **measuring cannot tell them apart — only rendering them can.**
+Every camp scale was also ~half what it should have been (a 0.98 m tent against a 1.2 m
+villager), the same class of error as the F5 lanterns: kit models are ~0.5 m pieces, so a
+plausible-looking multiplier lands nowhere near a plausible size.
+
+⚠️ **A ragged palisade was tried behind the camp and removed.** A broken fence is mostly
+gaps, so an arc of them reads as debris scattered behind the tents, not as a boundary —
+`reward_site.gd`'s hermit-hut lesson again: neither kit contains a palisade, and no
+arrangement of a garden fence becomes one.
+
+⚠️ **Two hiding mechanisms is the bug.** `_build` starts `_props` hidden because on the
+land maps `_check_discovery` un-hides it at `DISCOVER_R`. Handing that job to the fog
+mask stood the check down — and **the mask writes `visible` on the camp node, never on a
+child** — so `_props` stayed false forever and the island's camps were an ember, a smoke
+column and three bandits standing in an empty clearing, for as long as fog has existed.
+`_ready` now sets `_props.visible = true` whenever fog owns the hiding. Anything else that
+hides itself *and* joins `fog_hideable` has the same trap waiting.
+
+⚠️ **The camp's smoke was a 4–7 m slab.** `MarkFx.particle`'s `px` is `Sprite3D.pixel_size`
+— metres per texel — and `wood_chip.png` is 8×8, so a puff is **eight times** the number
+written; at 0.5–0.85 the tween grew it past 15 m, and the 8×8 texture was magnified enough
+to read as brown blocks. It is 0.11–0.17 now (0.9–1.4 m, about twice the hermit's one-man
+chimney). This is the third time this exact trap has been paid for — measure the texture,
+then divide.
+
+**A camp is a rumour until you ride out to it.** On the **land maps**, its structures and
+its garrison stay hidden until the monarch has been within `BanditCamp.DISCOVER_R` (26 m)
+while the smoke column and the ember stay visible from anywhere. 26 m is sized against the
+camera, not the map: `battle 45` reaches ~15 m ahead of the monarch, so a camp is always
+already revealed before it could enter frame. **Drop it below ~16 m and the reveal happens
+on screen, which reads as a bug.**
+
+⚠️ **On the island, fog of war owns this and the old rationale is reversed.** The whole
+camp — smoke and ember included — is hidden until the ground it stands on has been
+explored, and `_check_discovery` stands down. What used to be written here, in this file
+and in `bandit_camp.gd` and `world_decor.gd`, was that smoke saying *something is out
+there, that way* and the dusk flare saying *and tonight it is that one* were the game's
+only diegetic answer to "which way is the raid coming from", so a shroud that swallowed
+them would leave a quest marker in its place. **F5 moves that job to the walls.** Once the
+raid bearing is rolled fresh each night across the four walls regardless of where the camps
+are, a smoke column *cannot* forecast a raid — it is no longer connected to one. The lit
+torches say it instead, from inside the village, more precisely, and without the player
+having explored at all. So smoke reverts to its literal meaning: *someone lives out there,
+that way* — a scouting lead and a standing objective. `flare()` still means something, but
+it now means *this camp is active*, not *tonight comes from here*.
+
+Discovery is **permanent** either way — memory of a place, not line of sight, so nothing
+re-shrouds behind you. Hiding is cosmetic only: garrison bandits keep their colliders and
+stay in the `bandit` group, which costs nothing because every engagement happens inside
+10 m.
+
+⚠️ **Smoke puffs are parented to the scene, not to the camp** (they must not inherit its
+transform), so `visible = false` on a camp cannot reach them — `_smoke()` carries its own
+`if not visible: return`. Without it the tents vanish under fog and the column goes on
+rising out of black ground, which is exactly the tell the fog exists to remove.
 
 **Hiding a camp is distance and route, not wall height.** Mountain peaks were pushed to
 16–34 m to force occlusion; it worked and cost far more than it bought — a 16 m corridor
@@ -271,13 +402,21 @@ Two tree populations share the playfield, and the split is what lets a wood be *
 look at and safe to walk through at the same time** — Andrei's two requirements, which are
 only compatible because of it.
 
+**All three tree populations come from `NaturePack` and all three turn with the season**
+(2026-08-02). The understory was the last holdout — it loaded Kenney GLBs through a colour
+tint, two of which the survival kit's colormap paints *orange* whatever tint you give them,
+so a third of every wood stood summer-green-and-ember year-round among trees that had all
+turned. `map_forest.gd::_grow_filler` draws its **positions once at `_ready` and only remakes
+the models** on a season change, so the wood keeps its exact shape all year. Filler carries
+no script and no collider, so a re-skin can never reach the navmesh.
+
 | | Solid (`map_forest.gd` → `tree.tscn`) | Filler (`map_forest.gd::_filler`) |
 |---|---|---|
 | Script + collider | yes | **neither** |
 | Markable | yes | no |
 | Blocks / bakes into the navmesh | yes | no — walked through |
 | Sets | how much the wood **blocks** | how dense the canopy **looks** |
-| Count | ~100 (`forest.cap`) | ~320 (`understory.cap`) |
+| Count | 21–110 (`forest.cap`) | 76–1100 (`understory.cap`) |
 
 So filler can be packed arbitrarily tight — nothing collider-free can wedge anybody — while
 the solid trees are held apart by **`forest.spacing` (3.4–3.7 m), which is a walkability
@@ -294,8 +433,61 @@ how the map plays** — that is the whole point of the split.
 drawn `sqrt(u)` so it is uniform *by area*. Stands (clumps with travel between) were tried
 first and read as blobs of trees separated by suspiciously empty lawn.
 
-**Nothing is planted within `camp_clear` (12 m) of a camp** — the assault is archers shooting
-a garrison, and trunks among the tents mean blocked shots and a payoff you can't see.
+### Three populations, one grid, and the order is the design (F4)
+
+`MapDef.forest_plan()` places **bushes, then solid trees, then filler**, all against one
+shared exclusion grid. Bushes go first and register demanding a **glade** of clearance, so
+every other tree keeps back and each bush ends up in an opening. That is not a nicety:
+"you can spot a bush without hunting for it" is one of the two things this wood is for, and
+no amount of density tuning delivers it — a bush under a closed canopy is a bush you find
+by walking into it, at any density.
+
+Each point carries **two** clearances: `gap`, what it wants from its own kind, and `demand`,
+what it asks of everyone placed later. That is why `forest.spacing` can stay a wide
+walkability guarantee (3.7 m trunk to trunk) while `solid_demand` only asks filler for 2.4 —
+holding filler a full trunk-spacing away bored a bald ring round every sellable tree.
+
+⚠️ **Anything that reserves ground must be a fraction of the ground available.** A flat 6 m
+glade is fine on the island and catastrophic on `deep_wood`: eight of them come to 680 m² and
+that map's whole forest ring is 540, so the bushes ate the wood and it fell from 30 trees to
+9. `_bush_rules()` scales the glade, the spread and the band off the band's own area, capped
+at `GLADE_SHARE` (25%) of it.
+
+⚠️ **A spatial hash only works if everyone agrees on the bucket size.** `_scatter` used to
+derive its cell from its own gap, so the solid pass keyed the grid at 3.7 m and the filler
+pass read the same dictionary at 2.1 — different keys for the same ground. The filler
+therefore **never saw a single solid tree**, and the "no sprite growing out of a markable
+trunk" guarantee documented here had never once held. One cell for the whole plan now,
+sized to the largest clearance in play.
+
+**Measured on the island** (F4, 2026-08-03; bushes re-measured 2026-08-04): 80 solid at a
+tightest *actual* trunk gap of 4.06 m, 1100 filler, 14 bushes standing in **3.1–5.2 m**
+pockets, 5.0 ms/frame and 455 draw calls with the whole wood in shot. Measure the tightest
+gap; never trust `spacing` to have been honoured.
+
+⚠️ **A bush wants a pocket, not a paddock.** `bush_glade` was 6 m — a 12 m opening round a
+0.7 m bush, which reads as a clearing somebody made and put berries in rather than as
+berries growing in a wood. The island sets **3.0**, which still holds every trunk far
+enough off to spot one without walking into it. `_bush_rules`' `sep` ceiling came down
+12 → 8 in the same pass: it only ever bound here, and a minimum separation that large
+against 14 bushes stops being a minimum and becomes a lattice — the one arrangement
+random placement never produces.
+
+**A camp stands in the wood, and its clearing faces home.** `camp_clear` is the radius and
+**`camp_clear_bias` shifts that same disc toward the village** (island: 10 and 3.5, so 6.5 m
+behind the tents and 13.5 m in front — *less* bald ground than the old concentric 12, all of
+it on the side the monarch arrives from). The assault is archers shooting a garrison, so the
+fighting ground has to be where the fight is; trunks among the tents mean blocked shots and a
+payoff you can't see. `night_raids.gd` **turns the camp to match** — the tent's mouth is at
+local +Z, so an unturned camp has its back to its own clearing. That read correctly by luck
+on the one camp due north of the village and had the southern one facing out to sea.
+
+⚠️ **The island reserves no roads, and that is deliberate** (`keep_clear = []`). It used to
+lane 12 m out to each camp, which drew two strips of lawn through the wood pointing at the
+thing you were meant to discover. Nothing here needs one: raids land at the coast on a rolled
+bearing, wanderers come up the east beach, and `forest.spacing` guarantees the wood is
+walkable. **This is particular to the island** — on a map with corridors, `keep_clear` is
+what stops a stand of trees sealing one and stranding the map silently.
 
 ⚠️ **Scenery trees never stand on open ground, and never on a rock gate.** `world_decor.gd`
 fills only past the map edge and on **wood** gates; `mountains.gd` dresses wood gates. Two
@@ -307,11 +499,119 @@ models, so there is no visual tell left at all. **Scenery bushes obey the same g
 `berry_bush.gd`. Rocks, ground patches and small detail (grass, stumps, logs) are exempt and
 belong on open ground — none of them is markable, so none can be mistaken for a purchase.
 
-⚠️ **The navmesh bake now costs 67–91 ms**, up from ~15 ms, because the maps are ~5× the
-area at the same 0.15 m cell. It is synchronous and every felled tree pays it. The bake
-volume is already trimmed to reachable ground (`MapDef.play_min/play_max`). If the hitch
-becomes visible in play, **threaded baking is the lever, not a coarser cell** — `CELL_SIZE`
-is 0.15 to fix a documented bush-oscillation bug and must not be raised casually.
+⚠️ **The navmesh bake runs on a background thread** (`nav_world.gd`), and has since the
+island landed. Measured across all four maps the cost is a flat **~11 ms per 1000 m² of
+bake volume** — 86–94 ms on the land maps, **~520 ms on the island** — so it is the map's
+*area* that is expensive and **nothing about what seals the edge**: rock, wood and sea all
+voxelise the same. Synchronous, that was half a second of dead screen every time a tree fell.
+`bake_navigation_mesh(true)` leaves the frame paying **only 0–6 ms** (Godot parses the
+scene's colliders on the main thread inside that window, which is also why there is no
+scene-tree race) and Recast finishes on its own thread. The mesh is therefore ~0.5 s stale
+after a change, which is fine — nothing needs it instantly. Two things follow and both are easy to break: **the gates stay lifted
+until `bake_finished`** (re-enabling them on the next line now runs *before* Recast reads
+anything, and the village bakes sealed), and `surface_offset` is measured in the callback.
+A rebake requested mid-bake is re-armed, not run concurrently.
+
+The bake volume is trimmed to reachable ground (`MapDef.play_min/play_max`), and a **round
+map is the worst case for a box filter** — the island's box corners are 22% open sea that
+cannot be trimmed. Don't set `play_*` from `extent`: extent has to clear the coast with room
+to spare, and every spare metre there is ~11 ms. **A coarser cell is still not the lever** —
+`CELL_SIZE` is 0.15 to fix a documented bush-oscillation bug.
+
+### Fog of war (`fog_of_war.gd` · `ISLAND_PROMPTS.md` F3)
+
+**Per map** (`MapDef.fog`), on for the island and off for the three land prototypes —
+those are laid out to be *read*, and shrouding them argues with what each was built to
+demonstrate. **Explored ground stays explored forever**: memory of a place, not line of
+sight, no re-shrouding, no "visible but remembered" middle state.
+
+**Two halves, because one plane cannot do it at a 45° pitch.** A single plane above the
+world occludes the ground *in front of* it, never the ground under it, so a tree at the
+frame's far edge would stand clear of its own fog — there is no shader answer to that.
+1. **The ground** is darkened by a flat shroud reading a CPU-painted mask.
+2. **Anything that stands up** is hidden by its own `visible`, through the `fog_hideable`
+   group. Spawners call `FogOfWar.hide_until_found(node)` — one unconditional line, a
+   no-op off-map. When the mask catches up the node is shown and **leaves the group**, so
+   the sweep gets cheaper as the map opens and costs nothing once it's fully explored.
+   ~730 nodes join at start on the island.
+
+**The mask** is one 256² R8 image over the map's extent (~0.84 m/px), held as a raw
+`PackedByteArray` and written **by index** — `Image.set_pixel` is a method call per pixel
+and a monarch's brush is ~6 400 of them. Brushes are precomputed per radius and
+**max-blended**, which makes "explored stays explored" a property of the data rather than
+a rule to remember. Repainted and uploaded at 4 Hz, and only for revealers that have moved
+`REPAINT_AFTER` since last time — a villager at a workbench costs nothing.
+
+**Villagers reveal too, and that's the important part** (monarch **25 m**, villagers
+**15 m**, tightened from 34/14 after play-testing): archers hunt and forage across the map
+by daylight, so the island opens up as the economy grows rather than only when the player
+goes sightseeing. At 34 the monarch unrolled the map faster than he could look at it and
+the frontier was always off-screen; at 25 it sits near the edge of frame, so riding
+somewhere and the map opening are the same motion.
+
+⚠️ **The shroud is island-shaped, not a square.** A plane over the extent hangs a hard
+black rectangle out over open water — it's cut to `shore_at()`, the same curve the collider
+ring, the beach and the water mesh use. **The sea is deliberately not fogged**: it isn't
+explorable, so shrouding it would only delete the horizon and the distant islands in
+exchange for no information the player could act on. What you get is better — a dark island
+in a bright sea, whose outline you can see and whose contents you cannot.
+
+⚠️ The initial paint is **deferred**, and seeds the *village* as well as the monarch. This
+node readies before the Monarch does, so an immediate paint finds nobody in the `monarch`
+group and the run opens on a black village.
+
+**One dev tool: `G` toggles the fog off and on.** A *view override* — it does not touch the
+mask, so switching it back puts the frontier exactly where it was rather than wherever the
+camera has been; hidden nodes are shown but kept in the group so they can be re-hidden. The
+overlay prints `FOG OFF` while it is active, for the same reason it only shows the speed
+multiplier when it isn't ×1: a bypass you forgot about must not be mistakable for a map you
+explored.
+
+A second "explore everything permanently" tool briefly existed on P and was **removed**
+(Andrei, 2026-08-03). `FogOfWar.reveal_all()` survives, unwired, because nothing else can
+produce a genuinely-explored mask — but it was never worth a key: nothing in the game reads
+the mask except visibility, so a filled mask and a hidden shroud look and play identically,
+and only one of them is undoable. Two tools you cannot tell apart by their effects are one
+tool and a way to get confused.
+
+### The camera, and the zoom (`camera_rig.gd` · `ISLAND_PROMPTS.md` F2)
+
+The rig follows the monarch, spins on Z / X, and **zooms on the mouse wheel**
+(`cam_zoom_in` / `cam_zoom_out`). The wheel slides the camera along **its own
+back-vector**, which is the one motion that changes how much ground is in frame while
+leaving the pitch, the aim point and the framing of the monarch alone — verified, the
+pitch holds at exactly 45° at both stops. Steps are multiplicative (a fixed metre step
+is coarse zoomed in and useless zoomed out) and the level eases toward its target.
+
+**`CameraRig.zoom` is a static**, 1.0 being exactly what `kingdom_demo.tscn` ships —
+that identity is what keeps `CAM_PRESETS[0]` honest. Stops are 0.55×–3.0×, which is
+~15 m of ground to ~84 m. Deliberately **not** enough to hold the whole island; reading
+the map from above is the `map 45` preset's job, not something the player does mid-run.
+
+⚠️ **Three systems must read the zoom in the same frame, and all three fail silently
+if they don't:**
+- **`gold_fx.gd`** re-lays the tally out live, because pips are sized in *metres* — at
+  0.63× apparent size a pip once fell to ~14px and you could no longer tell paid from
+  unpaid, which is the entire readout. Re-applied every frame while a tally is up, not
+  just at spawn: a 30-gold hold is 14 seconds and the player can scroll at any point.
+- **`camera_rig.gd::_scale_prompts`** counter-scales `Label3D` prompts. They're authored
+  in metres across half a dozen scenes, so each label's own `pixel_size` is remembered
+  the first time it's seen and scaled from there — walking the `interactable` group, so
+  no scene had to join a new one.
+- **`day_night_cycle.gd`** scales `FOG_NEAR`/`FOG_FAR` and `directional_shadow_max_distance`.
+  Fixed, the fog band lands on the grass under the monarch's feet when zoomed out. The
+  shadow distance is **capped at 110** where the fog isn't: the shadow map is a fixed
+  resolution, so stretching it 3× trades every contact shadow in the village for shadows
+  at the frame edge nobody is looking at.
+
+⚠️ **Zoom must never move the `AudioListener3D`.** It's pinned to the rig at a fixed
+offset so camera distance and audio distance are separate things — that's the whole
+reason it exists. Everything in the zoom path writes `_camera.position` and nothing else.
+
+`_shake_camera` no longer *adopts* `_camera.position` as its rest pose. It used to, so
+that "any future dynamic zoom" wouldn't be stomped; the future arrived, zoom owns
+`_cam_base` directly, and adopting mid-shake would bake the shake offset in as the new
+rest.
 
 ### The main-building ladder (`hall_builder.gd`)
 
@@ -350,6 +650,166 @@ hundred draw calls — fine at this map size, worth remembering if it ever isn't
 ⚠️ **These are placeholders sized for depth, not final art.** They are capped at 4×4 so the
 current spawn positions still clear each other; growing them further needs the village laid
 out again (D2 in `DEPTH_PROMPTS.md`).
+
+### The way off the island (`wreck_site.gd` · `ISLAND_PROMPTS.md` F7 · §10 exit)
+
+**Two wrecks on opposite beaches**, from `MapDef.sites` with `kind = WRECK`. The map
+entry gives a *bearing*; `map_sites.gd` resolves the actual spot against
+`MapTerrain.beach_point()` and lays the hull tangent to the coast — "a wreck lies on
+the sand" is a rule, so retuning the shore can never strand one inland.
+
+**One model, two states.** The wreck *is* the ship: `SailShip` careened over 28°, sunk
+into the sand, sails struck and timber repainted weathered grey. Repairing rights her
+progressively as the crew works, so progress reads from across the beach with no bar.
+
+**She is a `build_site`, which is the whole integration.** Joining that group and
+answering the same seven duck-typed calls `wall_side.gd` answers is all it took —
+idle workers already walk to anything in the group and swing at it, and `villager.gd`
+never learns what a wreck is. It also keeps Pillar 1: the monarch commissions, his
+people build.
+
+**The bell is dead until every camp has burned** (`ROADMAP.md` R1). She can be rebuilt
+from night one, and a finished ship with a silent bell states the map's objective in
+one object. Ringing walks everyone aboard and banks `GameManager.carry_over`.
+
+⚠️ **This is where the island ends.** Map 2 does not exist; the carry-over is *stored*,
+not spent, and inventing a destination is explicitly not this task's job.
+
+### Reward sites (`reward_site.gd` · `map_sites.gd` · `ISLAND_PROMPTS.md` F6)
+
+**`MapDef.sites`** is `{pos, kind, clear}`, stamped by `map_sites.gd` the way
+`map_walls.gd` stamps walls — a map with no sites builds nothing, so the land
+prototypes are untouched. `clear` keeps trees off, exactly as `camp_clear` does: a
+reward you can't see from two paces isn't a reward, it's a scavenger hunt.
+
+**Ungated, and that is the design.** No portals, no risk tiers, no keys. On a map you
+can leave in every direction, the cost of a reward is the daylight spent riding to it
+instead of building — a real price, paid in the one currency the monarch can't make
+more of, needing no mechanism to enforce it.
+
+**Five finds on five bearings, none near another** (altar due west, hermit ESE, three
+chests on the remaining quarters; radii 58–63 m so the set isn't a ring). The altar and
+the hermit **used to share one clearing** 13 m apart, on the theory that two
+stone-and-hearth things read as a shrine precinct — what it did was make the whole west
+one destination and the other three quarters chests-only. Riding out and finding a second
+reward in the same glade is one trip paying twice, which is the opposite of what an
+ungated reward is for: the price is supposed to be the daylight.
+
+⚠️ **Measure new sites against the wrecks too.** They're placed by *bearing* against the
+live coastline, not by the coordinate written in `sites`, so they're easy to forget — the
+first spread put a chest 18 m off a hull. Nothing non-wreck is now within 25 m of anything.
+
+⚠️ **The chest is the first interactable in the game that gives rather than costs.**
+Two calls follow: **no tally** — `GoldFx.pay` is the grammar of *spending* and running
+it backwards would say the wrong thing, so the chest spills real `coin.tscn` coins to
+ride over and collect; and **the same prompt grammar anyway**, because "walk up and
+press E" is *the* verb and nobody should have to learn a second one to discover this
+one is free.
+
+**A chest sparkles until it's opened, and motion is what makes it findable — not bald
+ground.** It's the smallest thing on the map (a 1 m box) and the one you ride furthest
+for; `clear` was 7 m, which put it at the centre of a 14 m lawn and made it read as a
+monument rather than as treasure. `clear` is now **4** and `GLINT_EVERY` does the work.
+Glints are small and fast (a catch of light, not smoke — slow gold billboards read as the
+chest being on fire) and stop dead on `_taken`, because a spent chest that still twinkles
+is a reward the player rides back across the map to collect twice. **No `OmniLight3D` on
+it**, however tempting at night: `gl_compatibility` caps omni lights per object, the ground
+is one object, and that's the documented bug that silently killed the F5 wall lanterns.
+
+**Currency X is `relic`** — internal id neutral, and every word the player reads comes
+from `GameManager.RELIC_NAME`, so settling the name is one line. It is **not a third
+economy**: it buys exactly one thing, the altar's blessing. The HUD counter stays
+hidden until the first one is found, because a zero beside an unexplained icon on
+night one is a question the game can't yet answer.
+
+**All three sites are composed from owned kit modules**, the way `HallBuilder` composes
+the halls — no kit has a shrine, a cottage or an open chest. The altar is a
+`fountain-round-detail` plinth ringed by `pillar-stone` uprights; the hut is
+`HallBuilder.build(3, 3, 1, false)`; the chest is `chest.glb` on a pivot node that
+serves as its hinge. **Every model was measured first** — they run from a 26 cm chest
+to a 2 m fountain ring, so one shared "looks right" multiplier gives doll's-house
+furniture. Kit attributions in the briefs are unreliable: `pillar-stone.glb` is in the
+fantasy-town kit, not the castle kit, and `crate.glb` doesn't exist anywhere.
+
+⚠️ **The hermit's hut is the honest ceiling of these kits.** Hand-building it without
+`HallBuilder`'s parapet was tried on the theory that a battlement round a one-room
+cabin is what makes it read as a crate — it came out **worse**, because from a 45°
+camera a 1 m tall, 3 m wide box is almost entirely roof and the parapet is the only
+thing giving that slab an edge. A hut that reads as a *home* is an asset problem, not a
+composition one: the fantasy-town kit's only assembled buildings are a windmill and two
+watermills.
+
+**FX are ambient, not decoration.** The hermit's chimney smokes — the same job the
+bandit camps' column does, saying *somebody lives here* from further off than the
+building itself reads. The altar drifts slow motes, because a shrine with no motion
+reads as inert stone, and carries a low warm light so it can be found at night. Both
+puffs are parented to the **scene**, not the site, so they need the same
+`if not visible: return` guard `bandit_camp.gd` carries or they smoke out of unexplored
+black ground.
+
+⚠️ **`Sprite3D.pixel_size` is metres per texel, and `wood_chip.png` is 8×8** — so a
+sprite is *eight times* whatever you write. 0.20 is a 1.6 m sheet, which is what the
+first two passes drew: a translucent grey tarpaulin lying on the grass. Measure the
+texture, then divide.
+
+**Two blessings, and it must stay two** (`blessings.gd`, static like `CameraRig.zoom`).
+The altar gives **+2 population cap** — the one permanent kingdom-wide effect that
+can't violate Pillar 2, since it buys *room* for citizens rather than recruiting them.
+The hermit is §9's cook, and the one rule he bends is **+1 cauldron serving**. Both are
+deliberately small: a blessing that doubled income would make finding it the difference
+between winning and losing, which turns an optional ride into a mandatory one. **This
+is not a tech tree** (Pillar 4) — if a third reward looks tempting, first answer what
+it takes away from the two that exist.
+
+### Raids come from any bearing (`night_raids.gd` · `ISLAND_PROMPTS.md` F5)
+
+**The raid bearing is rolled fresh each night across the map's wall offers, with no
+regard for where the camps are.** While waves marched out of the raiding camp the
+bearing was fixed by layout — fine with one opening, and badly wrong on a map walled
+all the way round, where it would make three of the four walls decoration.
+
+Per-map **`MapDef.max_fronts`**: 1 on the land prototypes (which leaves them exactly as
+they were), 2 on the island. Schedule: **night 0 quiet · night 1 one front · night 2 two
+fronts**, then the existing growth curve clamped to `max_fronts`. Waves are counted in
+`CAMP_WAVE` units — "one camp's worth" per front — so two fronts is literally twice one
+front, and the queue is dealt round-robin so both walls are hit together.
+
+**Where a front lands is the map's business.** `MapDef.front_landing()` puts raiders
+ashore at the coast on that wall's bearing, which needs no camp on that side to justify
+it — that is what makes a random bearing honest. A landlocked map answers the village
+instead, and the director takes the hint and marches them out of a camp as before.
+Fronts are drawn from **wall offers, not walls built**: a front on a bearing you haven't
+walled walks straight in, and that is the lesson, not an edge case.
+
+**Lit lanterns are the cue**, and they are what pay for the fog swallowing the camp
+smoke. `wall_side.gd` stands `lantern.glb` posts along each run — from the **fantasy
+town kit**, the same kit the wall panels come from, so a lit wall is one piece of art.
+The director lights only tonight's fronts at dusk and douses everything at dawn.
+
+⚠️ **Nothing in the survival kit is the right model here.** F5's brief said to use
+`lantern.glb` "already in the survival kit"; it isn't there, and the fallback it named,
+`campfire-stand.glb`, measures **0.41 × 0.28 m** — a cooking tripod, invisible from the
+play camera, so for two passes only its glow ever read. The fantasy-town lantern is a
+**1.56 m standing post**, taller than a villager. That matters beyond looks: an *unlit*
+wall's posts are still visible, so "those two are burning and those two aren't" is a
+contrast rather than an absence. Measure a kit model before building around it. It is
+tinted walnut, because the kit paints it blue and blue is nowhere in the palette.
+
+⚠️ **The light is geometry, not lights.** `gl_compatibility` caps omni lights per object
+and the ground is one object, so six lit lanterns across two fronts silently dropped all
+but the nearest two and the outer half of every wall stayed dark. Each lantern now lays a
+**flat firelight pool** on the ground — an additive quad with a runtime `GradientTexture2D`
+radial falloff, the same trick the mist layer uses — plus an unshaded flame at the lamp
+head. Only the two lanterns flanking the gate carry an actual `OmniLight3D`. A glowing
+*sphere* in the air was tried first and was worse than nothing: low-poly reads as a hard
+octagon up close, and additive on a night sky reads as an opaque disc.
+
+**Archers man lit walls only, emptiest first.** `villager.gd::_claim_defense_post` used to
+take the *nearest* wall with a free perch, which was the same thing as "the only wall"
+until there were four. Now an unlit wall is never manned however close it is, and archers
+go to whichever lit wall has the fewest defenders — so they split across two fronts with
+nobody issuing an order, distance only breaking ties. The odd archer lands wherever is
+behind when they ask, so no one is left unassigned.
 
 ### The wall ladder (`wall_side.gd`)
 
@@ -504,7 +964,8 @@ Every key reaches into a system directly:
 |---|---|
 | **F1** | show/hide the overlay (live time, season, weather readout) |
 | **F2** | skip to night / day — lands *after* dusk and *at* sunrise, not on the phase boundary, which is still fully lit |
-| **C** | camera preset — **two now**: the shipped `battle 45°` (perspective, fov 40 at 16.5m, ~28m of ground) and `iso 30°` (**orthographic**, size 16, ~32m). The five D5 framing lenses are gone; that question is settled. The live A/B is projection: ortho gives the pixel-art isometric read — parallel edges stay parallel, no size falloff across the frame, and the horizon can never enter shot (every ortho ray sits at exactly the pitch), which is why 30° is safe here where a 30° *perspective* pitch would break the `FOG_PALE` seam rule. **Fog (22–55m slant) and `directional_shadow_max_distance` (48) are still tuned for the perspective frustum** — they hold under ortho but aren't tuned for it. A preset with `size` is ortho, one with `fov` is perspective; index 0 must stay in sync with the scene's camera or the readout lies |
+| **C** | camera preset — **three now**: the shipped `battle 45°` (perspective, fov 34, ~28m of ground), `iso 30°` (**orthographic**, size 16, ~32m), and `map 45°` (ortho 150, ~212m). The five D5 framing lenses are gone; that question is settled. The live A/B is projection: ortho gives the pixel-art isometric read — parallel edges stay parallel, no size falloff across the frame, and the horizon can never enter shot (every ortho ray sits at exactly the pitch), which is why 30° is safe here where a 30° *perspective* pitch would break the `FOG_PALE` seam rule. **`map 45` is a tool, not a lens** — it holds the whole island in one frame so the shape of the land can be read without a throwaway screenshot script, and fog and shadows are simply wrong in it by construction. A preset with `size` is ortho, one with `fov` is perspective; index 0 must stay in sync with the scene's camera or the readout lies. Presets go through **`CameraRig.set_rest_pose`**, never straight onto `Camera3D.position` — the wheel rewrites that every frame, so a direct write survives one frame |
+| **wheel** | zoom (not a dev tool — shipped, see below) |
 | **T** | speed ×1 → ×2 → ×4 → ×8 → ×16. `Engine.time_scale`, so the whole game moves, not just the clock. Audio keeps its own clock and stacks up badly past ×4; `max_physics_steps_per_frame` is raised alongside it or anything past ×8 silently runs slower than the label claims |
 | **F4** | step rain: off → light → steady → downpour |
 | **F5** | lightning now |
@@ -512,13 +973,37 @@ Every key reaches into a system directly:
 | **F7** | dry the ground (F4-off leaves pools to dry on their own) |
 | **J / H / K** | horn — 1 blast (nightfall) / 2 (attack) / 3 (blood moon). Needs the fire lit |
 | **L** | rooster — daybreak. Needs the fire lit |
+| **G** | fog on ↔ off — a view toggle that leaves the mask alone, so the frontier is where you left it |
 | **N / M** | spawn one bandit at the mouth / clear all bandits |
 | **R / Y / U** | raid now / advance the night counter / blood moon now |
+| **V** | walk tonight's fronts round the walls — the roll is random, so this is how you check the braziers read from every bearing |
 | **O / I** | dismiss the war party (P9) / burn the nearest camp (P10, skips the assault) |
+| **P** | copy the monarch's spot to the clipboard as `Vector3(x, 0, z)` — see below |
 | F3 | navmesh debug — **already taken** by `nav_world.gd` |
+
+**The `place` line is the map-authoring loop.** A map is data — camps, walls, sites, the
+muster point and the spawn lane are all literal `Vector3`s in one function in
+`map_catalog.gd` — and choosing a coordinate used to mean guessing a number, relaunching,
+and going to look at where the thing landed. The overlay's first line reads
+`place  Vector3(-54, 0, -7)   W 54m  ·  open`: ride to the spot, read it off, **P** to
+paste it. `y` is forced to 0 because the world is one flat slab and every coordinate in
+that file sits at zero. The ground word comes from `MapTerrain`, so `open` / `WATER` /
+`ROCK` / `WOOD` / `off-map` is the *same* answer the spawners will give — which is what
+stops a camp that looks fine in the file turning out to be three metres out to sea. It is
+deliberately **first** in the readout: the lines under it rewrap as the weather and the
+fronts change, so anything below them moves under the cursor while you're reading it.
 
 **Every tool is a clickable button too**, built from the same `ACTIONS` list that binds
 the keys, so the two can't drift. Add a tool by adding one entry and one method.
+
+**The tool list scrolls**, because at 19 actions it outgrew the window and the last few
+were simply unreachable. Only the list scrolls — the header and the readout stay pinned.
+⚠️ Its height is set by **measuring the panel's actual overflow**, not by adding up the
+chrome around it: an autowrapping label's height isn't known until it has been laid out at
+its final width, and the readout rewraps with the map, the weather and the zoom, so the
+arithmetic came out 130 px short. And it re-fits **on `visibility_changed`**, not just at
+`_ready` — Godot doesn't lay out a hidden Control, and the overlay starts hidden, so the
+startup fit measures a panel of size zero every time.
 
 ⚠️ It is a **dev tool with no release gate**. Wrap it in `OS.is_debug_build()` before
 shipping.
@@ -659,7 +1144,11 @@ for the duration, so the king stays **locked on target** and a second tally can 
   keeps an editor session open; when it saves, it writes the scene from *its* in-memory
   copy and everything you edited by hand is gone. This ate the `Weather` and `DevMenu`
   nodes once — scripts all present on disk, feature simply not in the scene and therefore
-  dead. After editing a `.tscn` by hand, **grep it back** to confirm the change survived.
+  dead. It later moved the shipped camera from 18.38 m to 60.58 m, which silently made
+  `CAM_PRESETS[0]` a lie about what the game ships with. After editing a `.tscn` by hand,
+  **grep it back** — and check the lines you *didn't* touch too, since a save rewrites the
+  whole file. The tell is float precision: `0.7071068` coming back as `0.70710677` is the
+  editor re-serialising, not a hand edit.
 - **A second writer can disable your feature outright, and the symptom is that *no*
   value you set changes anything.** `weather.gd` already owned `fog_enabled` and tied it
   to `_intensity > 0.02`, so fog was switched off whenever it wasn't raining. The new

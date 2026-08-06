@@ -38,6 +38,86 @@ palette colour, no textures or rigs.
 > it from scratch, so treat the GLBs as the source of truth — edit or replace them
 > directly rather than trying to re-run generation.
 
+**Medieval Village Pack** (`3d/quaternius_medieval-village/`, added 2026-08-03) — 44 FBX:
+ten **assembled buildings** (House_1–4, Inn, Blacksmith, Mill, Sawmill, Stable, Bell Tower)
+and 34 props (Well, Bonfire / Bonfire_Lit, Cauldron, Cart, Crate, Barrel, benches, market
+stands, hay, fences, paths, rocks). Quaternius, **CC0**, 2.6 MB, licence in
+`assets/licenses/quaternius-medieval-village-License.txt`. Approved by Andrei 2026-08-03.
+
+**Why this pack and not a newer one.** Quaternius ships in two eras and only one of them
+matches this game: the older **"Ultimate ___ Pack"** line (2020–21) is flat-shaded with
+simple named materials and *no texture files at all* — that is the nature pack and the
+animals pack you already have. The newer **"MegaKit"** line (2023–25) is PBR with 4K
+BaseColor/Normal/ORM trim sheets; its `Chest_Wood.fbx` alone is 10.9 MB. Dropping a MegaKit
+model next to these trees makes it the most detailed object in the game by an order of
+magnitude, and `gl_compatibility` will not show most of that detail anyway. **Match the era,
+not just the creator.**
+
+⚠️ `House_3` and `House_4` are **roofless base pieces**, not small houses, despite living in
+the Buildings folder. Measuring gave their heights (2.09 m / 1.07 m) but not what they
+*were*; only rendering one did.
+
+### Reskinning: `MarkFx.repaint`, not an image editor
+
+These models **name their materials** (`RoofTiles`, `Plaster`, `Wood`, `Stone_Dark`…), so
+bringing an off-palette asset into the palette is a dictionary, not a texture edit:
+`MarkFx.repaint(node, {"RoofTiles": ROOF_SLATE})`. It duplicates the material first — FBX
+materials are shared resources, so editing one in place repaints every other instance in
+the map.
+
+Use it instead of `MarkFx.tint` for anything whose own material set matters; `tint`
+flattens a whole model to one colour, which is right for a coin pip and destructive for a
+house. **No external program is needed for colour work** — Blender would only be required
+for geometry or UV changes, and is not installed.
+
+Quaternius roofs everything in teal, which from this camera is the swimming-pool read
+already recorded against the Kenney fantasy-town kit. Repaint to `HallBuilder`'s slate so
+every roof in the game agrees.
+
+**Ultimate Modular Ruins Pack** (`3d/quaternius_modular-ruins/`, added 2026-08-03) — 15 of
+the pack's 90 FBX, the ones actually used: `Statue_Stag` / `Statue_Fox`, `Column_Round` /
+`Column_Square`, `Arch_Round` / `Arch_Gothic`, **`Chest_Gold` / `Chest`**, `Floor_Squares` /
+`Floor_Standard`, `Torch`, pots and a bush, plus the pack's two shared textures. Quaternius,
+**CC0**, 1.5 MB, licence in `assets/licenses/quaternius-modular-ruins-License.txt`. Downloaded
+by Andrei 2026-08-03 (Quaternius routes this one through Google Drive, which needs a browser).
+
+Only the used models were extracted — the full pack is 105 MB across FBX/OBJ/Blends and most
+of it is dungeon walls and floors this game has no use for.
+
+**The altar is `Statue_Stag`, not `Statue_Fox`** — the island already has stags in its wood
+(`wildlife.gd`), so the shrine is a monument to an animal the player has actually seen.
+
+**Ship Pack** (`3d/quaternius_ships/`, added 2026-08-03) — 3 of the pack's 6 FBX:
+`SailShip` (the galleon, Andrei's pick), plus `Boat` and `BoatWSail` unused for now.
+Quaternius, **CC0**, 140 KB, licence in `assets/licenses/quaternius-ships-License.txt`.
+The cruise ship and inflatable lifeboat were left out.
+
+⚠️ **`SailShip`'s hull mesh carries a `Fabric` surface among its others.** `wreck_site.gd`
+finds the sails by **node name** (`BackSail`, `Front Sail`, `MidleSail`) for that reason —
+matching on material hid the whole ship, because `visible` is per node and cannot express
+"this surface only".
+
+## Textures (`assets/textures/`)
+
+**Watercolor Terrain Textures** (`textures/watercolor/`) — 16 seamless hand-painted
+1024×1024 PNGs, four each of Grass / Stone / Dirt / **Water**. Jonas Voland, distributed by
+Voxel Core Lab GmbH, **CC0 1.0** — commercial use fine, attribution not required, so it is
+deliberately *not* in `ATTRIBUTION-REQUIRED.md`. Downloaded 2026-08-02 with Andrei's
+approval; licence in `assets/licenses/voxelcorelab-watercolor-License.txt`.
+
+Only the water is wired, by `assets/shaders/water.gdshader`, which samples one tile twice at
+different scales and drift bearings and **divides by the tile's own mean** so it contributes
+grain rather than colour — the hue still comes from the sky, which is what keeps the sea
+greying under cloud and reddening under a blood moon.
+
+`Water_02` is the pick. **`Water_01` is deliberately unused**: it is the prettiest of the
+four and has *fish silhouettes* painted into it, which at a 42 m tile makes a metre-long fish
+repeat identically across the whole sea. Grass / Stone / Dirt are kept but unwired —
+candidates for the ground slab's flat albedo later. Per-tile notes and the mipmap
+requirement are in that folder's `SOURCE.md`.
+
+⚠️ ~29 MB for the pack. If repo size ever matters, the twelve unwired tiles go first.
+
 ## 2D (`assets/pixel/`)
 
 What's left of the sprite layer, after the world went 3D: coins, `mark_x.png`,

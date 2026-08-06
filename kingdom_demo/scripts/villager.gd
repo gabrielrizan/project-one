@@ -419,7 +419,13 @@ func _work_anchor() -> Vector3:
 # ---- picking up an errand ----
 
 func _job_is(kind: String) -> bool:
-	return is_instance_valid(_workplace) and _workplace.job_type == kind
+	return job_name() == kind
+
+## This villager's trade, or "" for a wanderer with no hut yet. Public because
+## things outside the state machine legitimately need to ask -- `wreck_site.gd`
+## refuses a sale when no worker exists to build what was bought.
+func job_name() -> String:
+	return String(_workplace.job_type) if is_instance_valid(_workplace) else ""
 
 ## An archer standing about with no errand -- available for a bush or a hunt.
 func is_free_archer() -> bool:
@@ -823,18 +829,42 @@ func _raid_pressure() -> bool:
 			return true
 	return false
 
-## Claim the nearest built wall's centre-most free perch through the same duck-typed
-## station flow every errand uses. Failing that -- no wall on this side -- take a
-## post ringing the campfire, which is the last line (§9). Never a player order (§1).
+## Claim a perch on one of tonight's **lit** walls, through the same duck-typed
+## station flow every errand uses. Failing that -- no lit wall with room, or none
+## built on the threatened bearing -- take a post ringing the campfire, which is the
+## last line (§9). Never a player order (§1).
+##
+## ## Lit walls only, and the emptiest one rather than the nearest (F5)
+##
+## This used to take the *nearest* wall with a free perch, which was right while a
+## map had one opening: nearest and only were the same wall. On a map walled all the
+## way round it is badly wrong -- every archer in the village would crowd the wall
+## they happened to be standing by, and a raid arriving on the far side would meet
+## nobody.
+##
+## So the rule is now: **only a lit wall can be manned, and archers go to whichever
+## lit wall has the fewest defenders.** That makes them spread evenly across two
+## fronts without anyone issuing an order, and it makes the braziers mean something
+## to the kingdom and not just to the player. An unlit wall is never manned, however
+## close it is or however grand it is.
+##
+## The odd archer across two fronts simply lands on whichever wall is behind at the
+## moment they ask, so nobody is ever left unassigned.
 func _claim_defense_post() -> void:
-	# the nearest built wall that still has a free perch
 	var best_wall: Node3D = null
+	var fewest := INF
 	var best_d := INF
 	for w in get_tree().get_nodes_in_group("wall_side"):
 		if not (w.has_method("perch_available") and w.perch_available()):
 			continue
+		if w.has_method("is_lit") and not w.is_lit():
+			continue
+		var n: float = float(w.defenders()) if w.has_method("defenders") else 0.0
 		var d: float = global_position.distance_to(w.global_position)
-		if d < best_d:
+		# distance only breaks ties between equally-manned walls, so two fronts
+		# fill in step and each archer still takes the nearer of the two
+		if n < fewest or (n == fewest and d < best_d):
+			fewest = n
 			best_d = d
 			best_wall = w
 	if best_wall != null:

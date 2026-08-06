@@ -17,6 +17,13 @@ extends Node3D
 ## like the loose camp it replaces, so there is no scene file to keep in sync.
 
 const SK := "res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/"
+## The camp is composed from **three kits we already own**, the way `HallBuilder` and
+## `reward_site.gd` compose theirs. Nothing was downloaded for it: there is no CC0
+## bandit-camp pack in any of the usual sources (Quaternius, Kenney, KayKit all have
+## medieval kits and none has an encampment), and between the survival kit's tents and
+## these two there is already a camp in the box.
+const FT := "res://kingdom_demo/assets/3d/kenney_fantasy-town-kit/Models/GLB format/"
+const CK := "res://kingdom_demo/assets/3d/kenney_castle-kit/Models/GLB format/"
 const BANDIT_SCENE := preload("res://kingdom_demo/scenes/bandit.tscn")
 
 const EMBER := Color(1.0, 0.55, 0.22)
@@ -36,6 +43,12 @@ const VOLLEY_R := 8.0         # an escorted archer this close can loose the fire
 const VOLLEY_ARROWS := 4      # fire arrows in the payoff volley (one per archer, capped)
 const IGNITE_BEAT := 0.6      # the pause between the volley landing and the flames
 const CHARCOAL := Color(0.12, 0.11, 0.12)
+## The bandits' own cloth -- `bandit.gd`'s Thug tint, so the standard over the camp and
+## the men under it are the same colour. Deliberately a shade off [constant CHARCOAL]:
+## a live camp must not already be wearing the colour a burnt one turns.
+const BANDIT_CLOTH := Color(0.15, 0.15, 0.18)
+## For the kit props that come painted off-palette -- the cart's wheels are blue.
+const WALNUT := Color(0.42, 0.30, 0.20)
 const FLAME_TIME := 3.0       # how long the fire burns before it's a cold wreck
 
 ## The smoke column (see [method _smoke]). Slow and sparse on purpose: it has to
@@ -81,6 +94,22 @@ var _found := false
 func _ready() -> void:
 	add_to_group("bandit_camp")
 	_build()
+	# Under fog of war the whole camp -- props, smoke column and ember together --
+	# is hidden by the mask, and this file's own distance check stands down. See
+	# [method _check_discovery] for why that reverses what used to be written here.
+	if FogOfWar.enabled():
+		_found = true                  # nothing left for the distance check to do
+		# ⚠️ **...which also means nothing is left to un-hide `_props`.** `_build`
+		# starts it hidden for the *land* maps, where `_check_discovery` shows it when
+		# the monarch rides within `DISCOVER_R`. Standing that check down handed the
+		# hiding to the fog mask -- and the mask sets `visible` on **this node**, never
+		# on a child, so `_props` stayed false forever and the island's camps were an
+		# ember, a smoke column and three bandits standing in an empty clearing.
+		#
+		# Two layers of hiding is the bug. Under fog the mask is the only one, so the
+		# props are simply visible and the camp node is what gets hidden.
+		_props.visible = true
+		FogOfWar.hide_until_found(self)
 	# after _ready, so the camp's world position (set by the director) is settled
 	# before the garrison spawns around it
 	call_deferred("_post_garrison")
@@ -103,12 +132,40 @@ func _build() -> void:
 	_props = Node3D.new()
 	add_child(_props)
 	_props.visible = false
-	var tent := _place("tent.glb", Vector3(0, 0, -2.8), 2.0, 0.0)   # behind the fire, mouth to the village
-	_place("campfire-pit.glb", Vector3.ZERO, 1.6, 0.0)
-	_place("bedroll.glb", Vector3(-2.4, 0, -1.4), 1.6, 0.6)
-	_place("bedroll.glb", Vector3(2.3, 0, -1.7), 1.6, -0.5)
-	_place("barrel.glb", Vector3(2.0, 0, 0.9), 1.3, 0.0)
+	# ⚠️ **`tent.glb` is a bare A-frame with no canvas on it.** The camps were built
+	# from it for months: four poles and a ridge beam, which from the play camera is
+	# not a tent, it is scaffolding, and at night it is nothing at all. The kit's
+	# actual tent is **`tent-canvas.glb`** -- the same frame with a canvas over it --
+	# and `tent-canvas-half.glb` is the lean-to. Rendering the three side by side is
+	# the only thing that showed it; the names and the bounding boxes are identical
+	# to three decimal places, because the canvas hangs *inside* the frame.
+	#
+	# ⚠️ **And every scale here was roughly half what it should be.** Every model in
+	# the survival kit is a ~0.5 m piece, so a plausible-looking 2.0x multiplier is a
+	# 0.98 m tent -- shorter than the 1.2 m villager meant to sleep in it -- and a
+	# 0.98 m bedroll he would not fit on. Measured, then divided into a target size,
+	# exactly as `reward_site.gd` does for the kits it composes from: tent 0.49 m ->
+	# 1.57 m at the ridge and 1.79 m across the door, bedroll 0.61 m -> 1.40 m long,
+	# barrel 0.34 m -> 0.78 m, fire pit 0.28 m -> 1.06 m across.
+	#
+	# The camp comes to ~10 m across with the fence, and its deepest piece sits 4.8 m
+	# back -- inside the 6.5 m of clearing behind it (`MapDef.camp_clear` and
+	# `camp_clear_bias`). Grow it and check that number first.
+	var tent := _place("tent-canvas.glb", Vector3(0, 0, -3.0), 3.2, 0.0)
+	var lean := _place("tent-canvas-half.glb", Vector3(-3.3, 0, -2.2), 2.8, 0.6)
+	_place("campfire-pit.glb", Vector3.ZERO, 3.8, 0.0)
+	_place("bedroll.glb", Vector3(-2.6, 0, -1.5), 2.3, 0.6)
+	_place("bedroll.glb", Vector3(2.5, 0, -1.8), 2.3, -0.5)
+	_place("barrel.glb", Vector3(2.2, 0, 1.0), 2.3, 0.0)
+	# Loot, which is the one prop that says *bandits* rather than *campers*: they are
+	# carrying off somebody's property and it is stacked by the fire.
+	_place("box-large.glb", Vector3(3.1, 0, -2.7), 2.4, 0.4)
+	_place("box.glb", Vector3(3.7, 0, -1.9), 2.2, -0.3)
+	var cart := _place("cart.glb", Vector3(-3.0, 0, 1.9), 1.4, -0.8, FT)
+	MarkFx.tint(cart, WALNUT)      # the kit paints its wheels blue; blue is off-palette
 	_tents.append(tent)
+	_tents.append(lean)
+	_raise_standard()
 	_ember = OmniLight3D.new()
 	add_child(_ember)
 	_ember.position = Vector3(0, 0.8, 0)
@@ -117,30 +174,76 @@ func _build() -> void:
 	_ember.omni_range = 16.0
 	_ember.shadow_enabled = false
 
-func _place(file: String, pos: Vector3, sc: float, yaw: float) -> Node3D:
-	var n: Node3D = (load(SK + file) as PackedScene).instantiate()
+func _place(file: String, pos: Vector3, sc: float, yaw: float, kit := SK) -> Node3D:
+	var n: Node3D = (load(kit + file) as PackedScene).instantiate()
 	_props.add_child(n)
 	n.position = pos
 	n.scale = Vector3.ONE * sc
 	n.rotation.y = yaw
 	return n
 
+## The standard: a pennant on a post, out in front where the monarch rides in.
+##
+## **This is what makes the place a faction's camp rather than somebody's campsite.**
+## Tents, a fire and bedrolls say people live here; a banner says *these* people, and
+## it is the only piece that reads at the range the camp is usually first seen from.
+##
+## ⚠️ Tinted, and it has to be. The castle kit paints its pennants **blue**, which is
+## nowhere in the palette, and the obvious alternative is worse: `banner-red` is exactly
+## the burgundy the palette reserves for the monarch, so a red bandit standard would put
+## the player's own colour on the enemy. Dark slate is the bandits' own cloth
+## (`bandit.gd`'s Thug tint), a shade off the charcoal a burnt camp goes to.
+## At 3.2x it stands **2.8 m** -- taller than the tent's 1.57 m ridge and than anything
+## else in the camp, which is the point: it is the piece that has to read from outside
+## the clearing, and one sized to match the tents would be lost among them.
+func _raise_standard() -> void:
+	var flag := _place("flag-pennant.glb", Vector3(2.4, 0, 2.4), 3.2, 0.3, CK)
+	MarkFx.tint(flag, BANDIT_CLOTH)
+	_tents.append(flag)          # it leans and blackens with everything else
+
+## ⚠️ **A ragged palisade was built here and removed** (2026-08-04). Three
+## `fence-broken.glb` segments on an arc across the rear, meant to say *they fortified
+## this, badly*. Rendered at the play camera's 45° it says nothing of the kind: a broken
+## fence is mostly gaps, so three of them 4.8 m out read as **debris scattered behind the
+## tents** and made the camp look untidy rather than defended.
+##
+## This is `reward_site.gd`'s hermit-hut problem again -- neither kit contains a
+## palisade, and no arrangement of a garden fence becomes one. If a camp ever wants a
+## boundary it wants a *model*, not a composition. The standard above does the "somebody
+## claimed this ground" job on its own and does it from much further off.
+
 # ---------------------------------------------------------------- discovery
 
-## **The camp is a rumour until you ride out to it.** The structures and the
-## garrison stay hidden until the monarch has been within [constant DISCOVER_R];
-## the smoke column and the ember do not.
+## **The camp is a rumour until you ride out to it.** On a map with no fog, the
+## structures and the garrison stay hidden until the monarch has been within
+## [constant DISCOVER_R], while the smoke column and the ember stay visible from
+## anywhere.
 ##
-## Which half is hidden is the entire design of this. Smoke says *something is
-## out there, that way* and the dusk flare says *and tonight it is that one* --
-## both are load-bearing (see [method _smoke] and [method flare]), and a shroud
-## that swallowed them would delete the only diegetic answer the game has to
-## "which way is the raid coming from" and put a quest marker in its place. What
-## you are denied is the detail: how many tents, how many bodies, whether the
-## garrison is three or six. Scouting buys the intel, not the bearing.
+## ⚠️ **Under fog of war none of that applies, and the reasoning that used to be
+## written here is reversed.** `fog_of_war.gd` hides the whole camp -- smoke and
+## ember included -- until the ground it stands on has been explored, and this
+## method stands down entirely (see [method _ready]).
 ##
-## Discovery is permanent -- ride away and the camp stays known. It is memory of a
-## place, not line of sight, so there is no re-shrouding and nothing to
+## What was argued here before, and why it no longer holds: the split existed
+## because smoke said *something is out there, that way* and the dusk flare said
+## *and tonight it is that one*, which was the game's only diegetic answer to
+## "which way is the raid coming from" -- so a shroud that swallowed them looked
+## like it would leave nothing but a quest marker.
+##
+## **`ISLAND_PROMPTS.md` F5 takes that job away from the smoke and gives it to the
+## walls.** Once the raid bearing is rolled fresh each night across the four walls,
+## regardless of where the camps are, a smoke column *cannot* forecast a raid --
+## it is no longer connected to one. The lit torches do it instead, from inside
+## the village, more precisely, and without the player having had to explore at
+## all. So smoke reverts to what it always meant literally: *someone lives out
+## there, that way* -- a scouting lead and a standing objective, not a forecast.
+## Losing it to fog costs nothing the walls do not now pay back.
+##
+## [method flare] keeps working and keeps meaning something, but what it means is
+## now *this camp is still active*, not *tonight comes from here*.
+##
+## Discovery is permanent either way -- ride away and the camp stays known. It is
+## memory of a place, not line of sight, so there is no re-shrouding and nothing to
 ## re-discover on the way back with the war party.
 func _check_discovery() -> void:
 	var king := get_tree().get_first_node_in_group("monarch")
@@ -179,6 +282,8 @@ func _post_garrison() -> void:
 		var a := TAU * float(i) / float(GARRISON) + randf() * 0.6
 		b.global_position = global_position + Vector3(cos(a), 0, sin(a)) * randf_range(1.6, 2.6)
 		b.visible = _found
+		if FogOfWar.enabled():
+			FogOfWar.hide_until_found(b)
 		_garrison.append(b)
 
 # ---------------------------------------------------------------- the fire
@@ -208,6 +313,14 @@ func flare(on: bool) -> void:
 func _smoke(delta: float) -> void:
 	if _burned or _burning:
 		return
+	# ⚠️ A hidden camp does not smoke. The puffs are parented to the **scene**, not
+	# to this node (see [method _smoke_puff] -- they must not inherit the camp's
+	# transform), so `visible = false` on the camp cannot reach them: under fog of
+	# war the tents vanished and the column went on rising out of black ground,
+	# which is precisely the tell the fog exists to remove. On a map without fog
+	# this node is always visible and the guard costs nothing.
+	if not visible:
+		return
 	_smoke_t -= delta
 	if _smoke_t > 0.0:
 		return
@@ -220,7 +333,14 @@ func _smoke_puff() -> void:
 	var scene := get_tree().current_scene
 	if scene == null:
 		return
-	var s := MarkFx.particle(MarkFx.CHIP_TEX, randf_range(0.5, 0.85))
+	# ⚠️ **`pixel_size` is metres per texel and `wood_chip.png` is 8x8**, so a puff is
+	# *eight times* the number written here. This was 0.5-0.85 -- a **4 to 7 metre**
+	# sheet, which the tween then grows to as much as 15 m -- so the camp's "column"
+	# was a single brown slab the size of the clearing hanging over the tents, and the
+	# 8x8 texture was magnified enough to read as blocks. 0.11-0.17 is a 0.9-1.4 m
+	# puff, about twice the hermit's one-man chimney (`reward_site.gd`), which is the
+	# right relationship. Measure the texture, then divide.
+	var s := MarkFx.particle(MarkFx.CHIP_TEX, randf_range(0.11, 0.17))
 	s.modulate = SMOKE_COLOR
 	scene.add_child(s)
 	var base := global_position + Vector3(randf_range(-0.4, 0.4), 1.0, randf_range(-0.4, 0.4))

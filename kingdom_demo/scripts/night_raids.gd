@@ -14,10 +14,16 @@ extends Node3D
 const BANDIT_SCENE := preload("res://kingdom_demo/scenes/bandit.tscn")
 
 # --- the wave table: PLACEHOLDER, exactly like the flat-5 hall costs (§11). ---
-const FIRST_RAID := 3        # nights 1-2 are grace, to teach the horn and the walls
-const BASE_WAVE := 2         # bandits on the first raid night
-const GROWTH_EVERY := 2      # +1 bandit every couple of nights
-const WAVE_CAP := 8
+## Night 0 is the only grace night now, down from two (F5). The old three-night wait
+## was teaching a lesson the walls now teach better: with the bearing rolled fresh
+## each night there is something to *read* from night one, so silence buys less.
+const FIRST_RAID := 1
+## **One camp's worth** -- the unit a single front arrives in. Waves are counted in
+## these rather than in bodies, so "two fronts" is literally twice one front, which
+## is the thing the player is being asked to feel.
+const CAMP_WAVE := 3
+const GROWTH_EVERY := 2      # +1 bandit per front every couple of nights
+const FRONT_CAP := 6         # ...up to this many per front
 ## Seconds between arrivals, so a wave trickles down the corridor rather than
 ## popping in all at once.
 const STAGGER := Vector2(1.1, 2.6)
@@ -40,7 +46,12 @@ var _raid_tonight := false
 var _blood := false
 var _night_started := false  # true from dusk until the next full daylight
 var _last_dark := 0.0
-var _queue: Array[String] = []   # archetypes still to trickle in tonight, in order
+## Still to trickle in tonight, in order: `{archetype, front}` where `front` indexes
+## [member _fronts].
+var _queue: Array[Dictionary] = []
+## Tonight's fronts, as indices into `MapTerrain.walls()`. Rolled fresh each night
+## and **independent of where the camps are** -- see [method _roll_fronts].
+var _fronts: Array[int] = []
 var _spawn_t := 0.0
 var _since_pulse := 0
 var _pulse_size := 0         # 0 = steady stagger; >0 = spawn in blood-moon pulses
@@ -70,6 +81,9 @@ func _watch_clock() -> void:
 	if _last_dark > ROUT_AT_DAWN and dark <= ROUT_AT_DAWN:
 		_rout()
 		_flare(false)
+		# the watch is stood down with the light. Braziers only ever mean "tonight,
+		# at this wall", so one left burning into the morning would be a lie.
+		_douse_all()
 	_last_dark = dark
 
 ## Begins tonight exactly once: advances the counter, decides the raid, queues the
@@ -84,13 +98,86 @@ func _ensure_night_started() -> void:
 
 func _decide_night() -> void:
 	_blood = is_blood_moon(_night)
-	var wave := wave_size(_night)
-	_raid_tonight = _blood or wave > 0
+	var per := per_front(_night)
+	_raid_tonight = _blood or per > 0
+	_roll_fronts(fronts_tonight(_night) if _raid_tonight else 0)
 	if _blood:
 		_start_wave(_blood_wave_size(), true)
-	elif wave > 0:
-		_start_wave(wave, false)
-	print("[raids] night %d -- %s" % [_night, _night_kind()])
+	elif per > 0:
+		_start_wave(per * maxi(1, _fronts.size()), false)
+	_light_fronts()
+	print("[raids] night %d -- %s, %d front(s): %s"
+		% [_night, _night_kind(), _fronts.size(), _front_names()])
+
+# ---------------------------------------------------------------- the fronts
+
+## Pick tonight's threatened walls, **at random and with no regard for where the
+## camps are** (ISLAND_PROMPTS F5).
+##
+## That decoupling is the whole task. While waves marched out of the raiding camp,
+## the bearing was fixed by map layout and the camp's smoke forecast it; on a map
+## walled all the way round, a fixed bearing makes three of the four walls decoration.
+## Rolling it fresh means every wall you bought can matter on any given night -- and
+## it is what lets the lit braziers become the warning, which is better than the
+## smoke was: precise, visible from the fire, and free of any need to explore.
+##
+## Deliberately drawn from the map's **wall offers**, not from the walls actually
+## built. A front on a bearing you have not walled yet is a front that walks
+## straight in, and that is the lesson, not an edge case to special-case away.
+func _roll_fronts(count: int) -> void:
+	_fronts.clear()
+	var walls := MapTerrain.walls()
+	if walls.is_empty() or count <= 0:
+		return
+	var pool: Array[int] = []
+	for i in walls.size():
+		pool.append(i)
+	pool.shuffle()
+	for i in mini(count, pool.size()):
+		_fronts.append(pool[i])
+
+## How many fronts night `n` comes at: none, then one, then the map's ceiling.
+func fronts_tonight(n: int) -> int:
+	if n < FIRST_RAID:
+		return 0
+	return mini(MapTerrain.max_fronts(), n)
+
+## Light the braziers on tonight's fronts and only those. A wall that is not built
+## has nothing to light, which is exactly right -- there is nothing there to man.
+func _light_fronts() -> void:
+	var walls := MapTerrain.walls()
+	for w in get_tree().get_nodes_in_group("wall_side"):
+		if not w.has_method("light_torches"):
+			continue
+		var threatened := false
+		for i in _fronts:
+			if i < walls.size() and w.global_position.distance_to(walls[i].pos) < 2.0:
+				threatened = true
+				break
+		w.light_torches(threatened)
+
+func _douse_all() -> void:
+	for w in get_tree().get_nodes_in_group("wall_side"):
+		if w.has_method("light_torches"):
+			w.light_torches(false)
+
+func _front_names() -> String:
+	var walls := MapTerrain.walls()
+	var out := PackedStringArray()
+	for i in _fronts:
+		if i < walls.size():
+			var p: Vector3 = walls[i].pos
+			out.append("%.0f,%.0f" % [p.x, p.z])
+	return ", ".join(out) if out.size() > 0 else "-"
+
+## Tonight's fronts, as world positions -- what the dev overlay reports.
+func front_positions() -> Array[Vector3]:
+	var walls := MapTerrain.walls()
+	var out: Array[Vector3] = []
+	for i in _fronts:
+		if i < walls.size():
+			out.append(walls[i].pos)
+	return out
 
 ## How many blasts the dusk horn gets, and the trigger ambience uses: 1 quiet,
 ## 2 a raid, 3 a blood moon.
@@ -100,14 +187,19 @@ func blasts_tonight() -> int:
 		return 3
 	return 2 if _raid_tonight else 1
 
-## How many bandits night `n` sends on an ordinary raid. Zero through the grace.
-func wave_size(n: int) -> int:
+## How many bandits arrive **per front** on night `n`. Zero through the grace.
+func per_front(n: int) -> int:
 	if n < FIRST_RAID:
 		return 0
-	return mini(WAVE_CAP, BASE_WAVE + (n - FIRST_RAID) / GROWTH_EVERY)
+	return mini(FRONT_CAP, CAMP_WAVE + (n - FIRST_RAID) / GROWTH_EVERY)
+
+## The whole night's bodies, across every front. Kept as the public name because
+## it is what the readouts and the dev tools ask for.
+func wave_size(n: int) -> int:
+	return per_front(n) * fronts_tonight(n)
 
 func _blood_wave_size() -> int:
-	return mini(BLOOD_CAP, int(ceil(maxi(wave_size(_night), BASE_WAVE) * BLOOD_MULT)))
+	return mini(BLOOD_CAP, int(ceil(maxi(wave_size(_night), CAMP_WAVE) * BLOOD_MULT)))
 
 func is_blood_moon(n: int) -> bool:
 	return n > 0 and n % BLOOD_EVERY == 0
@@ -141,9 +233,13 @@ func _village_exists() -> bool:
 ## Queue `count` raiders. A blood moon salts in Brutes and spawns in pulses; an
 ## ordinary raid trickles them in steadily.
 func _start_wave(count: int, blood: bool) -> void:
+	if _fronts.is_empty():
+		_roll_fronts(maxi(1, fronts_tonight(maxi(_night, FIRST_RAID))))
 	for i in range(count):
 		var brute := blood and (i % BRUTE_EVERY == BRUTE_EVERY - 1)
-		_queue.append("brute" if brute else "thug")
+		# dealt round-robin, so two fronts arrive together rather than one wall
+		# taking the whole wave while the other waits its turn
+		_queue.append({archetype = "brute" if brute else "thug", front = i % maxi(1, _fronts.size())})
 	_flare(true)
 	_pulse_size = int(ceil(count / 3.0)) if blood else 0
 	_since_pulse = 0
@@ -171,17 +267,36 @@ func _run_spawns(delta: float) -> void:
 	else:
 		_spawn_t = randf_range(STAGGER.x, STAGGER.y)
 
-func _spawn_one(archetype: String = "thug") -> void:
+## Put one raider on the ground, on its own front.
+##
+## **Where a front lands is the map's business.** On a map with a shore they wade in
+## off the sea on that bearing, which reads perfectly and needs no camp on that side
+## to justify it -- that is what makes a random bearing honest. On a landlocked map
+## `front_landing` says so by answering the village, and they march out of a camp
+## exactly as they always have, so the three land prototypes are untouched.
+func _spawn_one(order: Dictionary) -> void:
 	var scene := get_tree().current_scene
 	if scene == null:
 		return
-	var camp := _live_camp()
-	if camp == null:
-		return   # nowhere to spawn from -- every camp on this front is burned (P10)
+	var walls := MapTerrain.walls()
+	var at := Vector3.ZERO
+	var idx := int(order.get("front", 0))
+	if idx < _fronts.size() and _fronts[idx] < walls.size():
+		at = MapTerrain.front_landing(walls[_fronts[idx]])
+	if at == MapTerrain.village():
+		# landlocked, or no wall offer to march on: the classic camp march
+		var camp := _live_camp()
+		if camp == null:
+			return   # every camp on this front is burned (P10) -- nowhere to come from
+		at = camp.spawn_point()
+	else:
+		# spread arrivals along the beach so a front is a landing, not a conga line
+		var side := Vector3(-at.z, 0.0, at.x).normalized()
+		at += side * randf_range(-5.0, 5.0)
 	var b := BANDIT_SCENE.instantiate()
-	b.archetype = archetype
+	b.archetype = String(order.get("archetype", "thug"))
 	scene.add_child(b)
-	b.global_position = camp.spawn_point()
+	b.global_position = at
 
 ## A random live (unburned) **raiding** camp to send a wave from -- read straight
 ## from the group, so a burned camp (which leaves it) never spawns again (P10).
@@ -221,10 +336,23 @@ func _drive_blood(delta: float) -> void:
 
 # ---------------------------------------------------------------- dev overlay
 
-## Dev: raid immediately, whatever the night -- at least a token wave.
+## Dev: raid immediately, whatever the night -- at least a token wave, on freshly
+## rolled fronts with their braziers lit, so the whole cue is exercised.
 func raid_now() -> void:
-	_start_wave(maxi(2, wave_size(_night)), false)
-	print("[raids] raid now")
+	_roll_fronts(maxi(1, fronts_tonight(maxi(_night, FIRST_RAID))))
+	_light_fronts()
+	_start_wave(maxi(CAMP_WAVE, wave_size(maxi(_night, FIRST_RAID))), false)
+	print("[raids] raid now -- %d front(s): %s" % [_fronts.size(), _front_names()])
+
+## Dev: force tonight's fronts onto specific walls, by index into
+## `MapTerrain.walls()`. The one tool that makes "does the cue read?" testable
+## without rerolling until the dice cooperate.
+func set_fronts(indices: Array) -> void:
+	_fronts.clear()
+	for i in indices:
+		_fronts.append(int(i))
+	_light_fronts()
+	print("[raids] fronts forced to %s" % _front_names())
 
 ## Dev: bump the counter without waiting out a day.
 func advance_night() -> void:
@@ -240,6 +368,8 @@ func blood_moon_now() -> void:
 	_night_started = true
 	_blood = true
 	_raid_tonight = true
+	_roll_fronts(maxi(1, fronts_tonight(maxi(_night, FIRST_RAID))))
+	_light_fronts()
 	_start_wave(_blood_wave_size(), true)
 	var amb := get_tree().current_scene.get_node_or_null("Ambience")
 	if amb and amb.has_method("blow_horn"):
@@ -263,6 +393,15 @@ func _spawn_camps() -> void:
 		var camp := BanditCamp.new()
 		camp.raiding = bool(c.get("raiding", false))
 		camp.position = c.pos
+		# **Face the village.** `bandit_camp.gd::_build` puts the tent behind the fire
+		# with its mouth at local +Z, and `MapDef.camp_clearing_centre` now pushes the
+		# clearing that way too -- so an unturned camp has its back to its own fighting
+		# ground. It read as intended only by luck, on the one camp that happened to sit
+		# due north of the village; the southern one faced out to sea.
+		var home: Vector3 = MapTerrain.village() - (c.pos as Vector3)
+		home.y = 0.0
+		if home.length() > 0.01:
+			camp.rotation.y = atan2(home.x, home.z)
 		add_child(camp)
 		if camp.raiding:
 			raiders += 1

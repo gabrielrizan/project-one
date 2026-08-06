@@ -52,6 +52,23 @@ static func village() -> Vector3:
 static func muster_point() -> Vector3:
 	return map().muster
 
+## How many walls a night's raid may come at at once (F5).
+static func max_fronts() -> int:
+	return map().max_fronts
+
+## A point on the sand at bearing `theta` -- where a wreck lies (F7).
+static func beach_point(theta: float) -> Vector3:
+	return map().beach_point(theta)
+
+## The reward sites this map offers, as `{pos, kind, clear}` (F6).
+static func sites() -> Array[Dictionary]:
+	return map().sites
+
+## Where raiders marching on `wall` come ashore, or the village on a landlocked map
+## (which means "there is no shore -- use a camp"). See [method MapDef.front_landing].
+static func front_landing(wall: Dictionary) -> Vector3:
+	return map().front_landing(wall)
+
 # ---------------------------------------------------------------- ground tests
 
 ## True when p sits inside any sealed gate box (x/z only -- the world is flat).
@@ -69,6 +86,28 @@ static func is_home(p: Vector3) -> bool:
 ## Which kind of gate covers p, or "" if it is not sealed.
 static func gate_kind_at(p: Vector3) -> String:
 	return map().gate_kind_at(p)
+
+# ---------------------------------------------------------------- the coast
+
+## True on a map ringed by sea rather than by sealed bearings.
+static func has_shore() -> bool:
+	return map().has_shore()
+
+## The coast's distance from the origin at bearing `theta` (`atan2(z, x)`).
+static func shore_at(theta: float) -> float:
+	return map().shore_at(theta)
+
+## How wide the sand ring runs, and the setback nothing is planted inside.
+static func beach_width() -> float:
+	return map().beach_width()
+
+## True out past the coastline -- always false on a landlocked map.
+##
+## Scenery placement needs this separately from [method is_blocked], which the sea
+## also answers: a ROCK or WOOD gate is blocked *and* is exactly where the backdrop
+## belongs, whereas the sea is blocked and must stay bare.
+static func beyond_shore(p: Vector3) -> bool:
+	return map().beyond_shore(p)
 
 ## A point in the forest belly around the village -- open, home-side ground, never
 ## in the rock. Rejection-sampled, so wildlife can't land inside a mountain.
