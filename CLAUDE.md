@@ -56,9 +56,8 @@ camp lighting ·
 **sun shadows gated on the sun's elevation, and depth fog that thickens with the storm** ·
 **weather: rain, overcast skies, water pools, distant thunderstorms, on a season clock** ·
 navmesh pathfinding round everything solid, re-baked as the village changes ·
-title + pause menus, settings persist · **four selectable full-scale maps** picked from the
-title screen, including **a round island ringed by sea** · **a dev overlay on F1** for
-reaching any of it instantly.
+title + pause menus, settings persist · **one full-scale map, a round island ringed by
+sea** · **a dev overlay on F1** for reaching any of it instantly.
 
 **Combat is now built — `COMBAT_PROMPTS.md` P1–P10, bar P8's audio pass.** Charcoal bandits
 (`bandit.gd`, archetypes Thug/Brute) march on the village from camps out on the map. A raid
@@ -224,25 +223,20 @@ which is selected; **`MapTerrain` is the static facade everything else still rea
 so `mountains.gd`, `campfire.gd`, `wildlife.gd`, `night_raids.gd`, `muster_banner.gd` and
 `bandit.gd` never learned that maps are swappable.
 
-**Four maps, chosen from the title screen** (Play → Choose a Map; persisted in
-`Settings.selected_map`):
+**One map: Prototype 1 — Flat Terrain**, a round island in open water with no sealed bearing
+at all — every bearing is a bearing, and the answer is a wall on all four sides rather than a
+gate to stand in. The 2026-07 land prototypes (Mountain U, Deep Wood, Twin Passes) that used
+to sit alongside it in `MapCatalog` while the island was being proven out are gone
+(2026-08-06, "leave only prototype 1, remove all others") — `MapCatalog.all()` returns just
+the island now, and their `MapDef`-building code was deleted with them rather than kept
+around unused. The title screen's "Choose a Map" page still exists (`menu.gd::_build_maps`,
+driven off `MapCatalog.all()`) but now offers exactly one entry.
 
-| | Shape | Teaches |
-|---|---|---|
-| **The Mountain U** | rock on three sides, one 16 m corridor north | the canon §9 shape: one door, one wall, one fight |
-| **The Deep Wood** | a clearing walled by forest, one trail out | the second camp is reachable **only by felling a lane** through the wood |
-| **The Twin Passes** | a rock spine splits the north into two passes | two gates, but only one is hot — read the dusk fires |
-| **Prototype 1 — Flat Terrain** | a round island in open water, no sealed bearing at all | every bearing is a bearing — the answer is a wall on all four sides |
+The island runs a coast 76–94 m out (~180 m across), with camps 60 m from the fire — a
+**12 s ride** each way. That is what the ground slab was grown to **240 m** for, and the slab
+is shared should a future map ever need it again.
 
-The island is **much bigger than the land maps**: its coast runs 76–94 m out (~180 m across
-against their 110–120), with camps 60 m from the fire — a **12 s ride** each way. That is
-what the ground slab was grown from 180 m to **240 m** for, and the slab is shared, so it
-now has ~25 m of headroom before the coast would run off it.
-
-⚠️ **The first three are temporary.** They are the 2026-07 land prototypes; Andrei deletes
-them once he is happy with the island, and **not on a task boundary** — don't remove them as
-part of the island work. The map picker stays either way, even while the island is the only
-entry. `ISLAND_PROMPTS.md` (F1–F8) is the island's build order; **F1 has landed.**
+`ISLAND_PROMPTS.md` (F1–F8) is the island's build order; **F1 has landed.**
 
 ### The island (`ISLAND_PROMPTS.md` F1)
 

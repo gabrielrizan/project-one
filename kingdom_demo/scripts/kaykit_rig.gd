@@ -33,6 +33,10 @@ static var _lib: AnimationLibrary = null
 @export var weapon_bone := "handslot.r"
 @export var weapon_position := Vector3.ZERO
 @export var weapon_rotation_deg := Vector3.ZERO
+## 1.0 fits any prop from the KayKit pack itself, which shares this rig's own
+## unit scale. A prop from elsewhere (`tool-hammer.glb` is Kenney's, authored
+## at a real-world 0.15 m) needs this to land at hand size.
+@export var weapon_scale := 1.0
 @export var target_height := 1.2
 
 var body: Node3D = null
@@ -78,6 +82,7 @@ func _attach_weapon() -> void:
 	att.add_child(weapon)
 	weapon.position = weapon_position
 	weapon.rotation_degrees = weapon_rotation_deg
+	weapon.scale = Vector3.ONE * weapon_scale
 
 ## Built once for the whole game (every KayKit character shares it) by
 ## instancing the two library files off-tree, lifting their default

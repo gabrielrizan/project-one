@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://desrj62osn5lb"]
+
+[ext_resource type="Script" uid="uid://dn7sfpi68joi2" path="res://kingdom_demo/scripts/kaykit_rig.gd" id="1_lxqki"]
+[ext_resource type="PackedScene" uid="uid://2mgou3rmbr14" path="res://kingdom_demo/assets/3d/characters/kaykit/Barbarian.glb" id="2_x4r5o"]
+[ext_resource type="PackedScene" uid="uid://cjaq8e5ipc6fs" path="res://kingdom_demo/assets/3d/kenney_survival-kit/Models/GLB format/tool-hammer.glb" id="3_bjec3"]
+
+[node name="WorkerBarbarianRig" type="Node3D" unique_id=1248041411]
+script = ExtResource("1_lxqki")
+body_scene = ExtResource("2_x4r5o")
+weapon_scene = ExtResource("3_bjec3")
+weapon_scale = 2.3

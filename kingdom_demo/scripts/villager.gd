@@ -88,7 +88,7 @@ const SITE_WALK_TIMEOUT := 25.0   # can't reach the line -> free the slot for so
 ## A wanderer carries no tools; taking a job swaps in the model that does, so the
 ## job someone holds is readable at a glance from across the camp.
 const VILLAGER_MODEL := preload("res://kingdom_demo/assets/3d/characters/villager.glb")
-const WORKER_MODEL := preload("res://kingdom_demo/assets/3d/characters/worker.glb")
+const WORKER_MODEL := preload("res://kingdom_demo/assets/3d/characters/kaykit/worker_barbarian_rig.tscn")
 const ARCHER_MODEL := preload("res://kingdom_demo/assets/3d/characters/kaykit/archer_ranger_rig.tscn")
 const ARROW_MODEL := preload("res://kingdom_demo/assets/3d/props/arrow_marker.glb")
 const COIN_MODEL := preload("res://kingdom_demo/assets/3d/props/coin.glb")
@@ -508,6 +508,7 @@ func _walk_to_tree(delta: float) -> void:
 		_state = State.CHOP
 		_swing_t = 0.25
 		_face(_tree.global_position)
+		_play_idle()
 
 func _chop(delta: float) -> void:
 	if not _tree_standing():
@@ -519,8 +520,10 @@ func _chop(delta: float) -> void:
 		_swing_t = SWING_TIME
 		_swing_axe()
 
-## The worker model carries its own axe, so the swing is the whole body rocking
-## back and driving forward rather than a separate prop being animated.
+## The worker model carries a hammer socketed onto its hand bone (`kaykit_rig.gd`),
+## the same one whether it's an axe blow or a hammer blow landing -- the swing is
+## the whole body rocking back and driving forward rather than the held prop being
+## animated separately.
 ##
 ## The two steps up to `_land_blow` keep their **original durations** (0.17 +
 ## 0.07 = 0.24s to contact) -- that callback is also where the chop sound fires,
@@ -610,6 +613,7 @@ func _walk_to_site(delta: float) -> void:
 		_hammer_t = 0.2
 		_face(_site.face_point(global_position))
 		_site.builder_ready(self)
+		_play_idle()
 
 func _raise_wall(delta: float) -> void:
 	if not _site_open():
@@ -1453,8 +1457,8 @@ func _mill_near(delta: float, center: Vector3, radius: float) -> void:
 func _animate(delta: float, moving: bool) -> void:
 	if not is_instance_valid(_model):
 		return
-	# a rigged KayKit model (currently just the archer) plays real bone
-	# animation instead of the bob, which is baked into its walk/run clips
+	# a rigged KayKit model plays real bone animation instead of the bob,
+	# which is baked into its walk/run clips
 	var rigged := _model.has_method("play")
 	if moving:
 		if rigged:
@@ -1476,3 +1480,12 @@ func _animate(delta: float, moving: bool) -> void:
 	for c in _purse:
 		if is_instance_valid(c):
 			c.position.y = CARRY_Y + lift
+
+## `_animate` only runs while `_seek` is walking us somewhere, so a rigged
+## model's legs keep looping the last walk/run clip if nothing steps in at
+## the moment we arrive and stop. Called once from each work-errand's
+## arrival branch (chopping, building) so the idle breathing pose takes over
+## the instant the swing tweens start leaning the body into it.
+func _play_idle() -> void:
+	if is_instance_valid(_model) and _model.has_method("play"):
+		_model.play("Idle_A")

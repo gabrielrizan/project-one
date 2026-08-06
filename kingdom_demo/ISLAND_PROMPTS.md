@@ -28,8 +28,8 @@ Paste one prompt per session, under this preamble:
 
 | | |
 |---|---|
-| **Map** | `id = "flat_island"`, title **"Prototype 1 — Flat Terrain"**. Built as the fourth entry in `MapCatalog`. Village stays at `Vector3.ZERO`. |
-| **The other three maps** | Prototypes and concepts, **to be deleted — but not on a task boundary.** Andrei removes them once he is happy with the island (2026-08-02: *"after something I like"*). **Do not delete them as part of F1–F8**; they stay compiling and playable as working references until he says so. Assume the island is eventually the only map, but never that it already is. |
+| **Map** | `id = "flat_island"`, title **"Prototype 1 — Flat Terrain"**. Now the *only* entry in `MapCatalog`. Village stays at `Vector3.ZERO`. |
+| **The other three maps** | **Deleted (2026-08-06).** Mountain U, Deep Wood and Twin Passes were prototypes and concepts kept compiling and playable as working references until Andrei was happy with the island; that call has now been made and their `MapDef`-building code is gone from `map_catalog.gd`, not just unlisted. |
 | **Map picker** | **Stays**, even while the island is the only entry (Andrei, 2026-08-02). Don't "simplify" Play → Choose a Map into a straight launch — it earns its place again as soon as a second real map exists. |
 | **Art** | The **nature-pack** (`NaturePack`, `assets/nature-pack/FBX`) and the **season re-skin** merged on 2026-08-02 are the island's art basis — decided by Andrei, not a default to re-argue. **The season reaches the water and the beach too**, not just the ground and the vegetation (see F1). One gap to close first: "The forest is not all one asset pack yet", below. |
 | **Shape** | Round-ish island, water on all bearings, **no rock or wood gates at all**. Still one flat slab — no elevation, no ramps. |

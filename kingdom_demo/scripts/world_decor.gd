@@ -88,10 +88,21 @@ const DETAIL_H := Vector2(0.28, 0.7)
 const STUMP_H := Vector2(0.5, 0.95)
 const LOG_H := Vector2(0.35, 0.6)
 
-## The ground reads as snowfield in winter: its albedo lerps toward this. The mesh
+## The ground reads as snowfield in winter: its tint lerps toward this. The mesh
 ## material is world_decor's to tint -- day_night_cycle only writes the environment,
 ## never the ground, so there is no second writer to fight (see its gotcha note).
 const SNOW_GROUND := Color(0.86, 0.89, 0.95)
+
+## The ground's hand-painted coat -- the same Voxel Core Lab CC0 pack and the same
+## two-scale-sample-divided-by-mean trick as `water.gdshader` (see `ground.gdshader`
+## for why). `Grass_01`, not `Grass_02`/`03`: those carry visible veins and cloud-blob
+## structure that would repeat, exactly the fish-in-`Water_01` trap the sea pack's own
+## `SOURCE.md` already warns about -- `01` is the flattest wash of the four.
+const GROUND_SHADER := preload("res://kingdom_demo/assets/shaders/ground.gdshader")
+const GROUND_TEX := preload("res://kingdom_demo/assets/textures/watercolor/Grass_01.png")
+const GROUND_TEX_METRES := 9.0
+const GROUND_TEX_STRENGTH := 0.85
+const GROUND_TEX_CONTRAST := 4.0
 
 ## Tries a rejection-sampled placement gets before it gives up. Trees can afford to
 ## skip outright -- there are hundreds of samples -- but the low-count categories
@@ -103,7 +114,7 @@ var _vrng := RandomNumberGenerator.new()  # vegetation layout, reset every re-sk
 var _veg: Node3D = null
 var _season := SPRING
 var _variant := "___"                     # NaturePack variant currently planted
-var _ground_mat: StandardMaterial3D = null
+var _ground_mat: ShaderMaterial = null
 var _ground_base := Color(1, 1, 1)
 var _turf: Node3D = null   # holder for the flat tiles _build_turf() scatters
 
@@ -264,19 +275,45 @@ func _place_veg(node: Node3D, pos: Vector3, sway := false) -> void:
 
 # ---------------------------------------------------------------- ground snow
 
+## Replaces the ground's flat `StandardMaterial3D` with a `ShaderMaterial` carrying
+## the hand-painted coat -- built here rather than in the `.tscn`, the same way
+## `sea.gd` builds its own material in script, so the texture pick and its tuning
+## live next to the code that reasons about them.
 func _cache_ground() -> void:
 	var mesh := get_node_or_null("../Ground/Mesh")
-	if mesh and mesh.material_override is StandardMaterial3D:
-		_ground_mat = mesh.material_override
-		_ground_base = _ground_mat.albedo_color
+	if mesh == null:
+		return
+	if mesh.material_override is StandardMaterial3D:
+		_ground_base = (mesh.material_override as StandardMaterial3D).albedo_color
+	_ground_mat = ShaderMaterial.new()
+	_ground_mat.shader = GROUND_SHADER
+	_ground_mat.set_shader_parameter("ground_tex", GROUND_TEX)
+	_ground_mat.set_shader_parameter("tex_mean", _mean_of(GROUND_TEX))
+	_ground_mat.set_shader_parameter("tex_metres", GROUND_TEX_METRES)
+	_ground_mat.set_shader_parameter("tex_strength", GROUND_TEX_STRENGTH)
+	_ground_mat.set_shader_parameter("tex_contrast", GROUND_TEX_CONTRAST)
+	_ground_mat.set_shader_parameter("tint", _ground_base)
+	mesh.material_override = _ground_mat
+
+## Resizes to 1x1 to read the tile's own average colour, so the shader can divide
+## it back out -- identical to `sea.gd::_mean_of`, kept local rather than shared
+## since the two systems have no other reason to depend on each other.
+func _mean_of(tex: Texture2D) -> Vector3:
+	var img := tex.get_image()
+	if img == null:
+		return Vector3(0.35, 0.35, 0.35)
+	img = img.duplicate()
+	img.resize(1, 1, Image.INTERPOLATE_LANCZOS)
+	var c := img.get_pixel(0, 0)
+	return Vector3(maxf(c.r, 0.02), maxf(c.g, 0.02), maxf(c.b, 0.02))
 
 func _apply_ground_snow() -> void:
 	if _ground_mat == null:
 		return
 	if _season == WINTER:
-		_ground_mat.albedo_color = _ground_base.lerp(SNOW_GROUND, 0.78)
+		_ground_mat.set_shader_parameter("tint", _ground_base.lerp(SNOW_GROUND, 0.78))
 	else:
-		_ground_mat.albedo_color = _ground_base
+		_ground_mat.set_shader_parameter("tint", _ground_base)
 
 # ---------------------------------------------------------------- helpers
 
@@ -474,21 +511,3 @@ func _turf_color(noise: FastNoiseLite, x: float, z: float) -> Color:
 	var f := v * float(TURF_COLORS.size() - 1)
 	var i := clampi(int(f), 0, TURF_COLORS.size() - 2)
 	return TURF_COLORS[i].lerp(TURF_COLORS[i + 1], f - float(i))
-
-# ---------------------------------------------------------------- ground patches
-
-func _scatter_patches() -> void:
-	for i in range(patch_count):
-		var mi := MeshInstance3D.new()
-		var plane := PlaneMesh.new()
-		var w := _rng.randf_range(3.5, 8.0)
-		plane.size = Vector2(w, w * _rng.randf_range(0.7, 1.3))
-		mi.mesh = plane
-		mi.material_override = _flat_mat(PATCH_COLORS[_rng.randi() % PATCH_COLORS.size()])
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(mi)
-		var p := _near_point(_rng)
-		# stagger the height a hair per patch: they are flat sheets on a flat slab,
-		# and two coplanar sheets that overlap z-fight into stripes
-		mi.position = Vector3(p.x, 0.02 + float(i) * 0.0012, p.z)
-		mi.rotation.y = _rng.randf() * TAU
