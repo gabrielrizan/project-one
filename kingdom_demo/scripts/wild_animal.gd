@@ -51,7 +51,7 @@ func _ready() -> void:
 		model_root.add_child(_model)
 		_model.scale = Vector3(model_scale, model_scale, model_scale)
 		_anim = _find_anim(_model)
-		_play_anim(["Walk", "walk", "Gallop", "Idle", "idle"])
+		_play_anim(["Idle", "idle"])
 	_base_y = 0.0
 	_home = global_position
 	_nav = NavMover.new(_agent, self)
@@ -70,6 +70,9 @@ func _find_anim(n: Node) -> AnimationPlayer:
 			return found
 	return null
 
+## Matches by substring and does nothing if that clip is already playing --
+## called every frame from `_move_to`/`_idle` now that Walk/Gallop/Idle switch
+## with state, so restarting it each frame would never let a cycle finish.
 func _play_anim(prefer: Array) -> void:
 	if _anim == null:
 		return
@@ -79,9 +82,11 @@ func _play_anim(prefer: Array) -> void:
 	for want in prefer:
 		for a in list:
 			if String(a).findn(want) != -1:
-				_anim.play(a)
+				if _anim.current_animation != a:
+					_anim.play(a)
 				return
-	_anim.play(list[0])
+	if _anim.current_animation != list[0]:
+		_anim.play(list[0])
 
 func _physics_process(delta: float) -> void:
 	match _state:
@@ -178,10 +183,15 @@ func _move_to(p: Vector3, delta: float, speed: float) -> float:
 	move_and_slide()
 	var moving := Vector2(velocity.x, velocity.z).length() > 0.25
 	if moving:
-		_bob += delta * (14.0 if _state == State.BOLT else 8.0)
 		_face(velocity)
-		if is_instance_valid(_model):
+		if _anim != null:
+			_play_anim(["Gallop", "gallop"] if _state == State.BOLT else ["Walk", "walk"])
+		elif is_instance_valid(_model):
+			# No rig (the rabbit) -- the old sine bob is all it has.
+			_bob += delta * (14.0 if _state == State.BOLT else 8.0)
 			_model.position.y = _base_y + absf(sin(_bob)) * 0.05
+	elif _anim != null:
+		_play_anim(["Idle", "idle"])
 	elif is_instance_valid(_model):
 		_model.position.y = move_toward(_model.position.y, _base_y, delta * 0.4)
 	return d
@@ -201,7 +211,9 @@ func _idle(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, 0.0, ACCEL * delta)
 	velocity.z = move_toward(velocity.z, 0.0, ACCEL * delta)
 	move_and_slide()
-	if is_instance_valid(_model):
+	if _anim != null:
+		_play_anim(["Idle", "idle"])
+	elif is_instance_valid(_model):
 		_model.position.y = move_toward(_model.position.y, _base_y, delta * 0.4)
 
 # ---- death ----

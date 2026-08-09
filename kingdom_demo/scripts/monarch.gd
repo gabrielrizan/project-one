@@ -3,25 +3,6 @@ extends CharacterBody3D
 const SPEED := 5.0
 const ACCEL := 60.0
 
-## The body's rise and fall, and its fore-aft pitch, driven off the **same**
-## per-stride footfall data (`GAITS[gait]["at"]`) that already drives the
-## hoofbeats -- so picture and sound finally share one clock, which is exactly
-## what `stride_phase()` below was built to make possible. A gallop's shape is
-## "sink, sink, SINK, float": the body drops into each landing and lifts clear
-## during the suspension, so the curve is built the same way -- a dip pulse
-## centred on every entry in `at`, and a lift that grows with distance from the
-## nearest one. It generalises to any gait in the table, not just the one in use.
-const SURGE_DIP := 0.075        # how far the body sinks into a landing, in metres
-const SURGE_DIP_WIDTH := 0.10   # fraction of a stride a landing's sink spans
-const SURGE_LOFT := 0.11        # how far the body lifts clear of every landing
-const SURGE_LOFT_EASE := 0.24   # fraction of a stride to ease from a landing into full loft
-## Degrees. Small on purpose -- the hoofbeat mix keeps every accent shallow for
-## the same reason (see `GAITS`' own comment): a strong cue gives the eye
-## something to lock onto, and a subtle one reads as weight rather than cartoon.
-const PITCH_DIVE := 5.0         # nose-down, reaching into a landing
-const PITCH_RISE := 3.0         # nose-up, through the loft
-const SETTLE_RATE := 3.0        # how fast pitch eases back to level once stopped
-
 ## **A gallop is not an even tick.** Hoof-falls come bunched, and then all four
 ## feet leave the ground -- the suspension -- and there is silence until the next
 ## stride. That gap is the whole rhythm: evenly spaced strikes read as
@@ -71,9 +52,9 @@ const GAITS := {
 }
 const DEFAULT_GAIT := "gallop"
 
-## The stride clock drives the hoofbeats *and* the body's motion (`_gait_pose`)
-## off the same `_stride` value, via `stride_phase()` -- picture and sound share
-## one clock, rather than a decorative bounce running on its own timer next to it.
+## The stride clock drives the hoofbeats, via `stride_phase()` -- the legs
+## themselves move on the mount's own skeletal `Gallop`/`Idle` clips, not a
+## procedural bounce, so this clock only has the audio left to answer for.
 const HOOF_CLIPS := [
 	preload("res://kingdom_demo/assets/audio/hoof_1.ogg"),
 	preload("res://kingdom_demo/assets/audio/hoof_2.ogg"),
@@ -124,6 +105,8 @@ const IDLE_DB := -13.0
 
 @onready var interact_area: Area3D = $InteractArea
 @onready var model: Node3D = $Model
+@onready var mount: Node3D = $Model/Mount
+@onready var rider: KayKitRig = $Model/Rider
 
 var _nearby: Array = []
 var _highlighted: Node3D = null
@@ -131,6 +114,7 @@ var _base_y := 0.0
 var _yaw := 0.0
 var _hooves: Array[AudioStreamPlayer3D] = []
 var _voice := 0
+var _anim: AnimationPlayer = null
 ## 0..1 through the current stride, and the next hoof-fall due within it.
 var _stride := 0.0
 var _fall := 0
@@ -147,6 +131,10 @@ func _ready() -> void:
 		_hooves.append(_make_hoof())
 	_idle_voice = _make_voice(IDLE_CLIPS, IDLE_PITCH, IDLE_VOL_JITTER, IDLE_DB, 6.0, 22.0)
 	_idle_t = randf_range(IDLE_GAP.x, IDLE_GAP.y)
+	_anim = _find_anim(mount)
+	_play_anim(["Idle", "idle"])
+	if is_instance_valid(rider):
+		rider.sit()
 
 func _physics_process(delta: float) -> void:
 	var input_dir := Vector3.ZERO
@@ -178,11 +166,10 @@ func _physics_process(delta: float) -> void:
 
 func _animate(delta: float, moving: bool) -> void:
 	if moving:
-		# the horse's gait, plus turning to face the way we ride
+		# the hoofbeat clock, plus turning to face the way we ride -- the legs
+		# themselves are the mount's own Gallop clip, not code
 		_advance_stride(delta)
-		var pose := _gait_pose(_stride)
-		model.position.y = _base_y + pose.x
-		model.rotation.x = deg_to_rad(pose.y)
+		_play_anim(["Gallop", "gallop"])
 		# Re-armed every frame under way, so the clock only ever starts once you
 		# have actually stopped -- never mid-ride.
 		_idle_t = randf_range(IDLE_GAP.x, IDLE_GAP.y)
@@ -190,8 +177,7 @@ func _animate(delta: float, moving: bool) -> void:
 			_yaw = lerp_angle(_yaw, atan2(velocity.x, velocity.z), 0.2)
 			model.rotation.y = _yaw
 	else:
-		model.position.y = move_toward(model.position.y, _base_y, delta * 0.6)
-		model.rotation.x = move_toward(model.rotation.x, 0.0, delta * SETTLE_RATE)
+		_play_anim(["Idle", "idle"])
 		# Park the stride at its start so pulling away again opens on the first
 		# hoof of a stride rather than halfway through one.
 		_stride = 0.0
@@ -202,35 +188,34 @@ func _animate(delta: float, moving: bool) -> void:
 			if is_instance_valid(_idle_voice):
 				_idle_voice.play()
 
-## The body's vertical offset and fore-aft pitch (degrees) for `stride`, built off
-## the current gait's footfall table: a dip pulse centred on every entry in `at`
-## (the harder the fall's accent in `gain`, the deeper the dip), and a lift that
-## grows with distance from the nearest one, peaking through the suspension.
-## Returns (height, pitch) so `_animate` only ever has one place to read from.
-func _gait_pose(stride: float) -> Vector2:
-	var at: Array = GAITS[_gait]["at"]
-	var gain: Array = GAITS[_gait]["gain"]
-	var dip := 0.0
-	var min_gap := INF
-	for i in range(at.size()):
-		var d := absf(stride - float(at[i]))
-		d = minf(d, 1.0 - d)               # wrap around the stride
-		min_gap = minf(min_gap, d)
-		if d < SURGE_DIP_WIDTH:
-			var w := 1.0 - d / SURGE_DIP_WIDTH
-			w *= w                          # ease in toward the landing
-			# a louder fall (gain closer to 0 dB) hits harder -- same accent the
-			# ear gets, now something the eye gets too
-			var accent := inverse_lerp(-4.0, 0.0, float(gain[i]))
-			dip += w * lerpf(0.6, 1.0, clampf(accent, 0.0, 1.0))
-	dip = clampf(dip, 0.0, 1.0)
-	var loft := smoothstep(0.0, SURGE_LOFT_EASE, min_gap)
-	var height := SURGE_LOFT * loft - SURGE_DIP * dip
-	var pitch := PITCH_RISE * loft - PITCH_DIVE * dip
-	return Vector2(height, pitch)
+## Recursive, since the animated glTF import nests its `AnimationPlayer`
+## somewhere under the imported root rather than at a fixed path.
+func _find_anim(n: Node) -> AnimationPlayer:
+	if n is AnimationPlayer:
+		return n
+	for c in n.get_children():
+		var found := _find_anim(c)
+		if found:
+			return found
+	return null
 
-## 0..1 through the current stride -- what `_gait_pose` reads, and what the
-## hoofbeats step through, so picture and sound never drift apart.
+## Matches by substring against whatever the pack actually named its clips,
+## and does nothing if that clip is already playing -- called every frame from
+## `_animate`, so restarting it each frame would never let it finish a cycle.
+func _play_anim(prefer: Array) -> void:
+	if _anim == null:
+		return
+	var list := _anim.get_animation_list()
+	if list.is_empty():
+		return
+	for want in prefer:
+		for a in list:
+			if String(a).findn(want) != -1:
+				if _anim.current_animation != a:
+					_anim.play(a)
+				return
+
+## 0..1 through the current stride -- what the hoofbeats step through.
 func stride_phase() -> float:
 	return _stride
 

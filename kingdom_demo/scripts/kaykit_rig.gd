@@ -39,8 +39,15 @@ static var _lib: AnimationLibrary = null
 @export var weapon_scale := 1.0
 @export var target_height := 1.2
 
+## Held frame used as a stand-in seated/mounted pose until the pack gets a real one --
+## see ART_PIPELINE.md's "no seated pose in Rig_Medium" note. `Jump_Idle`'s hang has the
+## most bent-knee, weight-back shape of anything in the library.
+const SEATED_CLIP := "Jump_Idle"
+const SEATED_TIME := 0.35   # tune by eye once screenshotted; placeholder
+
 var body: Node3D = null
 var anim: AnimationPlayer = null
+var _seated := false
 
 func _ready() -> void:
 	body = body_scene.instantiate()
@@ -61,6 +68,23 @@ func play(anim_name: String, blend := 0.15) -> void:
 		return
 	if anim.current_animation != anim_name:
 		anim.play(anim_name, blend)
+
+## Freezes on a held frame that reads as roughly seated -- there is no seated/mount clip
+## in this pack. Idempotent like `play()`; calling this repeatedly is free.
+func sit(clip := SEATED_CLIP, at := SEATED_TIME) -> void:
+	if _seated or not is_instance_valid(anim) or not anim.has_animation(clip):
+		return
+	anim.play(clip)
+	anim.seek(at, true)
+	anim.pause()
+	_seated = true
+
+## Leaves the seated hold, e.g. if this rig is ever reused for a character that dismounts.
+func stand() -> void:
+	if not _seated:
+		return
+	_seated = false
+	play("Idle_A")
 
 func _fit_height() -> void:
 	var box := _combined_aabb(body)
