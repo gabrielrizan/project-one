@@ -88,10 +88,17 @@ const DETAIL_H := Vector2(0.28, 0.7)
 const STUMP_H := Vector2(0.5, 0.95)
 const LOG_H := Vector2(0.35, 0.6)
 
-## The ground reads as snowfield in winter: its tint lerps toward this. The mesh
+## The ground wears a season's colour by re-tinting the *same* watercolour grain
+## (the winter snowfield is just Grass_01's grain tinted near-white, which is why it
+## reads so well -- the grain does the texturing, the tint does the season). Summer
+## keeps the shipped forest green (`_ground_base`); the rest shift off it. The mesh
 ## material is world_decor's to tint -- day_night_cycle only writes the environment,
 ## never the ground, so there is no second writer to fight (see its gotcha note).
-const SNOW_GROUND := Color(0.86, 0.89, 0.95)
+## Palette: sage → forest → muted gold → snow (GAME_DESIGN north star).
+const SNOW_GROUND := Color(0.86, 0.89, 0.95)     # winter
+const SPRING_GROUND := Color(0.62, 0.80, 0.34)   # bright lime -- new growth
+const SUMMER_GROUND := Color(0.29, 0.49, 0.24)   # deep emerald -- mature foliage
+const AUTUMN_GROUND := Color(0.62, 0.50, 0.26)   # muted gold / olive-brown
 
 ## The ground's hand-painted coat -- the same Voxel Core Lab CC0 pack and the same
 ## two-scale-sample-divided-by-mean trick as `water.gdshader` (see `ground.gdshader`
@@ -140,11 +147,12 @@ func _hook_weather() -> void:
 
 func _on_season_changed(season: int) -> void:
 	_season = season
-	_apply_ground_snow()
+	_apply_ground_season()
 	if is_instance_valid(_turf):
-		# the base ground already whitens for snow (`_apply_ground_snow`); grass
-		# grain showing through it would read as bare ground under snow, wrong
-		_turf.visible = season != WINTER
+		# the grass tufts read as fresh green, so they belong in spring/summer. Under
+		# snow they'd look like bare ground poking through; on the autumn floor they'd
+		# fight the gold. So they show only in the two green seasons.
+		_turf.visible = season == SPRING or season == SUMMER
 	var variant := _variant_for(season)
 	# Spring and summer are both green: only re-grow when the coat actually changes,
 	# so an ordinary spring->summer tick costs nothing.
@@ -307,13 +315,26 @@ func _mean_of(tex: Texture2D) -> Vector3:
 	var c := img.get_pixel(0, 0)
 	return Vector3(maxf(c.r, 0.02), maxf(c.g, 0.02), maxf(c.b, 0.02))
 
-func _apply_ground_snow() -> void:
+## Re-tint the ground grain for the current season. Summer keeps the shipped forest
+## green; spring is a fresher sage, autumn a muted gold, winter a near-white snow --
+## each visibly its own season while the (clean Grass_01) grain does the texturing.
+func _apply_ground_season() -> void:
 	if _ground_mat == null:
 		return
-	if _season == WINTER:
-		_ground_mat.set_shader_parameter("tint", _ground_base.lerp(SNOW_GROUND, 0.78))
-	else:
-		_ground_mat.set_shader_parameter("tint", _ground_base)
+	var c := _ground_tint_for(_season)
+	_ground_mat.set_shader_parameter("tint", c)
+	# temporary: confirms the per-season tint path actually fires on F6 -- remove once
+	# spring/summer/autumn/winter are all reading distinctly on screen.
+	print("[decor] season %d ground tint (%.2f, %.2f, %.2f)" % [_season, c.r, c.g, c.b])
+
+func _ground_tint_for(season: int) -> Color:
+	if season == SUMMER:
+		return _ground_base   # keeps the shipped forest green -- see comment block
+	if season == AUTUMN:
+		return AUTUMN_GROUND
+	if season == WINTER:
+		return _ground_base.lerp(SNOW_GROUND, 0.78)
+	return _ground_base.lerp(SPRING_GROUND, 0.78)   # bright lime, blended with the base
 
 # ---------------------------------------------------------------- helpers
 

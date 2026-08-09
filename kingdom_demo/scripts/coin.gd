@@ -9,8 +9,13 @@ const BOB_SPEED := 3.0
 const BOB_HEIGHT := 0.07
 const SPIN_SPEED := 1.9   # radians/sec; a real turn now that it's a model
 const MAGNET_RANGE := 1.5
-const MAGNET_TIME := 0.16
-const SCOOP_TIME := 0.2
+## The pickup/scoop are a graceful lofted hop now, not an instant slide, so they
+## read as the coin being carried up and set into place. Slower than before on
+## purpose -- the arc is the point.
+const MAGNET_TIME := 0.42
+const SCOOP_TIME := 0.34
+## How high the coin lofts on its way to the purse -- the apex of the parabola.
+const ARC_HEIGHT := 0.9
 const VALUE := 1
 
 ## The same coins-in-cloth takes the tally spends out of -- see `_purse_sound`.
@@ -80,18 +85,61 @@ func _fly_to(target: Node3D, duration: float, bank: bool) -> void:
 	set_deferred("monitoring", false)
 	if _pop and _pop.is_valid():
 		_pop.kill()
-	var dest: Vector3 = target.global_position + Vector3(0, (0.9 if bank else 1.25), 0)
-	var t := create_tween()
-	t.tween_property(self, "global_position", dest, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	t.parallel().tween_property(model, "scale", (_base_scale * 1.4 if bank else Vector3.ZERO), duration)
-	t.tween_callback(_bank_it if bank else queue_free)
+	var start := global_position
+	var lift := 0.9 if bank else 1.25
+	# A parabolic hop that homes on the (moving) target every step, so the coin is
+	# visibly lofted and set down into the purse rather than sliding straight in.
+	var flight := create_tween()
+	flight.tween_method(_arc.bind(target, start, lift), 0.0, 1.0, duration) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# a couple of quick turns on the way -- a small flourish
+	flight.parallel().tween_property(model, "rotation:y",
+		model.rotation.y + TAU * 2.0, duration).set_trans(Tween.TRANS_SINE)
+	flight.tween_callback(_bank_it if bank else queue_free)
+	# scale: swell as it lofts, then tuck away as it lands in place
+	var sc := create_tween()
+	if bank:
+		sc.tween_property(model, "scale", _base_scale * 1.5, duration * 0.45) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		sc.tween_property(model, "scale", _base_scale * 0.05, duration * 0.55) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	else:
+		sc.tween_property(model, "scale", _base_scale * 0.05, duration) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+
+## One point along the lofted flight: lerp toward the target's *current* spot (so it
+## tracks a walking monarch) and add a clean parabola on top, apex at mid-flight.
+func _arc(p: float, target: Node3D, start: Vector3, lift: float) -> void:
+	if not is_instance_valid(target):
+		return
+	var dest: Vector3 = target.global_position + Vector3(0, lift, 0)
+	var pos := start.lerp(dest, p)
+	pos.y += sin(p * PI) * ARC_HEIGHT
+	global_position = pos
 
 func _bank_it() -> void:
 	var game_manager := get_tree().get_first_node_in_group("game_manager")
 	if game_manager:
 		game_manager.add_coins(VALUE)
 	_purse_sound()
+	_sparkle(global_position)
 	queue_free()
+
+## A little catch-of-light where the coin lands in the purse -- gold motes that lift
+## and fade. Parented to the scene, since the coin frees itself this frame.
+func _sparkle(at: Vector3) -> void:
+	if not is_inside_tree():
+		return
+	for i in range(4):
+		var s := MarkFx.particle(MarkFx.CHIP_TEX, 0.02)
+		s.modulate = Color(1.9, 1.55, 0.5, 1.0)   # gold, a touch over-bright so it glints
+		get_tree().current_scene.add_child(s)
+		s.global_position = at + Vector3(randf_range(-0.12, 0.12), randf_range(0.0, 0.2), randf_range(-0.12, 0.12))
+		var up := s.global_position + Vector3(randf_range(-0.2, 0.2), randf_range(0.35, 0.6), randf_range(-0.2, 0.2))
+		var t := s.create_tween()
+		t.tween_property(s, "global_position", up, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(s, "modulate:a", 0.0, 0.45)
+		t.tween_callback(s.queue_free)
 
 ## Gold going *into* the purse, using the same coins-in-cloth clips the tally
 ## spends out of -- one material for one substance. Pitched down and quieter than

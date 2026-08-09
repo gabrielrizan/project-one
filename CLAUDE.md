@@ -869,8 +869,9 @@ pops, because intensity ramps up from zero through the gathering phase.
 odds. **Winter is still dry** (snow is a look, not precipitation yet). Seasons now carry a
 **visual identity** (2026-08-02): `weather.gd` fires a **`season_changed(season)`** signal,
 and the world re-skins off it — `world_decor.gd` re-grows its forest, rocks and bushes in
-the season's coat (green in spring/summer, **autumn** colours, **snow-laden** in winter,
-plus a whitened ground), harvestable trees (`tree_resource.gd`) swap their trunk to match,
+the season's coat (green in spring/summer, **autumn** colours, **snow-laden** in winter) and
+**re-tints the watercolour ground per season** (sage → forest → gold → snow, over the same
+Grass_01 grain), harvestable trees (`tree_resource.gd`) swap their trunk to match,
 and `wildlife.gd` thins game hard in winter. All the scenery is the imported **nature-pack**
 (`assets/nature-pack/FBX`), planted through **`NaturePack`** (`nature_pack.gd`), which
 auto-scales each raw FBX to a target height by its own bounding box — so model size is one

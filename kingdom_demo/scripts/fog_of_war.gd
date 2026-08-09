@@ -55,9 +55,10 @@ const RES := 256
 ## black with the grass, and below anything that stands up, which the group hides.
 const FOG_Y := 0.35
 
-## Repaint/upload rate. Four times a second is imperceptible at a walk and an
-## eightieth of the work of doing it per frame.
-const TICK := 0.25
+## Repaint/upload rate. ~7x a second: fine enough that riding into the frontier
+## melts it away smoothly rather than in visible steps, still a fraction of doing it
+## per frame. The animated shader edge hides what stepping remains.
+const TICK := 0.14
 
 ## How far each kind of revealer sees.
 ##
@@ -67,17 +68,18 @@ const TICK := 0.25
 ## grows rather than only when the player personally goes sightseeing. It also means
 ## a bigger kingdom knows more of its own land, which is the right thing for it to
 ## mean.
-## Tightened from 34/14 after play-testing (Andrei, 2026-08-02). At 34 the monarch
-## unrolled the map faster than he could look at it and the frontier was always
-## somewhere off-screen; 25 keeps it near the edge of frame, so riding somewhere and
-## the map opening are the same motion. The villagers' 15 is now *larger* than a
-## sixth of the monarch's rather than a half of it, which weights the reveal further
-## toward the economy doing it -- see the note above.
-const R_MONARCH := 25.0
-const R_VILLAGER := 15.0
+## Tightened again to 18/12 (Andrei, 2026-08-04): 25 pushed the frontier out near
+## the edge of frame, where it read as a distant wall you could never quite reach --
+## "too far to interact with". At 18 the dark sits close in front of the monarch, so
+## riding toward it visibly rolls it back and the map opens right where you are
+## looking. The soft, wafting shader edge (`fog_of_war.gdshader`) is what keeps that
+## close frontier from looking like a hard stamped circle.
+const R_MONARCH := 18.0
+const R_VILLAGER := 12.0
 
-## A revealer has to move this far before its brush is stamped again.
-const REPAINT_AFTER := 2.5
+## A revealer has to move this far before its brush is stamped again. Small, so the
+## reveal keeps up with a gallop and dissipates smoothly rather than in 2.5 m jumps.
+const REPAINT_AFTER := 1.2
 
 ## True on maps that carry fog. Read straight off the map rather than off a node,
 ## so spawners can ask before this node has readied -- scene order stops mattering.
@@ -249,9 +251,10 @@ func _paint(at: Vector3, radius: float) -> void:
 
 ## A disc of falloff bytes, cached per pixel radius.
 ##
-## Solid to 55% of the radius then eased out, so the frontier is a soft gradient
-## rather than a stamped circle -- overlapping brushes then merge into one shape
-## instead of reading as a chain of coins.
+## Solid only to 30% of the radius then eased out over the remaining 70%, so the
+## frontier is a wide, soft gradient the shader can waft -- overlapping brushes merge
+## into one rolling shape instead of reading as a chain of coins, and riding toward
+## the edge dissipates it gradually rather than snapping a hard disc clear.
 func _brush_for(pr: int) -> PackedByteArray:
 	if _brush.has(pr):
 		return _brush[pr]
@@ -263,7 +266,7 @@ func _brush_for(pr: int) -> PackedByteArray:
 			var dx := float(x - pr)
 			var dy := float(y - pr)
 			var d := sqrt(dx * dx + dy * dy) / float(pr)
-			var v := 1.0 - smoothstep(0.55, 1.0, d)
+			var v := 1.0 - smoothstep(0.30, 1.0, d)
 			b[y * span + x] = int(clampf(v, 0.0, 1.0) * 255.0)
 	_brush[pr] = b
 	return b
